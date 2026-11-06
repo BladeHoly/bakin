@@ -21,7 +21,17 @@ Your music and wallpaper library on your PC (Windows 10 and 11).
 
 The interface is in Spanish and English.
 
-Download: [latest release](https://github.com/BladeHoly/bakin/releases/latest).
+## Download
+
+Windows 10 and 11 (64-bit): the installer of the
+[latest release](https://github.com/BladeHoly/bakin/releases/latest).
+Earlier versions (0.4–0.13), from before the code was opened, are in
+[BladeHoly/bakin-releases](https://github.com/BladeHoly/bakin-releases/releases).
+Installed copies update themselves, after asking.
+
+Releases are built by this repository's public workflow and, once SignPath
+Foundation accepts the project, signed through it: see
+[Open source and code signing](#open-source-and-code-signing).
 
 ## Layout
 
