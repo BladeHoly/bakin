@@ -1,0 +1,356 @@
+# Build Bakin on GitHub-hosted Windows runners and prepare a DRAFT release.
+#
+#   push of a v* tag  -> test, build, (sign), draft release in this repository
+#   workflow_dispatch -> test and build; the draft release only if asked
+#
+# Order of the release path:
+#   1. tests (pytest + cargo test)
+#   2. build the unsigned engine (PyInstaller) and app (tauri build --no-bundle)
+#   3. [SignPath] sign bakin-desktop.exe and the engine's executables
+#   4. bundle the NSIS installer from the (signed) binaries (tauri bundle)
+#   5. [SignPath] sign the installer
+#   6. minisign updater signature over the FINAL installer (tauri signer sign)
+#   7. latest.json + SHA-256, then a draft GitHub release: a human publishes it
+#
+# Steps marked [SignPath] run only when the repository variable
+# SIGNPATH_ENABLED is 'true' (disabled by default, until SignPath Foundation
+# accepts the project). Without them the installer ships unsigned, as today.
+#
+# Secrets (names only; never echo them):
+#   TAURI_SIGNING_PRIVATE_KEY           updater key (content of the .key file)
+#   TAURI_SIGNING_PRIVATE_KEY_PASSWORD  its password
+#   SIGNPATH_API_TOKEN                  SignPath submitter token
+# Variables:
+#   SIGNPATH_ENABLED                    'true' to sign with SignPath
+#   SIGNPATH_ORGANIZATION_ID            SignPath organization id
+name: release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      draft_release:
+        description: 'Also create a draft GitHub release (tag v<version> from tauri.conf.json)'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  PYTHON_VERSION: '3.14'  # the same as the local .venv the releases were built with
+  NODE_VERSION: '24'
+  # PyInstaller is pinned: build-bootloader.ps1 compiles this exact version's
+  # bootloader from source, and build-engine.ps1 checks its hash.
+  PYINSTALLER_VERSION: '6.22.3'
+  SIGNPATH_PROJECT_SLUG: bakin
+  SIGNPATH_POLICY_SLUG: release-signing
+
+defaults:
+  run:
+    shell: pwsh
+
+jobs:
+  test:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Python environment
+        run: |
+          python -m venv .venv
+          .venv\Scripts\python -m pip install --upgrade pip
+          .venv\Scripts\pip install -e ".[test]"
+
+      - name: pytest
+        env:
+          BAKIN_MUTE: '1'
+        run: .venv\Scripts\python -m pytest -q tests
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: desktop/src-tauri
+
+      - name: cargo test
+        working-directory: desktop/src-tauri
+        run: |
+          # tauri-build checks that bundle resources exist; the engine is
+          # not built in this job, so an empty folder stands in for it.
+          New-Item -ItemType Directory -Force engine-dist\bakin-engine | Out-Null
+          cargo test --locked
+
+  build:
+    needs: test
+    runs-on: windows-latest
+    permissions:
+      contents: read
+      actions: read   # SignPath reads the uploaded artifacts of this run
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Version
+        id: version
+        run: |
+          $version = (Get-Content desktop\src-tauri\tauri.conf.json -Raw | ConvertFrom-Json).version
+          if ($env:GITHUB_REF_TYPE -eq 'tag' -and $env:GITHUB_REF_NAME -ne "v$version") {
+            throw "tag $env:GITHUB_REF_NAME does not match tauri.conf.json version $version"
+          }
+          "version=$version" >> $env:GITHUB_OUTPUT
+          Write-Host "Bakin $version"
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Python environment
+        run: |
+          python -m venv .venv
+          .venv\Scripts\python -m pip install --upgrade pip
+          .venv\Scripts\pip install -e . "pyinstaller==$env:PYINSTALLER_VERSION"
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: desktop/src-tauri
+
+      # 2. Unsigned engine and app ------------------------------------------
+      - name: PyInstaller bootloader (compiled from source with MSVC)
+        run: .\packaging\build-bootloader.ps1
+
+      - name: Engine (bakin-engine.exe)
+        run: .\packaging\build-engine.ps1
+
+      - name: Third-party notices for this build
+        # Regenerated from what this run actually bundled; the installer
+        # ships this file.
+        run: .venv\Scripts\python packaging\notices.py
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+
+      - name: npm ci
+        working-directory: desktop
+        run: npm ci
+
+      - name: App (tauri build --no-bundle)
+        working-directory: desktop
+        run: npx tauri build --no-bundle --ci
+
+      # 3. [SignPath] sign the binaries before they go into the installer ---
+      - name: '[SignPath] Stage binaries'
+        if: vars.SIGNPATH_ENABLED == 'true'
+        run: |
+          $stage = Join-Path $env:RUNNER_TEMP 'unsigned'
+          New-Item -ItemType Directory -Force $stage | Out-Null
+          Copy-Item desktop\src-tauri\target\release\bakin-desktop.exe $stage
+          Copy-Item -Recurse desktop\src-tauri\engine-dist\bakin-engine (Join-Path $stage 'bakin-engine')
+
+      - name: '[SignPath] Upload unsigned binaries'
+        id: upload-unsigned-binaries
+        if: vars.SIGNPATH_ENABLED == 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: unsigned-binaries
+          path: ${{ runner.temp }}/unsigned
+          if-no-files-found: error
+
+      - name: '[SignPath] Sign binaries'
+        if: vars.SIGNPATH_ENABLED == 'true'
+        uses: signpath/github-action-submit-signing-request@v3
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ env.SIGNPATH_PROJECT_SLUG }}
+          signing-policy-slug: ${{ env.SIGNPATH_POLICY_SLUG }}
+          artifact-configuration-slug: binaries
+          github-artifact-id: ${{ steps.upload-unsigned-binaries.outputs.artifact-id }}
+          wait-for-completion: true
+          output-artifact-directory: ${{ runner.temp }}/signed
+
+      - name: '[SignPath] Put the signed binaries back'
+        if: vars.SIGNPATH_ENABLED == 'true'
+        run: |
+          $signed = Join-Path $env:RUNNER_TEMP 'signed'
+          Copy-Item -Force (Join-Path $signed 'bakin-desktop.exe') desktop\src-tauri\target\release\bakin-desktop.exe
+          Remove-Item -Recurse -Force desktop\src-tauri\engine-dist\bakin-engine
+          Copy-Item -Recurse (Join-Path $signed 'bakin-engine') desktop\src-tauri\engine-dist\bakin-engine
+          foreach ($exe in 'desktop\src-tauri\target\release\bakin-desktop.exe', 'desktop\src-tauri\engine-dist\bakin-engine\bakin-engine.exe') {
+            $auth = Get-AuthenticodeSignature $exe
+            if ($auth.Status -ne 'Valid') { throw "${exe}: signature is $($auth.Status)" }
+            Write-Host "${exe}: Valid ($($auth.SignerCertificate.Subject))"
+          }
+
+      # 4. NSIS installer from the binaries above ---------------------------
+      - name: Installer (tauri bundle)
+        working-directory: desktop
+        run: |
+          # The updater signature is made in the release job, over the final
+          # (possibly Authenticode-signed) installer, so the bundler must not
+          # make one here: no updater key in this job.
+          $conf = Join-Path $env:RUNNER_TEMP 'bundle.conf.json'
+          '{"bundle":{"createUpdaterArtifacts":false}}' | Set-Content -Encoding utf8NoBOM $conf
+          npx tauri bundle --bundles nsis --ci --config $conf
+
+      - name: Locate installer
+        id: setup
+        run: |
+          $version = '${{ steps.version.outputs.version }}'
+          $setup = "desktop\src-tauri\target\release\bundle\nsis\Bakin_${version}_x64-setup.exe"
+          if (-not (Test-Path $setup)) { throw "missing $setup" }
+          $out = Join-Path $env:RUNNER_TEMP 'installer'
+          New-Item -ItemType Directory -Force $out | Out-Null
+          Copy-Item $setup $out
+          "dir=$out" >> $env:GITHUB_OUTPUT
+          "name=$(Split-Path $setup -Leaf)" >> $env:GITHUB_OUTPUT
+
+      # 5. [SignPath] sign the installer ------------------------------------
+      - name: '[SignPath] Upload unsigned installer'
+        id: upload-unsigned-installer
+        if: vars.SIGNPATH_ENABLED == 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: unsigned-installer
+          path: ${{ steps.setup.outputs.dir }}
+          if-no-files-found: error
+
+      - name: '[SignPath] Sign installer'
+        if: vars.SIGNPATH_ENABLED == 'true'
+        uses: signpath/github-action-submit-signing-request@v3
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ env.SIGNPATH_PROJECT_SLUG }}
+          signing-policy-slug: ${{ env.SIGNPATH_POLICY_SLUG }}
+          artifact-configuration-slug: installer
+          github-artifact-id: ${{ steps.upload-unsigned-installer.outputs.artifact-id }}
+          wait-for-completion: true
+          output-artifact-directory: ${{ runner.temp }}/signed-installer
+
+      - name: '[SignPath] Use the signed installer'
+        if: vars.SIGNPATH_ENABLED == 'true'
+        run: |
+          $name = '${{ steps.setup.outputs.name }}'
+          $signed = Join-Path $env:RUNNER_TEMP "signed-installer\$name"
+          $auth = Get-AuthenticodeSignature $signed
+          if ($auth.Status -ne 'Valid') { throw "installer signature is $($auth.Status)" }
+          Copy-Item -Force $signed (Join-Path '${{ steps.setup.outputs.dir }}' $name)
+          Write-Host "installer: Valid ($($auth.SignerCertificate.Subject))"
+
+      - name: Add the notices next to the installer
+        run: Copy-Item THIRD-PARTY-NOTICES.md '${{ steps.setup.outputs.dir }}'
+
+      - name: Upload installer
+        uses: actions/upload-artifact@v7
+        with:
+          name: bakin-installer
+          path: ${{ steps.setup.outputs.dir }}
+          if-no-files-found: error
+
+  release:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v') || inputs.draft_release
+    runs-on: windows-latest
+    environment: release   # add required reviewers to this environment on GitHub
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: bakin-installer
+          path: ${{ runner.temp }}/release
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Tauri CLI
+        working-directory: desktop
+        run: npm ci --ignore-scripts
+
+      # 6. minisign updater signature over the final installer --------------
+      - name: Updater signature
+        working-directory: desktop
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          $version = '${{ needs.build.outputs.version }}'
+          $setup = Join-Path $env:RUNNER_TEMP "release\Bakin_${version}_x64-setup.exe"
+          if (-not (Test-Path $setup)) { throw "missing $setup" }
+          npx tauri signer sign $setup
+          if ($LASTEXITCODE) { throw 'tauri signer sign failed' }
+          if (-not (Test-Path "$setup.sig")) { throw "missing $setup.sig" }
+
+      # 7. latest.json, SHA-256 and notes -----------------------------------
+      - name: Manifest and notes
+        run: |
+          $version = '${{ needs.build.outputs.version }}'
+          $tag = "v$version"
+          $dir = Join-Path $env:RUNNER_TEMP 'release'
+          $setupName = "Bakin_${version}_x64-setup.exe"
+          $setup = Join-Path $dir $setupName
+          $utf8 = [Text.UTF8Encoding]::new($false)
+
+          $sha256 = (Get-FileHash $setup -Algorithm SHA256).Hash.ToLower()
+          [IO.File]::WriteAllText("$setup.sha256", "$sha256  $setupName`n", $utf8)
+
+          # The updater shows the sections newer than the user's version, so
+          # latest.json carries the whole changelog (as packaging/release.ps1).
+          $notes = (Get-Content CHANGELOG.md -Raw -Encoding utf8) -replace '(?sm)\A.*?(?=^## )', ''
+          $latest = [ordered]@{
+            version   = $version
+            notes     = $notes.Trim()
+            pub_date  = (Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ')
+            platforms = [ordered]@{
+              'windows-x86_64' = [ordered]@{
+                signature = (Get-Content "$setup.sig" -Raw).Trim()
+                url       = "https://github.com/$env:GITHUB_REPOSITORY/releases/download/$tag/$setupName"
+              }
+            }
+          }
+          [IO.File]::WriteAllText((Join-Path $dir 'latest.json'), ($latest | ConvertTo-Json -Depth 5), $utf8)
+
+          $section = ($notes -split '(?m)^(?=## )' | Where-Object { $_ -match "^## v?$([regex]::Escape($version))\b" } | Select-Object -First 1)
+          $body = ($section -replace '^## [^\r\n]*\r?\n', '').Trim() + "`n`n---`n`nSHA-256 de ``$setupName``:`n``$sha256``"
+          [IO.File]::WriteAllText((Join-Path $dir 'notes.md'), $body, $utf8)
+          Write-Host "sha256: $sha256"
+
+      - name: Draft release
+        uses: softprops/action-gh-release@v3
+        with:
+          draft: true
+          tag_name: v${{ needs.build.outputs.version }}
+          target_commitish: ${{ github.sha }}
+          name: Bakin ${{ needs.build.outputs.version }}
+          body_path: ${{ runner.temp }}/release/notes.md
+          fail_on_unmatched_files: true
+          files: |
+            ${{ runner.temp }}/release/Bakin_${{ needs.build.outputs.version }}_x64-setup.exe
+            ${{ runner.temp }}/release/Bakin_${{ needs.build.outputs.version }}_x64-setup.exe.sha256
+            ${{ runner.temp }}/release/latest.json
+            ${{ runner.temp }}/release/THIRD-PARTY-NOTICES.md

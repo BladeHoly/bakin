@@ -1,0 +1,23 @@
+/*
+ * Theme for a transparent window over the operating system's own backdrop (Windows Acrylic or
+ * Mica, macOS vibrancy) in a desktop webview. Glass can only bend what's in the page, not the
+ * desktop behind the window, so there it reads by its tint: denser tints, a firmer rim, a
+ * heavier lift, light ink. <html data-gm-theme="os-backdrop">. Large surfaces read best with
+ * variant="lite" (the blur tier).
+ *
+ * Outside the cascade layers and on :root[…] on purpose: tokensToCss() writes the default tokens
+ * on :root, unlayered, and the theme has to win over them.
+ */
+:root[data-gm-theme='os-backdrop'] {
+  color-scheme: dark;
+  --gm-ink: rgb(255 255 255 / 0.94);
+  --gm-ink-muted: rgb(255 255 255 / 0.66);
+  --gm-tint-light: rgb(255 255 255 / 0.1);
+  --gm-frost-tint: rgb(14 14 22 / 0.45);
+  --gm-highlight-edge: rgb(255 255 255 / 0.4);
+  --gm-lift: 0 8px 28px rgb(0 0 0 / 0.28);
+  --gm-panel-fill: rgb(16 16 24 / 0.42);
+  --gm-panel-rim: inset 0 0 0 0.5px rgb(255 255 255 / 0.18);
+  --gm-chip-fill: rgb(255 255 255 / 0.08);
+  --gm-chip-fill-hover: rgb(255 255 255 / 0.14);
+}

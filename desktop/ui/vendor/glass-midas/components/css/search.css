@@ -1,0 +1,92 @@
+@layer gm-base, gm-components, gm-overrides;
+
+@layer gm-components {
+  /* Search */
+  :where(gm-search) {
+    position: relative;
+    display: block;
+  }
+  :where(.gm-search-field) {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.6rem 1rem;
+    border-radius: var(--gm-radius-pill, 999px);
+  }
+  :where(.gm-search-field svg) {
+    flex: none;
+    width: 1.1rem;
+    height: 1.1rem;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    opacity: 0.7;
+  }
+  :where(.gm-search-field input) {
+    flex: 1;
+    min-width: 0;
+    border: 0;
+    outline: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+  }
+  :where(.gm-search-field input)::placeholder {
+    color: var(--gm-ink-muted);
+  }
+  :where(.gm-search-field input)::-webkit-search-cancel-button {
+    display: none;
+  }
+  :where(.gm-search-field:focus-within) {
+    box-shadow: var(--gm-rim), var(--gm-focus), var(--gm-lift);
+  }
+  :where(.gm-search-field kbd) {
+    padding: 0.1rem 0.45rem;
+    border-radius: var(--gm-radius-sm, 10px);
+    box-shadow: var(--gm-rim);
+    color: var(--gm-ink-muted);
+    font: inherit;
+    font-size: 0.7rem;
+  }
+  :where(.gm-search-results) {
+    position: absolute;
+    top: calc(100% + 0.5rem);
+    left: 0;
+    right: 0;
+    z-index: 10;
+    max-height: min(60vh, 26rem);
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: rgb(255 255 255 / 0.25) transparent;
+    padding: 0.375rem;
+    border-radius: 24px;
+  }
+  :where(.gm-search-results[hidden]) {
+    display: none;
+  }
+  :where(.gm-search-result) {
+    display: flex;
+    flex-direction: column;
+    padding: 0.55rem 0.85rem;
+    border-radius: var(--gm-radius-md, 18px);
+    cursor: pointer;
+  }
+  :where(.gm-search-result[aria-selected='true']) {
+    background: var(--gm-highlight-glow, rgb(255 255 255 / 0.12));
+    box-shadow: var(--gm-rim);
+  }
+  :where(.gm-search-result small) {
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    color: var(--gm-ink-muted);
+  }
+  :where(.gm-search-empty) {
+    margin: 0;
+    padding: 0.55rem 0.85rem;
+    color: var(--gm-ink-muted);
+  }
+}

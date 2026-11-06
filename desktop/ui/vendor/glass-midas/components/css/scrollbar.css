@@ -1,0 +1,52 @@
+@layer gm-base, gm-components, gm-overrides;
+
+@layer gm-components {
+  /*
+ * Scrollbar: the glass thumb takes over from the native bar with a mouse. It should go almost
+ * unnoticed: no rim or shadow (those mark what deserves attention), faint while the page rests,
+ * clear while it scrolls or under the pointer. Touch screens keep their native indicator.
+ */
+  :where(gm-scrollbar) {
+    position: fixed;
+    top: 0;
+    right: 3px;
+    z-index: 100;
+    width: 8px;
+    border-radius: var(--gm-radius-pill, 999px);
+    background: var(--gm-scrollbar-tint, rgb(255 255 255 / 0.22));
+    opacity: 0.35;
+    cursor: grab;
+    touch-action: none;
+    transition:
+      width 0.2s,
+      opacity 0.4s;
+  }
+  :where(gm-scrollbar[active], gm-scrollbar:hover, gm-scrollbar[dragging]) {
+    opacity: 1;
+    transition:
+      width 0.2s,
+      opacity 0.15s;
+  }
+  :where(gm-scrollbar:hover, gm-scrollbar[dragging]) {
+    width: 12px;
+  }
+  :where(gm-scrollbar[dragging]) {
+    cursor: grabbing;
+  }
+  :where(gm-scrollbar[hidden]) {
+    display: none;
+  }
+  @media (pointer: coarse), (hover: none) {
+    :where(gm-scrollbar) {
+      display: none;
+    }
+  }
+  @media (pointer: fine) and (hover: hover) {
+    :where(html:has(gm-scrollbar)) {
+      scrollbar-width: none;
+    }
+    :where(html:has(gm-scrollbar))::-webkit-scrollbar {
+      display: none;
+    }
+  }
+}

@@ -1,0 +1,47 @@
+@layer gm-base, gm-components, gm-overrides;
+
+@layer gm-components {
+  /*
+ * Action bar: what can be done with the items chosen in a list, in the place of the list's
+ * filters while choosing (not stacked under them). A pill with the count and the actions; it
+ * sticks to the top of a scrolling list, so it's dense enough that the list doesn't show
+ * through. Not glass: it sits inside the surface that holds the list.
+ * <div class="gm-actionbar"><strong class="gm-actionbar-count">3 chosen</strong>
+ * <div class="gm-actionbar-actions">…chips… <button class="gm-chip gm-chip-primary">Done</button></div></div>
+ */
+  :where(.gm-actionbar) {
+    position: sticky;
+    top: 0;
+    z-index: 4;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--gm-space-xs, 4px) var(--gm-space-md, 12px);
+    min-height: 2.6rem;
+    padding: 0.25rem 0.3rem 0.25rem var(--gm-space-lg, 16px);
+    border-radius: var(--gm-radius-pill, 999px);
+    background: var(--gm-actionbar-fill, rgb(36 33 50 / 0.94));
+    box-shadow: var(--gm-actionbar-rim, inset 0 0 0 0.5px rgb(255 255 255 / 0.14));
+    color: var(--gm-ink);
+  }
+  :where(.gm-actionbar[hidden]) {
+    display: none;
+  }
+  :where(.gm-actionbar-count) {
+    font-size: var(--gm-text-sm, 0.875rem);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+  :where(.gm-actionbar-actions) {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 2px;
+    margin-left: auto;
+  }
+  :where(.gm-actionbar-actions > .gm-chip) {
+    min-height: 2rem;
+  }
+}

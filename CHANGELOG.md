@@ -1,0 +1,205 @@
+# Novedades de Bakin
+
+Resumen de los cambios de cada versión, la más nueva arriba. Bakin muestra
+desde aquí lo que cambió entre tu versión y la nueva cuando hay una
+actualización. Formato: `## <versión> — <fecha>` y una lista corta.
+
+## 0.13.2 — 2026-11-03
+
+- Configuración ordenada por categorías: General, Apariencia (con las pestañas de arriba), Fondos de pantalla, Música, Atajos (los de cualquier lado y los de la ventana, en una lista), Descargas, Cuentas y Consumo.
+- El vidrio de las tarjetas ya no hace arcos al plegar o desplegar la barra lateral ni al maximizar.
+
+## 0.13.1 — 2026-11-03
+
+- Arriba, Música e Imágenes (antes «Fotos»); con «+» sumas Descargas y Convertir. La búsqueda va centrada y «Descargar» al lado, con el mismo estilo; todo a la misma altura y prolijo también con la ventana angosta.
+- «Descargar» en un solo panel: Fondos, y Música y video (un campo para cualquier enlace, «Me gusta» a mano).
+- Atajos de teclado que andan en cualquier lado (Configuración › General) y «Modo gaming» (Ctrl+Shift+G): la ventana chica arriba de todo y el mouse la atraviesa.
+- La ventana chica: la tarjeta es la portada, con los controles al pasar el mouse; menús y volumen se abren hacia arriba o abajo, sin tapar el tema.
+- La lista de música: ordenas por las columnas, ♥ directo en cada tema, «Baja calidad» junto a Reproducir y Aleatorio. Scroll fluido con listas largas; el suave es opcional (Configuración).
+- «Ajustar encuadre…» antes de poner una foto de fondo, y se recuerda para la rotación.
+- La barra lateral colapsada, prolija; en Imágenes los tags son un botón. Sin el menú del clic derecho ni los atajos del navegador.
+- Más liviano: los diálogos grandes no se trancan con música sonando, y la bandeja no guarda listas viejas.
+
+## 0.13.0 — 2026-11-02
+
+- Poner de fondo: clic derecho en una foto (o «Poner de fondo…» en el visor) y elige el monitor, o todos. Cada monitor recibe una copia a su medida exacta, sin perder calidad.
+- Fondos que rotan solos: en Configuración › Fondos de pantalla, cada monitor puede ir cambiando desde Wallhaven, tus favoritas o una carpeta, cada 5 minutos hasta una vez por día, al azar o en orden, y solo con fotos de su forma. Opcional: claros de día y oscuros de noche, o del color de la portada que suena. Sigue con la ventana cerrada; «Siguiente fondo» y «Pausar» también están en el ícono de la bandeja.
+- En Fotos, nuevos filtros por forma (horizontales, verticales, cuadradas), resolución mínima y color. Cada foto muestra su medida y la que está de fondo lo dice.
+- Wallhaven con tu cuenta (opcional): con tu clave de API ves tus colecciones, también las privadas, y con «Seguir…» Bakin baja lo nuevo de una búsqueda o colección cada tanto. La clave se guarda en el Administrador de credenciales de Windows.
+- Pantalla de bloqueo, donde Windows lo permite, desde el mismo menú.
+- Scroll suave con la rueda del mouse en todas las listas, y el panel de Wallhaven más liviano (miniaturas más chicas y sin trabas al scrollear).
+- Descargas › Colas: la música y el video, los fondos y las conversiones tienen cada uno su cola, con su estado («Espera hasta mañana…») y su botón para pausar o seguir. El límite diario de YouTube solo frena la música y el video; los fondos y las conversiones ya no esperan detrás.
+- Un solo aviso que va sumando («Listo: 5 fondos nuevos») en vez de uno por cada descarga.
+- Más liviano: con la ventana cerrada y nada por bajar, el motor de descargas se cierra solo y vuelve cuando hace falta. En la bandeja con música Bakin usa unos 10 MB.
+
+## 0.11.0 — 2026-11-02
+
+- «Descargar» ahora abre un solo panel con todo: fondos de Wallhaven, pegar un enlace, música o video, tus «Me gusta» de YouTube Music y seguir un canal. Recuerda la última sección que usaste.
+- ¿Música o video? Al elegir formato, Bakin detecta solo qué es el enlace (por el sitio, si solo trae audio o si YouTube lo marca como canción) y elige el preset que corresponde. Si lo cambias, lo recuerda para ese sitio, también para las descargas directas.
+- Modo mínimo, segunda vuelta: tres tamaños (barra, tarjeta con portada grande, o solo el tema) con un botón para cambiarlos, volumen a la vista, y vuelve al mismo lugar y tamaño donde lo dejaste (se puede apagar en Configuración › General). Con «transparente al mouse» pasa solo a mostrar el tema. También se abre desde el menú del ícono en la bandeja.
+- El registro de actividad se recorta solo y nunca pasa de unos 8 MB; su tamaño está en Configuración › Consumo.
+- El motor de descargas es más liviano.
+
+## 0.10.0 — 2026-11-02
+
+- Fondos de Wallhaven: en «Descargar ▾» › «Fondos de Wallhaven…» buscas fondos de pantalla por tags, categoría (general, anime, personas) y orden (los más populares del mes, recientes, al azar…), y eliges para qué pantalla: Bakin detecta tus monitores y muestra solo fondos de su resolución y forma (también los verticales).
+- Las miniaturas tienen la forma de cada fondo; con doble clic (o ⤢) lo ves en grande. Elige los que quieras y «Bajar»: quedan en Fotos, en la colección «Wallhaven», con sus tags para buscarlos. Los que ya tienes aparecen marcados y nunca se bajan dos veces.
+- También puedes pegar un enlace de Wallhaven (un fondo, una búsqueda o una colección pública) y lo baja directo de Wallhaven.
+- Solo contenido apto por defecto; «sketchy» es opcional y nunca se baja contenido NSFW. Bakin respeta los límites de Wallhaven: si pide ir más despacio, la cola espera una hora sola.
+
+## 0.9.4 — 2026-11-01
+
+- Al abrir Bakin ya no se ve por un instante la ventana «desarmada» (diálogos abiertos uno encima del otro y botones sin estilo): se ve el fondo oscuro y enseguida la ventana completa, de una sola vez.
+
+## 0.9.3 — 2026-11-01
+
+- Arreglado: si cambiabas de lista (por ejemplo de Música a Fotos, o a una colección) mientras la anterior todavía cargaba, la nueva quedaba vacía con un «Cargar más» que no hacía nada. Pasaba sobre todo mientras Bakin estaba ocupado con una descarga.
+- Cuando un tema de la cola no se puede bajar, el aviso ahora dice cuál y por qué (por ejemplo, «video no disponible»), en lugar de solo «Ocurrió un error». El botón «Ver» abre el registro de Descargas.
+
+## 0.9.2 — 2026-11-01
+
+- Modo mínimo transparente al mouse: con el botón de la flecha, los clics pasan a lo que está detrás y la barrita queda solo para mirar. Para volver a usarla: clic derecho en el ícono de Bakin en la bandeja › «Modo mínimo: usar el mouse» (o abrir la ventana completa). La primera vez te lo recuerda un aviso.
+- El fondo ya no tiene puntos: quedan solo las luces suaves.
+
+## 0.9.1 — 2026-11-01
+
+- Barra lateral que se achica: ☰ (o Ctrl+B) la deja en una columna de íconos y la lista ocupa casi todo el ancho. Se acuerda.
+- La búsqueda de arriba ahora busca solo en tu biblioteca (Ctrl+K). Para bajar algo está el botón nuevo «Descargar ▾» (Ctrl+D): pegar un enlace, música o video, tus «Me gusta» de YouTube Music o seguir un canal. Si pegas un enlace en la búsqueda, también te ofrece bajarlo.
+- En Música la primera vista se llama «Todo» (como en Fotos) y cada número aparece una sola vez.
+- Ventanas angostas o monitor vertical: las pestañas pasan a una segunda fila y la barra lateral se abre como un cajón con ☰. La ventana ahora se puede achicar bastante más.
+- Aleatorio con clic derecho: totalmente al azar, inteligente (más favoritas y temas que hace rato no suenan, nunca el mismo artista seguido) o por álbum (álbumes enteros, en orden). El botón muestra cuál está activo.
+- Modo mínimo (⧉ en el reproductor, o la tecla N): solo la barrita de música en una ventana chica, con portada, avance, ⏮ ⏯ ⏭ y la rueda del mouse para el volumen. El 📌 la pone siempre encima, normal o siempre debajo (sobre el escritorio). ⤢ vuelve a la ventana completa.
+- Fondo nuevo: ya no es negro liso, sino un dibujo suave en los colores de Bakin, que se dibuja una sola vez (no gasta mientras usas Bakin). En Configuración > General puedes hacer que tome el color de la portada del tema que suena.
+
+## 0.8.0 — 2026-11-01
+
+- Fotos y Música separadas: dos espacios arriba (Fotos · Música · Descargas · Convertir). En Fotos están tus perfiles y carpetas de fotos; en Música, las vistas, mixes, playlists y tus carpetas de música. Cada uno recuerda su búsqueda y filtros.
+- Interfaz más compacta: barra lateral, tarjetas, filas y reproductor más chicos, con la misma información.
+- «Eliminadas» abre al instante aunque tengas cientos de archivos (antes tardaba unos segundos).
+- Configuración (el ⚙ junto a la búsqueda): todos los ajustes en un solo lugar, sin repetirse, en General, Música, Descargas y Consumo. En Consumo ves cuánta memoria usa Bakin de verdad, sumando todo lo que tiene abierto.
+- La barra de Descargas ahora es un resumen (sesión, carpeta, preset, límite) con un acceso a sus ajustes.
+- El ⚙ del reproductor ahora es el temporizador; los segundos de ⏮ ⏭ y el fundido están en Configuración > Música.
+- La cola ahora es una lista más en Música («Cola»): el tema que suena primero y lo que sigue, con portadas; clic en un tema para saltar ahí. El botón de cola del reproductor la abre.
+- Clic en la portada o el título del reproductor (o la tecla L): te lleva al tema en la lista que estás viendo y lo resalta; si no está ahí, abre la Cola.
+- Las listas de música cargan bastante más rápido (portadas más livianas).
+- Arreglado: la barra de selección era casi transparente y se mezclaba con la lista; ahora es sólida, el encabezado de columnas queda debajo y sus botones pasan a una segunda fila si no entran.
+
+## 0.7.1 — 2026-11-01
+
+- Los botones ⏮ ⏭ ahora hacen dos cosas: clic para atrasar o adelantar unos segundos (5, 10, 15 o 30, en Reproducción) y clic derecho para cambiar de tema. Las flechas ← → usan los mismos segundos.
+- Barras de posición y volumen más finas, con un indicador más chico; al pasar el mouse por la barra ves el tiempo exacto.
+- En el Administrador de tareas el motor de Bakin aparece con su ícono como «Bakin (motor)».
+
+## 0.7.0 — 2026-11-01
+
+- La música ahora la reproduce Bakin por dentro, sin depender de la ventana: cerrar o abrir la ventana nunca corta ni recarga nada. Un tema sigue al otro sin silencio, y el fundido entre temas es más suave.
+- Las teclas multimedia del teclado y el control de música de Windows (volumen, pantalla de bloqueo) muestran el tema y su portada.
+- Si no hay salida de audio (por ejemplo, auriculares Bluetooth apagados), Bakin avisa y empieza a sonar solo cuando aparece; si se desconectan a mitad de un tema, pausa y sigue cuando vuelven.
+- Bakin en la bandeja casi no ocupa memoria: 20 segundos después de cerrar la ventana, la ventana se cierra de verdad (la música y las descargas siguen). Con música sonando pasó de unos 450 MB a unos 60 MB; al abrir Bakin la ventana vuelve como estaba.
+- Mientras la ventana está cerrada, Bakin igual avisa cuando termina o se pausa la cola, y guarda los enlaces que copies o abras para ofrecértelos al volver.
+- Se quitó la velocidad de reproducción.
+
+## 0.6.3 — 2026-11-01
+
+- Vista previa nueva: la foto ocupa todo el espacio, con los controles encima (♥, detalles, cerrar, anterior y siguiente) que se esconden solos si no mueves el mouse. Los detalles y los tags se abren con el botón ⓘ (o la tecla I).
+- Arreglado: en la vista previa la foto podía salirse del recuadro y cambiaba de tamaño de golpe al pasar a la siguiente.
+- Arreglado: al bajar y volver a subir por la biblioteca las fotos y portadas parpadeaban como si se recargaran.
+- Música favorita: ♥ en el reproductor (o la tecla F) y «Favoritas» en Música.
+- Las listas de música en grilla usan tarjetas cuadradas, como sus portadas.
+
+## 0.6.2 — 2026-11-01
+
+- Arreglado: al volver a Bakin después de un rato en la bandeja, la ventana podía recargarse (y perderse la cola o lo que estabas viendo) o la música se detenía sola. Se quitó el «reposo» de la 0.6.1; la memoria en segundo plano se va a bajar con un reproductor propio que no depende de la ventana.
+
+## 0.6.1 — 2026-11-01
+
+- Bakin en la bandeja ocupa mucha menos memoria: 15 segundos después de cerrar la ventana, la vista descansa (suelta las imágenes y la memoria gráfica) y la música sigue sonando. En nuestras pruebas pasó de unos 450 MB a unos 20 MB; al abrir la ventana vuelve todo como estaba.
+
+## 0.6.0 — 2026-11-01
+
+Bakin Música, primera parte.
+
+- Reproductor: toca un tema y suena la lista que estás viendo, desde ese tema. Barra abajo con portada, aleatorio, anterior, siguiente, repetir (todo o un tema), posición y volumen. Sigue sonando con la ventana cerrada (desde la bandeja) y retoma donde lo dejaste al abrir Bakin.
+- Cola: «Reproducir» y «Agregar a la cola» (suena a continuación) desde la selección; en la cola ves lo que sigue, lo puedes saltar o quitar.
+- Sin silencios entre temas, o fundido de 1 a 12 segundos. Temporizador para dormir, velocidad, atajos de teclado, y las teclas multimedia y el control de volumen de Windows.
+- Música en la biblioteca: Canciones, Artistas, Álbumes, Más escuchadas, Escuchadas hace poco, Agregadas hace poco y Nunca escuchadas.
+- Playlists normales (eliges los temas) e inteligentes (por reglas: artista, duración, veces escuchada, agregada hace…), que se exportan como .m3u8 para otros reproductores o el celular.
+- Mixes armados con tu propia biblioteca: Mix del día, Favoritas olvidadas, Para redescubrir y la radio de tus artistas más escuchados. Se llenan a medida que escuchas.
+- Un tema mejorado (MP3 → OPUS) conserva sus reproducciones y su lugar en las playlists.
+
+## 0.5.2 — 2026-10-31
+
+- Arreglado: con cientos de archivos, la grilla de la biblioteca se salía del panel.
+- Las actualizaciones ya no esperan a que se vacíe la cola: solo frena si hay una descarga bajándose en ese momento. La cola se guarda y sigue después de actualizar.
+- Aviso de cookies vencidas: en «Música y video» ves hasta cuándo valen tus cookies de YouTube, y si dejan de servir (YouTube las renueva) Bakin te avisa para que exportes un cookies.txt nuevo. También avisa si un preset usa cookies de Brave, Chrome o Edge, que Windows no deja leer.
+- La biblioteca se mueve más liviana con miles de archivos: solo dibuja lo que está cerca de la pantalla.
+
+## 0.5.1 — 2026-10-31
+
+- Portadas en la música: la biblioteca muestra la carátula de cada tema (en la lista y en la grilla, entera y nítida), y las carpetas de música también tienen portada.
+- Al elegir temas de una playlist ves la miniatura de cada uno.
+- Arreglado: en «Extensión del navegador» el marcador ya no queda tapado por el botón «Copiar».
+
+## 0.5.0 — 2026-10-31
+
+- Pestaña «Convertir»: imágenes a JPG, PNG, WebP o AVIF; audio a MP3, M4A, OPUS, FLAC, OGG o WAV; video a MP4, WebM, MKV o GIF, o solo su audio. Arrastra archivos a la ventana o elígelos en la biblioteca. Siempre crea archivos nuevos: los originales no se tocan.
+- Biblioteca de música: con el filtro «Audio» ves una lista con título, artista, álbum, duración y calidad, ordenable por cualquier columna, y un filtro de «Baja calidad».
+- «Mejorar calidad…»: vuelve a bajar desde YouTube tus temas viejos (por ejemplo MP3) en OPUS u otro formato. El viejo va a la Papelera solo cuando el nuevo ya está guardado, y si el video ya no existe tu archivo queda como estaba.
+- Presets incluidos: Música, Me gusta de YouTube Music, Playlist o álbum en orden, MP3 compatible, Video y Video para compartir. En la búsqueda aparece «Bajar mis Me gusta de YouTube Music».
+- Las carpetas de tus presets de música y video aparecen solas en la biblioteca.
+- Cookies: si Brave está abierto y bloquea sus cookies, Bakin sigue sin ellas y te avisa, en lugar de reintentar sin sentido. Las listas privadas como «Me gusta» ahora activan las cookies en modo «Solo si el sitio lo pide».
+- Los avisos ya no quedan tapados por los diálogos.
+- Bakin trabaja en segundo plano: si hay algo en cola, al cerrar la ventana queda en la bandeja (junto al reloj) y sigue. Desde ahí se abre, se pausa o se cierra. Opción de iniciar con Windows.
+- La cola se guarda: si cierras Bakin o reinicias la PC, sigue donde quedó.
+- Límite diario de descargas de música y video: al llegar, se pausa y sigue sola al día siguiente.
+- Si YouTube frena («confirma que no eres un bot»), la cola se pausa y reintenta sola unas horas después, sin usar tu cuenta para esquivarlo.
+- «Me gusta» de YouTube Music: se lee la lista una vez con tus cookies y cada canción se baja sin usar tu cuenta (salvo las +18).
+- Cookies: Bakin explica que Brave, Chrome y Edge cifran sus cookies y yt-dlp no puede leerlas en Windows; usa un cookies.txt o Firefox.
+- Analizar antes de bajar: al pegar un enlace ves título, duración, mejor calidad, capítulos y subtítulos; en una playlist eliges qué temas con casillas («Solo nuevos» marca lo que te falta).
+- Bajar solo un tramo de un video, un archivo por capítulo, y subtítulos dentro del video.
+- Avisos de Windows cuando termina la cola o se pausa.
+- Extensión «Descargar con Bakin» para Brave, Chrome, Edge y Firefox (botón y clic derecho), enlaces bakin:// y un marcador para usar sin extensión. Siempre te pide confirmar antes de bajar.
+- Vigilar el portapapeles (opcional): si copias un enlace, Bakin ofrece descargarlo.
+- Seguir canales y playlists: Bakin los revisa cada tanto y baja solo lo nuevo, aunque la ventana esté cerrada.
+- Horario de descargas: por ejemplo, solo de noche.
+
+## 0.4.1 — 2026-10-31
+
+- Arreglado: «Presets…», «Herramientas» y el selector de preset no respondían, y el orden de la biblioteca no cambiaba.
+- Arreglado: al abrir Bakin, consultar la versión de yt-dlp podía quedar colgado y dejar sin cargar la música y el video.
+
+## 0.4.0 — 2026-10-31
+
+- Música y video: pega cualquier enlace que soporte yt-dlp (YouTube, SoundCloud, Twitch…) y elige el formato antes de bajar: MP3, M4A, OPUS, FLAC, OGG, WAV u original, o video con resolución máxima.
+- Presets como los de tu script: carpeta, nombre de archivo, SponsorBlock, pausas, límite de velocidad, rango de playlist y registro anti-duplicados. Se pueden importar los presets del script.
+- Cookies opcionales para contenido con restricción de edad, privado o de miembros: desde Brave u otro navegador, o desde un cookies.txt. Bakin no las guarda.
+- Bakin baja y mantiene al día yt-dlp, ffmpeg y Deno, comprobando sus checksums oficiales.
+- «Registrar lo que ya tengo» y re-descarga de los videos que quedaron en MP4 en carpetas de audio.
+- Las carpetas de música y video aparecen en la biblioteca.
+- Los datos de Bakin se mudaron a su propia carpeta (BakinData), separada de la de instalación.
+- El instalador ya no lo marca Windows Defender como virus (era un falso positivo).
+
+## 0.3.0 — 2026-10-31
+
+- La biblioteca es ahora lo primero que ves: todo lo descargado en una sola vista, con «Descargas» en la otra pestaña.
+- Puedes sumar carpetas tuyas a la biblioteca, con fotos, videos, audio y cualquier otro archivo; Bakin no escribe nada en ellas.
+- Favoritas (♥), tags y filtros por colección, tipo, tags y nombre, con varios órdenes.
+- Selección de varios archivos (también con Ctrl o Mayús + clic y Ctrl + A) para marcarlos como favoritos, etiquetarlos o eliminarlos.
+- Eliminar manda a la Papelera de Windows y se puede deshacer; en «Eliminadas» puedes restaurar.
+- Visor con la imagen a tamaño completo, videos y audio, y anterior/siguiente con las flechas.
+
+## 0.2.0 — 2026-10-31
+
+- Actualizaciones: Bakin avisa cuando hay una versión nueva, con lo que cambió, y se actualiza con un clic (nunca durante una descarga).
+- La versión instalada se ve junto al nombre; un clic muestra estas novedades.
+- Cambiar la carpeta de descargas pregunta si mover allí lo ya descargado. Se puede deshacer y volver a la carpeta anterior.
+- Cola de descargas: varios enlaces a la vez, quitar los que esperan, «Actualizar todos» en la biblioteca. Si un sitio pide parar, la cola se pausa.
+- «Mejorar fotos»: si hoy hay una versión mayor de una foto guardada, se baja y la anterior queda en «anteriores».
+- «Desde»: descargar solo lo publicado a partir de una fecha.
+- Más seguro: un perfil no se descarga dos veces a la vez y una foto guardada justo antes de un corte no se duplica.
+
+## 0.1.0 — 2026-10-31
+
+- Primera versión de escritorio.
+- Inicio de sesión dentro de la app; la sesión se guarda en el Administrador de credenciales de Windows.
+- Biblioteca con lo ya descargado e informe de calidad por sesión.

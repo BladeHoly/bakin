@@ -1,0 +1,185 @@
+@layer gm-base, gm-components, gm-overrides;
+
+@layer gm-components {
+  /*
+ * Steps: where a process is, as a track. <ol class="gm-steps"><li data-state="done">Ordered
+ * <small>Oct 21</small></li><li aria-current="step">Shipped</li><li>Delivered</li></ol>.
+ * Done steps and the line up to the current one fill with the ink; the current one is ringed.
+ * Across by default; data-orientation="vertical" stacks them, and so does a narrow screen.
+ */
+  :where(.gm-steps) {
+    --gm-steps-dot: 0.8rem;
+    --gm-steps-line: color-mix(in srgb, var(--gm-ink) 20%, transparent);
+    --gm-steps-on: var(--gm-steps-fill, var(--gm-ink));
+    display: grid;
+    grid-auto-columns: 1fr;
+    grid-auto-flow: column;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  :where(.gm-steps > li) {
+    position: relative;
+    display: grid;
+    align-content: start;
+    gap: 0.15rem;
+    padding: calc(var(--gm-steps-dot) + var(--gm-space-sm, 8px)) var(--gm-space-sm, 8px) 0 0;
+    color: var(--gm-ink-muted);
+    font-size: var(--gm-text-sm, 0.875rem);
+  }
+  :where(.gm-steps > li[data-state='done'], .gm-steps > li[aria-current]) {
+    color: var(--gm-ink);
+  }
+  :where(.gm-steps > li[aria-current]) {
+    font-weight: 600;
+  }
+  :where(.gm-steps small) {
+    color: var(--gm-ink-muted);
+    font-size: var(--gm-text-xs, 0.75rem);
+    font-weight: 400;
+  }
+  /* The line, from this dot to the next. */
+  :where(.gm-steps > li:not(:last-child))::before {
+    content: '';
+    position: absolute;
+    top: calc(var(--gm-steps-dot) / 2 - 1px);
+    left: calc(var(--gm-steps-dot) + 3px);
+    right: 3px;
+    height: 2px;
+    background: var(--gm-steps-line);
+  }
+  :where(.gm-steps > li[data-state='done']:not(:last-child))::before {
+    background: var(--gm-steps-on);
+  }
+  /* The dot: hollow ahead, filled when done, ringed where we are. */
+  :where(.gm-steps > li)::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: var(--gm-steps-dot);
+    height: var(--gm-steps-dot);
+    border-radius: var(--gm-radius-pill, 999px);
+    background: var(--gm-steps-bg, transparent);
+    box-shadow: inset 0 0 0 2px var(--gm-steps-line);
+  }
+  :where(.gm-steps > li[data-state='done'])::after {
+    background: var(--gm-steps-on);
+    box-shadow: none;
+  }
+  :where(.gm-steps > li[aria-current])::after {
+    background: var(--gm-steps-on);
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--gm-steps-on) 25%, transparent);
+  }
+  :where(.gm-steps > li[data-state='problem'])::after {
+    background: var(--gm-status-danger, rgb(255 110 110));
+    box-shadow: none;
+  }
+
+  :where(.gm-steps[data-orientation='vertical']) {
+    grid-auto-flow: row;
+    gap: var(--gm-space-lg, 16px);
+  }
+  :where(.gm-steps[data-orientation='vertical'] > li) {
+    padding: 0 0 0 calc(var(--gm-steps-dot) + var(--gm-space-md, 12px));
+  }
+  :where(.gm-steps[data-orientation='vertical'] > li:not(:last-child))::before {
+    top: calc(0.25em + var(--gm-steps-dot) + 3px);
+    bottom: calc(3px - var(--gm-space-lg, 16px) - 0.25em);
+    left: calc(var(--gm-steps-dot) / 2 - 1px);
+    right: auto;
+    width: 2px;
+    height: auto;
+  }
+  :where(.gm-steps[data-orientation='vertical'] > li)::after {
+    top: 0.25em;
+  }
+  @media (max-width: 36rem) {
+    :where(.gm-steps:not([data-orientation='horizontal'])) {
+      grid-auto-flow: row;
+      gap: var(--gm-space-lg, 16px);
+    }
+    :where(.gm-steps:not([data-orientation='horizontal']) > li) {
+      padding: 0 0 0 calc(var(--gm-steps-dot) + var(--gm-space-md, 12px));
+    }
+    :where(.gm-steps:not([data-orientation='horizontal']) > li:not(:last-child))::before {
+      top: calc(0.25em + var(--gm-steps-dot) + 3px);
+      bottom: calc(3px - var(--gm-space-lg, 16px) - 0.25em);
+      left: calc(var(--gm-steps-dot) / 2 - 1px);
+      right: auto;
+      width: 2px;
+      height: auto;
+    }
+    :where(.gm-steps:not([data-orientation='horizontal']) > li)::after {
+      top: 0.25em;
+    }
+  }
+
+  /*
+ * Timeline: what happened, newest first or oldest first, each with when.
+ * <ol class="gm-timeline"><li><time datetime="…">Oct 21, 14:02</time><p>Paid with a card</p></li>
+ * </ol>. A thin rail joins the dots; data-tone colors a dot that means something (a refund, a
+ * problem) and a note in .gm-timeline-note reads as quoted.
+ */
+  :where(.gm-timeline) {
+    display: grid;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  :where(.gm-timeline > li) {
+    --gm-timeline-tone: var(--gm-ink-muted);
+    position: relative;
+    display: grid;
+    gap: 0.2rem;
+    padding: 0 0 var(--gm-space-lg, 16px) calc(0.6rem + var(--gm-space-md, 12px));
+    color: var(--gm-ink);
+    font-size: var(--gm-text-sm, 0.875rem);
+  }
+  :where(.gm-timeline > li:not(:last-child))::before {
+    content: '';
+    position: absolute;
+    top: 0.9em;
+    bottom: -0.25em;
+    left: calc(0.3rem - 0.5px);
+    width: 1px;
+    background: color-mix(in srgb, var(--gm-ink) 20%, transparent);
+  }
+  :where(.gm-timeline > li)::after {
+    content: '';
+    position: absolute;
+    top: 0.4em;
+    left: 0;
+    width: 0.6rem;
+    height: 0.6rem;
+    border-radius: var(--gm-radius-pill, 999px);
+    background: var(--gm-timeline-tone);
+  }
+  :where(.gm-timeline > li[data-tone='success']) {
+    --gm-timeline-tone: var(--gm-status-success, rgb(90 210 150));
+  }
+  :where(.gm-timeline > li[data-tone='warning']) {
+    --gm-timeline-tone: var(--gm-status-warning, rgb(255 196 90));
+  }
+  :where(.gm-timeline > li[data-tone='danger']) {
+    --gm-timeline-tone: var(--gm-status-danger, rgb(255 110 110));
+  }
+  :where(.gm-timeline > li[data-tone='info']) {
+    --gm-timeline-tone: var(--gm-status-info, rgb(120 170 255));
+  }
+  :where(.gm-timeline time) {
+    color: var(--gm-ink-muted);
+    font-size: var(--gm-text-xs, 0.75rem);
+    font-variant-numeric: tabular-nums;
+  }
+  :where(.gm-timeline p) {
+    margin: 0;
+  }
+  :where(.gm-timeline-note) {
+    margin-top: var(--gm-space-xs, 4px);
+    padding: var(--gm-space-sm, 8px) var(--gm-space-md, 12px);
+    border-radius: var(--gm-radius-sm, 10px);
+    background: var(--gm-chip-fill, rgb(255 255 255 / 0.1));
+    color: var(--gm-ink);
+  }
+}

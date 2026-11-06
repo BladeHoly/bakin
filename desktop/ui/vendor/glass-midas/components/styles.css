@@ -1,0 +1,3545 @@
+/*
+ * glass-midas components: the base every component sheet needs. Custom properties only (the core
+ * tokens, --gm-<group>-<name>, and the component ones below), inside :where(), in cascade layers:
+ * base, then components, then overrides (focus, reduced motion), whatever order the sheets load
+ * in. Any CSS of yours outside a layer wins over all of it.
+ */
+@layer gm-base, gm-components, gm-overrides;
+
+@layer gm-base {
+  :where(:root) {
+    --gm-ink: rgb(255 255 255 / 0.94);
+    --gm-ink-muted: rgb(255 255 255 / 0.66);
+    /* What reads on a fill of the ink: marks on a checked box, text on a primary chip. */
+    --gm-ink-inverse: rgb(14 14 20);
+    --gm-rim: inset 0 0 0 0.5px var(--gm-highlight-edge, rgb(255 255 255 / 0.55));
+    --gm-lift: 0 8px 28px rgb(0 0 0 / 0.18);
+    --gm-focus: 0 0 0 2px rgb(255 255 255 / 0.85);
+    --gm-callout-note: var(--gm-status-info, rgb(120 170 255));
+    --gm-callout-tip: var(--gm-status-success, rgb(90 210 150));
+    --gm-callout-caution: var(--gm-status-warning, rgb(255 196 90));
+    --gm-callout-danger: var(--gm-status-danger, rgb(255 110 110));
+    --gm-frost-tint: var(--gm-tint-dark, rgb(20 20 28 / 0.32));
+    --gm-chip-fill: rgb(255 255 255 / 0.1);
+    --gm-chip-fill-hover: rgb(255 255 255 / 0.16);
+    --gm-chip-fill-on: rgb(255 255 255 / 0.22);
+  }
+
+  /* Every surface: a light tint, the hairline rim and a soft lift. */
+  :where(
+    gm-surface,
+    gm-button,
+    gm-callout,
+    gm-code,
+    .gm-tablist,
+    gm-segmented,
+    gm-popover,
+    gm-menu,
+    .gm-dialog-panel,
+    gm-toast,
+    gm-nav,
+    .gm-search-field,
+    .gm-search-results,
+    .gm-tip-card
+  ) {
+    background: var(--gm-tint-light, rgb(255 255 255 / 0.18));
+    box-shadow: var(--gm-rim), var(--gm-lift);
+    color: var(--gm-ink);
+  }
+
+  /* Frost material: a smoke tint under heavy frosting, so what's on the glass always reads. */
+  :where(
+    [material='frost']:not(gm-tabs, gm-search, gm-tip, gm-dialog),
+    gm-dialog[material='frost'] > .gm-dialog-panel,
+    gm-tabs[material='frost'] > .gm-tablist,
+    gm-tip[material='frost'] > .gm-tip-card,
+    gm-search[material='frost'] :is(.gm-search-field, .gm-search-results)
+  ) {
+    background: var(--gm-frost-tint);
+  }
+
+  /* No backdrop effect: an opaque tint keeps text legible. */
+  :where([data-glass-tier='solid']) {
+    background: var(--gm-tint-solid, rgb(28 28 36 / 0.88));
+  }
+
+  /*
+ * Chip: a control inside a glass surface. Not glass itself (glass inside glass can't see the
+ * page), just a light fill. The rim is kept for the one that's on: pressed, selected, current.
+ */
+  :where(.gm-chip) {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5em;
+    min-height: 2.5em;
+    padding: 0.45em 1.1em;
+    border: 0;
+    border-radius: var(--gm-radius-pill, 999px);
+    background: var(--gm-chip-fill);
+    color: var(--gm-ink);
+    font: inherit;
+    text-decoration: none;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+  :where(.gm-chip-plain) {
+    background: none;
+  }
+  :where(.gm-chip:hover) {
+    background: var(--gm-chip-fill-hover);
+  }
+  :where(.gm-chip[aria-pressed='true'], .gm-chip[aria-selected='true'], .gm-chip[aria-current]) {
+    background: var(--gm-chip-fill-on);
+    box-shadow: var(--gm-rim);
+  }
+  /* Primary: the one action a surface is for. The ink as its fill, so it leads without glass. */
+  :where(.gm-chip-primary) {
+    background: var(--gm-chip-primary, var(--gm-ink));
+    color: var(--gm-ink-inverse);
+    font-weight: 600;
+  }
+  :where(.gm-chip-primary:hover) {
+    background: var(
+      --gm-chip-primary-hover,
+      color-mix(in srgb, var(--gm-chip-primary, var(--gm-ink)) 86%, transparent)
+    );
+  }
+  :where(.gm-chip:disabled, .gm-chip[aria-disabled='true']) {
+    opacity: 0.5;
+    cursor: default;
+  }
+  /* Busy: a spinner where the label was, at the same size, while the action runs. */
+  :where(.gm-chip[aria-busy='true']) {
+    position: relative;
+    color: transparent;
+    pointer-events: none;
+  }
+  :where(.gm-chip[aria-busy='true'])::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    width: 1.1em;
+    height: 1.1em;
+    margin: auto;
+    border: 2px solid var(--gm-ink);
+    border-right-color: transparent;
+    border-radius: var(--gm-radius-pill, 999px);
+    animation: gm-spin 0.7s linear infinite;
+  }
+  :where(.gm-chip-primary[aria-busy='true'])::after {
+    border-color: var(--gm-ink-inverse);
+    border-right-color: transparent;
+  }
+  @keyframes gm-spin {
+    to {
+      rotate: 1turn;
+    }
+  }
+  /* Icon only: a circle. */
+  :where(.gm-chip-round) {
+    width: 2.5em;
+    padding: 0;
+  }
+  :where(.gm-chip svg, gm-button svg) {
+    width: 1.25em;
+    height: 1.25em;
+    flex: none;
+  }
+
+  /* Droplet: the moving marker under the selected tab or current link. */
+  :where(.gm-droplet) {
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 0;
+    border-radius: var(--gm-radius-pill, 999px);
+    background: var(--gm-highlight-glow, rgb(255 255 255 / 0.12));
+    box-shadow: var(--gm-rim);
+    pointer-events: none;
+    transform-origin: center;
+  }
+}
+
+@layer gm-overrides {
+  :where(
+    gm-nav a,
+    .gm-tab-button,
+    .gm-segment,
+    .gm-copy,
+    .gm-chip,
+    gm-button > :is(button, a),
+    .gm-tip-close,
+    .gm-toggle,
+    .gm-check,
+    .gm-select-trigger
+  ):focus-visible {
+    outline: 0;
+    box-shadow: var(--gm-focus);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    :where(
+      .gm-copy,
+      .gm-tab-button,
+      .gm-segment,
+      gm-nav a,
+      gm-scrollbar,
+      .gm-dialog-panel,
+      gm-toast,
+      .gm-toggle,
+      .gm-input,
+      .gm-check
+    ) {
+      transition: none;
+    }
+    :where(.gm-toggle, .gm-check)::before,
+    :where(gm-slider input[type='range'])::-webkit-slider-thumb {
+      transition: none;
+    }
+    :where(gm-slider input[type='range'])::-moz-range-thumb {
+      transition: none;
+    }
+  }
+}
+
+@layer gm-base, gm-components, gm-overrides;
+
+@layer gm-components {
+  :where(gm-surface) {
+    display: block;
+    border-radius: var(--gm-radius-lg, 28px);
+    padding: 1.5rem;
+  }
+}
+
+@layer gm-base, gm-components, gm-overrides;
+
+@layer gm-components {
+  /* Button: a glass pill around a native button or link, for actions floating on their own. */
+  :where(gm-button) {
+    display: inline-flex;
+    border-radius: var(--gm-radius-pill, 999px);
+  }
+  :where(gm-button > :is(button, a)) {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.55em;
+    padding: 0.7em 1.3em;
+    border: 0;
+    border-radius: inherit;
+    background: none;
+    color: inherit;
+    font: inherit;
+    text-decoration: none;
+    cursor: pointer;
+  }
+  :where(gm-button > :is(button, a):hover) {
+    background: var(--gm-chip-fill);
+  }
+
+  /* Icon only: a circle. */
+  :where(gm-button[shape='round'] > :is(button, a)) {
+    justify-content: center;
+    width: 2.9em;
+    height: 2.9em;
+    padding: 0;
+  }
+}
+
+@layer gm-base, gm-components, gm-overrides;
+
+@layer gm-components {
+  /* Callout */
+  :where(gm-callout) {
+    --gm-accent: var(--gm-callout-note);
+    display: block;
+    border-radius: var(--gm-radius-md, 18px);
+    padding: 1rem 1.25rem;
+    margin-block: 1.25rem;
+    box-shadow:
+      var(--gm-rim),
+      inset 3px 0 0 var(--gm-accent),
+      var(--gm-lift);
+  }
+  :where(gm-callout[type='tip']) {
+    --gm-accent: var(--gm-callout-tip);
+  }
+  :where(gm-callout[type='caution']) {
+    --gm-accent: var(--gm-callout-caution);
+  }
+  :where(gm-callout[type='danger']) {
+    --gm-accent: var(--gm-callout-danger);
+  }
+  :where(.gm-callout-heading) {
+    margin: 0 0 0.35rem;
+    font-weight: 600;
+    color: var(--gm-accent);
+  }
+  :where(gm-callout > :last-child) {
+    margin-bottom: 0;
+  }
+}
+
+@layer gm-base, gm-components, gm-overrides;
+
+@layer gm-components {
+  /* Code block */
+  :where(gm-code) {
+    position: relative;
+    display: block;
+    border-radius: var(--gm-radius-md, 18px);
+    margin-block: 1.25rem;
+  }
+  :where(gm-code pre) {
+    margin: 0;
+    padding: 1rem 1.25rem;
+    overflow-x: auto;
+    scrollbar-width: thin;
+    scrollbar-color: rgb(255 255 255 / 0.2) transparent;
+    background: none !important;
+    font-size: 0.875rem;
+    line-height: 1.6;
+  }
+  /* The copy button sits on the center of the first line, so a one-line block centers it exactly:
+   1rem of padding, plus half a 0.875rem × 1.6 line (0.7rem), minus half the 1.8rem button. */
+  :where(.gm-copy) {
+    position: absolute;
+    top: 0.8rem;
+    right: 0.6rem;
+    display: grid;
+    place-items: center;
+    width: 1.8rem;
+    height: 1.8rem;
+    padding: 0;
+    border: 0;
+    border-radius: var(--gm-radius-pill, 999px);
+    background: var(--gm-chip-fill, rgb(255 255 255 / 0.1));
+    color: var(--gm-ink-muted);
+    cursor: pointer;
+    opacity: 0;
+    transition:
+      opacity 0.2s,
+      color 0.2s;
+  }
+  :where(.gm-copy:hover) {
+    color: var(--gm-ink);
+  }
+  :where(.gm-copy svg) {
+    width: 1rem;
+    height: 1rem;
+  }
+  /* Copied: the check, and the rim for the moment it confirms. */
+  :where(.gm-copy[data-copied]) {
+    box-shadow: var(--gm-rim);
+    color: var(--gm-callout-tip);
+    opacity: 1;
+  }
+  :where(gm-code:hover .gm-copy, .gm-copy:focus-visible) {
+    opacity: 1;
+  }
+  @media (hover: none) {
+    :where(.gm-copy) {
+      opacity: 1;
+    }
+  }
+}
+
+@layer gm-base, gm-components, gm-overrides;
+
+@layer gm-components {
+  /* Tabs */
+  :where(gm-tabs) {
+    display: block;
+    margin-block: 1.25rem;
+  }
+  :where(gm-tab) {
+    display: block;
+  }
+  :where(gm-tab[hidden]) {
+    display: none;
+  }
+  /* Before the script runs, show only the first tab rather than all of them. */
+  :where(gm-tabs:not(:defined) > gm-tab:not(:first-of-type)) {
+    display: none;
+  }
+  :where(.gm-tablist) {
+    position: relative;
+    display: inline-flex;
+    gap: 0.125rem;
+    padding: 0.25rem;
+    margin-bottom: 0.75rem;
+    border-radius: var(--gm-radius-pill, 999px);
+    /* More tabs than room: the row scrolls sideways instead of widening the page. */
+    max-width: 100%;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  :where(.gm-tab-button) {
+    flex: none;
+    position: relative;
+    z-index: 1;
+    padding: 0.4rem 0.95rem;
+    border: 0;
+    border-radius: var(--gm-radius-pill, 999px);
+    background: none;
+    color: var(--gm-ink-muted);
+    font: inherit;
+    font-size: 0.875rem;
+    cursor: pointer;
+    transition: color 0.2s;
+  }
+  :where(.gm-tab-button[aria-selected='true']) {
+    color: var(--gm-ink);
+  }
+}
+
+@layer gm-base, gm-components, gm-overrides;
+
+@layer gm-components {
+  /* Segmented: one choice among a few, a droplet under the chosen one. */
+  :where(gm-segmented) {
+    position: relative;
+    display: inline-flex;
+    gap: 0.125rem;
+    padding: 0.25rem;
+    border-radius: var(--gm-radius-pill, 999px);
+    vertical-align: middle;
+  }
+  :where(.gm-segment) {
+    position: relative;
+    z-index: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.45em;
+    padding: 0.45rem 1rem;
+    border: 0;
+    border-radius: var(--gm-radius-pill, 999px);
+    background: none;
+    color: var(--gm-ink-muted);
+    font: inherit;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: color 0.2s;
+  }
+  :where(.gm-segment[aria-checked='true']) {
+    color: var(--gm-ink);
+  }
+  :where(.gm-segment svg) {
+    width: 1.15em;
+    height: 1.15em;
+    flex: none;
+  }
+}
+
+@layer gm-base, gm-components, gm-overrides;
+
+@layer gm-components {
+  /*
+ * Popover and menu: frosted glass in the top layer, placed next to the button that opens it.
+ * The browser hides a closed popover; these only reset its default box and lay it out when open.
+ */
+  :where(gm-popover, gm-menu) {
+    margin: 0;
+    inset: auto;
+    padding: 0.75rem;
+    border: 0;
+    border-radius: 18px;
+    overflow: visible;
+    color: var(--gm-ink);
+  }
+  :where(gm-menu) {
+    min-width: 11rem;
+    padding: 0.3rem;
+  }
+  :where(gm-menu:popover-open) {
+    display: flex;
+    flex-direction: column;
+  }
+  :where(gm-menu > :is(button, a)) {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.5rem 0.75rem;
+    border: 0;
+    border-radius: 12px;
+    outline: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    font-size: 0.9rem;
+    text-align: start;
+    text-decoration: none;
+    cursor: pointer;
+  }
+  :where(gm-menu > :is(button, a) svg) {
+    width: 1.1em;
+    height: 1.1em;
+    flex: none;
+    color: var(--gm-ink-muted);
+  }
+  /* A group's name: not an item, the arrow keys skip it. */
+  :where(gm-menu > .gm-menu-label) {
+    display: block;
+    padding: 0.35rem 0.75rem 0.15rem;
+    font-size: var(--gm-text-xs, 0.75rem);
+    color: var(--gm-ink-muted);
+  }
+  :where(gm-menu > hr) {
+    width: calc(100% - 1rem);
+    height: 1px;
+    margin: 0.25rem auto;
+    border: 0;
+    background: var(--gm-chip-fill, rgb(255 255 255 / 0.1));
+  }
+  :where(gm-menu > .gm-droplet) {
+    border-radius: 12px;
+  }
+}
+
+@layer gm-base, gm-components, gm-overrides;
+
+@layer gm-components {
+  /*
+ * Dialog: frosted glass on a native <dialog>, over a dimmed page. It rises in as it opens; with
+ * placement="bottom" it's a sheet along the bottom edge; with "end" or "start", a drawer down a
+ * side (a cart, filters), full height and scrolling inside.
+ */
+  :where(gm-dialog) {
+    display: contents;
+  }
+  /* --gm-dialog-width sets how wide it is (a longer form); it never outgrows the screen. */
+  :where(.gm-dialog-panel) {
+    width: min(var(--gm-dialog-width, 28rem), calc(100vw - 2rem));
+    max-width: none;
+    padding: 1.3rem 1.4rem;
+    border: 0;
+    border-radius: 24px;
+    color: var(--gm-ink);
+  }
+  :where(.gm-dialog-panel)::backdrop {
+    background: rgb(0 0 0 / 0.35);
+  }
+  :where(.gm-dialog-heading) {
+    margin: 0 0 0.4rem;
+    font-size: 1.15rem;
+    font-weight: 600;
+  }
+  :where(.gm-dialog-panel > :not(.gm-dialog-heading, form)) {
+    color: var(--gm-ink-muted);
+  }
+  :where(.gm-dialog-panel form[method='dialog']) {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    margin-top: 1.2rem;
+  }
+  :where(gm-dialog[placement='bottom'] > .gm-dialog-panel) {
+    width: min(var(--gm-dialog-width, 40rem), 100vw);
+    margin: auto auto 0;
+    padding-bottom: calc(1.4rem + env(safe-area-inset-bottom));
+    border-radius: 28px 28px 0 0;
+  }
+  :where(gm-dialog:is([placement='end'], [placement='start']) > .gm-dialog-panel) {
+    width: min(var(--gm-dialog-width, 26rem), calc(100vw - 2.5rem));
+    height: 100dvh;
+    max-height: none;
+    margin: 0 0 0 auto;
+    padding-top: calc(1.3rem + env(safe-area-inset-top));
+    padding-bottom: calc(1.3rem + env(safe-area-inset-bottom));
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    border-radius: 28px 0 0 28px;
+  }
+  :where(gm-dialog:is([placement='end'], [placement='start']) > .gm-dialog-panel[open]) {
+    display: flex;
+    flex-direction: column;
+  }
+  /* A drawer's buttons wait at its foot, however little is above them. */
+  :where(gm-dialog:is([placement='end'], [placement='start']) form[method='dialog']:last-child) {
+    margin-top: auto;
+    padding-top: 1.2rem;
+  }
+  :where(gm-dialog[placement='start'] > .gm-dialog-panel) {
+    margin: 0 auto 0 0;
+    border-radius: 0 28px 28px 0;
+  }
+  :where(.gm-dialog-panel[open]) {
+    transition:
+      opacity 0.25s,
+      translate 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+  @starting-style {
+    :where(.gm-dialog-panel[open]) {
+      opacity: 0;
+      translate: 0 0.75rem;
+    }
+    :where(gm-dialog[placement='bottom'] > .gm-dialog-panel[open]) {
+      translate: 0 100%;
+    }
+    :where(gm-dialog[placement='end'] > .gm-dialog-panel[open]) {
+      translate: 100% 0;
+    }
+    :where(gm-dialog[placement='start'] > .gm-dialog-panel[open]) {
+      translate: -100% 0;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    :where(.gm-dialog-panel[open]) {
+      transition: opacity 0.2s;
+    }
+  }
+}
+
+@layer gm-base, gm-components, gm-overrides;
+
+@layer gm-components {
+  /* Toasts: frosted messages stacked at the bottom center, fading out as they leave. */
+  :where(.gm-toasts) {
+    position: fixed;
+    bottom: calc(1rem + env(safe-area-inset-bottom));
+    left: 50%;
+    z-index: 70;
+    display: grid;
+    justify-items: center;
+    gap: 0.5rem;
+    width: max-content;
+    max-width: calc(100vw - 2rem);
+    translate: -50% 0;
+  }
+  /* As a popover (in the top layer, over modal dialogs): none of the popover's own box. */
+  :where(.gm-toasts[popover]) {
+    inset: auto;
+    bottom: calc(1rem + env(safe-area-inset-bottom));
+    left: 50%;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: inherit;
+    overflow: visible;
+  }
+  :where(gm-toast) {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.6rem 0.6rem 0.6rem 1.1rem;
+    border-radius: 22px;
+    transition:
+      opacity 0.2s,
+      translate 0.2s;
+  }
+  :where(gm-toast[leaving]) {
+    opacity: 0;
+    translate: 0 0.5rem;
+  }
+  @starting-style {
+    :where(gm-toast) {
+      opacity: 0;
+      translate: 0 0.5rem;
+    }
+  }
+}
+
+@layer gm-base, gm-components, gm-overrides;
+
+@layer gm-components {
+  /*
+ * Toggle and slider: controls that sit inside glass, so they aren't glass themselves. A light
+ * track, the accent or ink where it's on, a white knob that stretches while it's held.
+ */
+  :where(.gm-toggle) {
+    position: relative;
+    flex: none;
+    width: 2.9rem;
+    height: 1.75rem;
+    margin: 0;
+    border-radius: var(--gm-radius-pill, 999px);
+    background: var(--gm-chip-fill-hover, rgb(255 255 255 / 0.16));
+    vertical-align: middle;
+    cursor: pointer;
+    appearance: none;
+    transition: background 0.2s;
+  }
+  :where(.gm-toggle)::before {
+    content: '';
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: calc(1.75rem - 6px);
+    height: calc(1.75rem - 6px);
+    border-radius: var(--gm-radius-pill, 999px);
+    background: var(--gm-knob, #fff);
+    box-shadow: 0 1px 4px rgb(0 0 0 / 0.3);
+    transition:
+      translate 0.25s cubic-bezier(0.3, 1.4, 0.5, 1),
+      width 0.2s;
+  }
+  :where(.gm-toggle:checked) {
+    background: var(--gm-toggle-on, var(--gm-callout-tip));
+  }
+  :where(.gm-toggle:checked)::before {
+    translate: 1.15rem 0;
+  }
+  :where(.gm-toggle:active)::before {
+    width: calc(1.75rem + 2px);
+  }
+  :where(.gm-toggle:checked:active)::before {
+    translate: calc(1.15rem - 8px) 0;
+  }
+  :where(.gm-toggle:disabled) {
+    opacity: 0.5;
+    cursor: default;
+  }
+
+  /*
+   * Toggle row: one setting, its name and a line about it, with the switch at the end; the whole
+   * row is the label, so it toggles anywhere it's pressed.
+   * <label class="gm-toggle-row"><span class="gm-toggle-row-text"><strong>Resume</strong>
+   * <small>Picks up an interrupted download.</small></span>
+   * <input type="checkbox" class="gm-toggle" role="switch"></label>
+   */
+  :where(.gm-toggle-row) {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--gm-space-lg, 16px);
+    color: var(--gm-ink);
+    cursor: pointer;
+  }
+  :where(.gm-toggle-row-text) {
+    display: grid;
+    gap: var(--gm-space-2xs, 2px);
+    min-width: 0;
+  }
+  :where(.gm-toggle-row-text > strong) {
+    font-size: var(--gm-text-sm, 0.875rem);
+    font-weight: 600;
+  }
+  :where(.gm-toggle-row-text > small) {
+    color: var(--gm-ink-muted);
+    font-size: var(--gm-text-xs, 0.75rem);
+    line-height: 1.4;
+  }
+}
+
+@layer gm-base, gm-components, gm-overrides;
+
+@layer gm-components {
+  /* Slider: a light track filled up to the value, a knob that stretches while held. */
+  :where(gm-slider) {
+    --gm-slider-track: linear-gradient(
+      to right,
+      var(--gm-chip-fill-hover, rgb(255 255 255 / 0.16)) var(--gm-from, 0%),
+      var(--gm-slider-fill, var(--gm-ink)) var(--gm-from, 0%) var(--gm-fill, 50%),
+      var(--gm-chip-fill-hover, rgb(255 255 255 / 0.16)) var(--gm-fill, 50%)
+    );
+    display: block;
+  }
+  /* Two knobs: the inputs on top of each other; only the knobs take the pointer, and the first
+     input's track paints the fill for both. */
+  :where(gm-slider[data-range]) {
+    display: grid;
+  }
+  :where(gm-slider[data-range] > input[type='range']) {
+    position: relative;
+    grid-area: 1 / 1;
+    pointer-events: none;
+  }
+  :where(gm-slider[data-range] > input[type='range'] + input[type='range']) {
+    --gm-slider-track: none;
+  }
+  :where(gm-slider[data-range] > input[type='range'])::-webkit-slider-thumb {
+    pointer-events: auto;
+  }
+  :where(gm-slider[data-range] > input[type='range'])::-moz-range-thumb {
+    pointer-events: auto;
+  }
+  :where(gm-slider input[type='range']) {
+    display: block;
+    width: 100%;
+    height: 1.75rem;
+    margin: 0;
+    background: none;
+    cursor: pointer;
+    appearance: none;
+  }
+  :where(gm-slider input[type='range'])::-webkit-slider-runnable-track {
+    height: 0.4rem;
+    border-radius: var(--gm-radius-pill, 999px);
+    background: var(--gm-slider-track);
+  }
+  :where(gm-slider input[type='range'])::-moz-range-track {
+    height: 0.4rem;
+    border-radius: var(--gm-radius-pill, 999px);
+    background: var(--gm-slider-track);
+  }
+  :where(gm-slider input[type='range'])::-webkit-slider-thumb {
+    width: 1.5rem;
+    height: 1.5rem;
+    margin-top: -0.55rem;
+    border: 0;
+    border-radius: var(--gm-radius-pill, 999px);
+    background: var(--gm-knob, #fff);
+    box-shadow: 0 1px 4px rgb(0 0 0 / 0.3);
+    appearance: none;
+    transition: scale 0.2s;
+  }
+  :where(gm-slider input[type='range'])::-moz-range-thumb {
+    width: 1.5rem;
+    height: 1.5rem;
+    border: 0;
+    border-radius: var(--gm-radius-pill, 999px);
+    background: var(--gm-knob, #fff);
+    box-shadow: 0 1px 4px rgb(0 0 0 / 0.3);
+    transition: scale 0.2s;
+  }
+  :where(gm-slider input[type='range']:active)::-webkit-slider-thumb {
+    scale: 1.25 1;
+  }
+  :where(gm-slider input[type='range']:active)::-moz-range-thumb {
+    scale: 1.25 1;
+  }
+  :where(gm-slider input[type='range']:focus-visible) {
+    outline: 0;
+  }
+  :where(gm-slider input[type='range']:focus-visible)::-webkit-slider-thumb {
+    box-shadow: var(--gm-focus);
+  }
+  :where(gm-slider input[type='range']:focus-visible)::-moz-range-thumb {
+    box-shadow: var(--gm-focus);
+  }
+}
+
+@layer gm-base, gm-components, gm-overrides;
+
+@layer gm-components {
+  /*
+ * Field: a label, a control, a hint or an error, stacked. Inputs sit inside glass, so like chips
+ * they're a light fill, not glass; the focus ring and the rim mark the one being typed in.
+ */
+  :where(.gm-field) {
+    display: grid;
+    gap: var(--gm-space-xs, 4px);
+    min-width: 0;
+  }
+  :where(.gm-field > label, .gm-field-label) {
+    color: var(--gm-ink);
+    font-size: var(--gm-text-sm, 0.875rem);
+    font-weight: 500;
+  }
+  :where(.gm-field-hint, .gm-field-error) {
+    margin: 0;
+    color: var(--gm-ink-muted);
+    font-size: var(--gm-text-xs, 0.75rem);
+    line-height: 1.4;
+  }
+  :where(.gm-field-error) {
+    color: var(--gm-status-danger, rgb(255 110 110));
+  }
+  :where(.gm-field-error:empty) {
+    display: none;
+  }
+
+  :where(.gm-input) {
+    box-sizing: border-box;
+    width: 100%;
+    min-height: 2.75rem;
+    margin: 0;
+    padding: 0.6em 0.9em;
+    border: 0;
+    border-radius: var(--gm-radius-sm, 10px);
+    background: var(--gm-chip-fill);
+    color: var(--gm-ink);
+    font: inherit;
+    transition:
+      background 0.2s,
+      box-shadow 0.2s;
+  }
+  :where(textarea.gm-input) {
+    min-height: 6rem;
+    resize: vertical;
+  }
+  :where(.gm-input)::placeholder {
+    color: var(--gm-ink-muted);
+    opacity: 0.8;
+  }
+  :where(.gm-input:hover) {
+    background: var(--gm-chip-fill-hover);
+  }
+  :where(.gm-input:focus) {
+    outline: 0;
+    background: var(--gm-chip-fill-hover);
+    box-shadow: var(--gm-focus);
+  }
+  :where(.gm-input[aria-invalid='true'], .gm-input:user-invalid) {
+    box-shadow: inset 0 0 0 1px var(--gm-status-danger, rgb(255 110 110));
+  }
+  /* Being fixed: the focus ring around the error ring, so both read. */
+  :where(.gm-input[aria-invalid='true']:focus, .gm-input:user-invalid:focus) {
+    box-shadow:
+      var(--gm-focus),
+      inset 0 0 0 1px var(--gm-status-danger, rgb(255 110 110));
+  }
+  :where(.gm-input:disabled) {
+    opacity: 0.5;
+    cursor: default;
+  }
+  /* Autofill paints its own yellow; keep the field's look and ink. */
+  :where(.gm-input:autofill) {
+    -webkit-text-fill-color: var(--gm-ink);
+    caret-color: var(--gm-ink);
+    transition: background-color 600000s 0s;
+  }
+
+  /* A control with an icon or a button inside, at either end. */
+  :where(.gm-input-group) {
+    position: relative;
+    display: flex;
+    align-items: center;
+  }
+  :where(.gm-input-group > .gm-input) {
+    flex: 1;
+  }
+  :where(.gm-input-group > :not(.gm-input)) {
+    position: absolute;
+    display: inline-flex;
+    color: var(--gm-ink-muted);
+  }
+  :where(.gm-input-group > :not(.gm-input):first-child) {
+    left: 0.75em;
+  }
+  :where(.gm-input-group > :not(.gm-input):last-child) {
+    right: 0.4em;
+  }
+  :where(.gm-input-group > :not(.gm-input):first-child ~ .gm-input) {
+    padding-left: 2.5em;
+  }
+  :where(.gm-input-group > .gm-input:has(~ :not(.gm-input))) {
+    padding-right: 3em;
+  }
+  :where(.gm-input-group svg) {
+    width: 1.15em;
+    height: 1.15em;
+  }
+}
+
+@layer gm-base, gm-components, gm-overrides;
+
+@layer gm-components {
+  /*
+ * Checkbox and radio: native inputs with a class, for inside glass. A light fill when off; the
+ * ink with a mark when on (a tick, a dash for "some", a dot for a radio).
+ */
+  :where(.gm-check) {
+    position: relative;
+    flex: none;
+    display: inline-grid;
+    place-content: center;
+    width: 1.25rem;
+    height: 1.25rem;
+    margin: 0;
+    border-radius: 6px;
+    background: var(--gm-chip-fill-hover, rgb(255 255 255 / 0.16));
+    box-shadow: inset 0 0 0 1px var(--gm-chip-fill-on, rgb(255 255 255 / 0.22));
+    vertical-align: middle;
+    cursor: pointer;
+    appearance: none;
+    transition:
+      background 0.15s,
+      box-shadow 0.15s;
+  }
+  :where(.gm-check[type='radio']) {
+    border-radius: var(--gm-radius-pill, 999px);
+  }
+  :where(.gm-check)::before {
+    content: '';
+    width: 0.8rem;
+    height: 0.8rem;
+    background: var(--gm-check-mark, var(--gm-ink-inverse));
+    scale: 0;
+    transition: scale 0.15s cubic-bezier(0.3, 1.4, 0.5, 1);
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M3 8.5l3.2 3L13 4.5' fill='none' stroke='%23000' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")
+      center / contain no-repeat;
+  }
+  :where(.gm-check:indeterminate)::before {
+    mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M4 8h8' stroke='%23000' stroke-width='2.4' stroke-linecap='round'/%3E%3C/svg%3E");
+  }
+  :where(.gm-check[type='radio'])::before {
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: var(--gm-radius-pill, 999px);
+    mask: none;
+  }
+  :where(.gm-check:is(:checked, :indeterminate)) {
+    background: var(--gm-check-on, var(--gm-ink));
+    box-shadow: none;
+  }
+  :where(.gm-check:is(:checked, :indeterminate))::before {
+    scale: 1;
+  }
+  :where(.gm-check[aria-invalid='true']) {
+    box-shadow: inset 0 0 0 1px var(--gm-status-danger, rgb(255 110 110));
+  }
+  :where(.gm-check:disabled) {
+    opacity: 0.5;
+    cursor: default;
+  }
+
+  /* A box and its label, side by side; the label is the bigger target. */
+  :where(.gm-check-label) {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--gm-space-sm, 8px);
+    min-height: 2.25rem;
+    cursor: pointer;
+  }
+}
+
+@layer gm-base, gm-components, gm-overrides;
+
+@layer gm-components {
+  /*
+ * Select: a field-like button, and its list on frosted glass in the top layer, with a droplet
+ * under the option in focus. The native select stays underneath for forms and validation.
+ */
+  :where(gm-select) {
+    position: relative;
+    display: block;
+    min-width: 0;
+  }
+  :where(.gm-select-native) {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    pointer-events: none;
+  }
+  :where(.gm-select-trigger) {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--gm-space-sm, 8px);
+    text-align: start;
+    cursor: pointer;
+  }
+  :where(.gm-select-value) {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  :where(.gm-select-placeholder .gm-select-value) {
+    color: var(--gm-ink-muted);
+  }
+  :where(.gm-select-trigger svg) {
+    flex: none;
+    width: 1.1em;
+    height: 1.1em;
+    color: var(--gm-ink-muted);
+    transition: rotate 0.2s;
+  }
+  :where(.gm-select-trigger[aria-expanded='true'] svg) {
+    rotate: 180deg;
+  }
+
+  /* The list is a gm-popover; this sheet places it without needing popover.css. */
+  :where(.gm-select-list) {
+    margin: 0;
+    inset: auto;
+    border: 0;
+    border-radius: 16px;
+    color: var(--gm-ink);
+    max-height: min(20rem, 50vh);
+    padding: 0.3rem;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  :where(.gm-select-list:popover-open) {
+    display: flex;
+    flex-direction: column;
+  }
+  :where(.gm-select-option) {
+    position: relative;
+    z-index: 1;
+    flex: none;
+    padding: 0.5rem 0.75rem;
+    border-radius: 10px;
+    outline: 0;
+    font-size: 0.9rem;
+    cursor: pointer;
+  }
+  :where(.gm-select-option[aria-selected='true']) {
+    font-weight: 600;
+  }
+  :where(.gm-select-option[aria-selected='true'])::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    right: 0.7rem;
+    width: 0.9rem;
+    height: 0.9rem;
+    translate: 0 -50%;
+    background: currentColor;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M3 8.5l3.2 3L13 4.5' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")
+      center / contain no-repeat;
+  }
+  :where(.gm-select-option[aria-selected='true']) {
+    padding-right: 2.2rem;
+  }
+  :where(.gm-select-option[aria-disabled='true']) {
+    opacity: 0.45;
+    cursor: default;
+  }
+  :where(.gm-select-group) {
+    flex: none;
+    padding: 0.6rem 0.75rem 0.25rem;
+    color: var(--gm-ink-muted);
+    font-size: var(--gm-text-xs, 0.75rem);
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+  :where(.gm-select-list > .gm-droplet) {
+    border-radius: 10px;
+  }
+}
+
+@layer gm-base, gm-components, gm-overrides;
+
+@layer gm-components {
+  /*
+ * One-time code: one input stretched invisibly over a row of boxes that show its characters.
+ * The box being typed in gets the focus ring.
+ */
+  :where(gm-otp) {
+    position: relative;
+    display: inline-block;
+    max-width: 100%;
+  }
+  :where(.gm-otp-input) {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    outline: 0;
+    background: none;
+    color: transparent;
+    caret-color: transparent;
+    font: inherit;
+    letter-spacing: 2em;
+    /* The selection highlight would show through; the boxes are the visible text. */
+    -webkit-text-fill-color: transparent;
+  }
+  :where(.gm-otp-input)::selection {
+    background: transparent;
+  }
+  :where(.gm-otp-cells) {
+    display: flex;
+    gap: var(--gm-space-sm, 8px);
+  }
+  :where(.gm-otp-cells > span) {
+    display: grid;
+    place-items: center;
+    width: 2.75rem;
+    height: 3.25rem;
+    border-radius: var(--gm-radius-sm, 10px);
+    background: var(--gm-chip-fill);
+    color: var(--gm-ink);
+    font-size: var(--gm-text-xl, 1.375rem);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    transition: box-shadow 0.15s;
+  }
+  :where(gm-otp:has(.gm-otp-input[aria-invalid='true']) .gm-otp-cells > span) {
+    box-shadow: inset 0 0 0 1px var(--gm-status-danger, rgb(255 110 110));
+  }
+  :where(.gm-otp-cells > span.gm-otp-active) {
+    box-shadow: var(--gm-focus);
+  }
+  :where(gm-otp:has(.gm-otp-input[aria-invalid='true']) .gm-otp-cells > span.gm-otp-active) {
+    box-shadow:
+      var(--gm-focus),
+      inset 0 0 0 1px var(--gm-status-danger, rgb(255 110 110));
+  }
+  /* The caret, drawn in the empty box being typed in. */
+  :where(.gm-otp-cells > span.gm-otp-active:empty)::after {
+    content: '';
+    width: 2px;
+    height: 1.4rem;
+    background: var(--gm-ink);
+    animation: gm-otp-caret 1s steps(1) infinite;
+  }
+  :where(gm-otp:has(.gm-otp-input:disabled)) {
+    opacity: 0.5;
+  }
+  @media (max-width: 380px) {
+    :where(.gm-otp-cells > span) {
+      width: 2.4rem;
+      height: 3rem;
+    }
+  }
+  @keyframes gm-otp-caret {
+    50% {
+      opacity: 0;
+    }
+  }
+}
+
+@layer gm-overrides {
+  @media (prefers-reduced-motion: reduce) {
+    :where(.gm-otp-cells > span.gm-otp-active:empty)::after {
+      animation: none;
+    }
+  }
+}
+
+@layer gm-base, gm-components, gm-overrides;
+
+@layer gm-components {
+  /*
+ * Table: content, not glass. Hairlines between rows, a quiet header, numbers that line up, and
+ * a fill on the rows that are selected. It scrolls sideways when it's wider than its box.
+ */
+  :where(gm-table) {
+    --gm-table-row: 48px;
+    /* Positioned, so visually hidden text in a cell stays inside the scroll and can't widen the page. */
+    position: relative;
+    display: block;
+    max-width: 100%;
+    overflow-x: auto;
+    color: var(--gm-ink);
+  }
+  :where(gm-table[density='compact']) {
+    --gm-table-row: 40px;
+  }
+  :where(gm-table[density='relaxed']) {
+    --gm-table-row: 56px;
+  }
+  :where(gm-table table) {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-variant-numeric: tabular-nums;
+  }
+  :where(gm-table :is(th, td)) {
+    height: var(--gm-table-row);
+    padding: 0 var(--gm-space-md, 12px);
+    text-align: start;
+    vertical-align: middle;
+    white-space: nowrap;
+  }
+  :where(gm-table th) {
+    height: 2.5rem;
+    color: var(--gm-ink-muted);
+    font-size: var(--gm-text-sm, 0.875rem);
+    font-weight: 500;
+  }
+  :where(gm-table td) {
+    border-top: 1px solid var(--gm-table-line, var(--gm-chip-fill, rgb(255 255 255 / 0.1)));
+  }
+  :where(gm-table tbody tr:hover > td) {
+    background: var(--gm-table-hover, color-mix(in srgb, var(--gm-chip-fill) 50%, transparent));
+  }
+  :where(gm-table tr[aria-selected='true'] > td) {
+    background: var(--gm-table-selected, var(--gm-chip-fill));
+  }
+  :where(gm-table :is(th, td):is(.gm-num, [data-type='number'])) {
+    text-align: end;
+  }
+  /* A checkbox column: as narrow as its box. */
+  :where(gm-table :is(th, td):has(> .gm-check:only-child)) {
+    width: 1px;
+    padding-inline-end: 0;
+  }
+
+  /* Sortable headers: the whole label is the button; an arrow shows the order. */
+  :where(.gm-table-sort) {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35em;
+    margin: 0 -0.4em;
+    padding: 0.3em 0.4em;
+    border: 0;
+    border-radius: 6px;
+    background: none;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+  }
+  :where(.gm-table-sort:hover) {
+    color: var(--gm-ink);
+  }
+  :where(.gm-table-sort)::after {
+    content: '';
+    width: 0.7em;
+    height: 0.7em;
+    background: currentColor;
+    opacity: 0.35;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M3 4.5 6 1.5l3 3M3 7.5l3 3 3-3' fill='none' stroke='%23000' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")
+      center / contain no-repeat;
+  }
+  :where([aria-sort] > .gm-table-sort) {
+    color: var(--gm-ink);
+  }
+  :where([aria-sort] > .gm-table-sort)::after {
+    opacity: 1;
+    mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M3 7.5 6 4.5l3 3' fill='none' stroke='%23000' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  }
+  :where([aria-sort='descending'] > .gm-table-sort)::after {
+    rotate: 180deg;
+  }
+  :where(:is(.gm-num, [data-type='number']) > .gm-table-sort) {
+    flex-direction: row-reverse;
+  }
+
+  /* Filterable headers: a small funnel beside the label, filled with a count when it's on. */
+  :where(.gm-table-filter) {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.2em;
+    min-width: 24px;
+    min-height: 24px;
+    margin-inline-start: 0.25em;
+    padding: 0.25em 0.35em;
+    border: 0;
+    border-radius: 6px;
+    background: none;
+    color: inherit;
+    font: inherit;
+    font-size: var(--gm-text-xs, 0.75rem);
+    vertical-align: middle;
+    cursor: pointer;
+  }
+  :where(.gm-table-filter svg) {
+    width: 0.95em;
+    height: 0.95em;
+    opacity: 0.55;
+  }
+  :where(.gm-table-filter:hover) {
+    color: var(--gm-ink);
+    background: var(--gm-chip-fill, rgb(255 255 255 / 0.1));
+  }
+  :where(.gm-table-filter[data-active]) {
+    background: var(--gm-chip-fill-on, rgb(255 255 255 / 0.22));
+    box-shadow: var(--gm-rim);
+    color: var(--gm-ink);
+    font-weight: 600;
+  }
+  :where(.gm-table-filter[data-active] svg) {
+    opacity: 1;
+  }
+  :where(.gm-table-filter span:empty) {
+    display: none;
+  }
+  :where(.gm-table-sort:focus-visible, .gm-table-filter:focus-visible) {
+    outline: 0;
+    box-shadow: var(--gm-focus);
+  }
+  /* The list of a column's values: content on a plain fill, under its button. */
+  :where(.gm-table-filter-menu) {
+    position: fixed;
+    inset: auto;
+    width: 15rem;
+    max-height: min(22rem, 60vh);
+    margin: 0;
+    padding: var(--gm-space-sm, 8px);
+    overflow-y: auto;
+    border: 0;
+    border-radius: var(--gm-radius-md, 18px);
+    background: var(--gm-tint-solid, rgb(24 22 34));
+    box-shadow: var(--gm-rim), var(--gm-lift);
+    color: var(--gm-ink);
+    font-size: var(--gm-text-sm, 0.875rem);
+  }
+  :where(.gm-table-filter-list) {
+    display: grid;
+  }
+  :where(.gm-table-filter-menu .gm-check-label) {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    min-height: 2.25rem;
+    padding: 0 var(--gm-space-sm, 8px);
+    border-radius: var(--gm-radius-sm, 10px);
+  }
+  :where(.gm-table-filter-menu .gm-check-label:hover) {
+    background: var(--gm-chip-fill, rgb(255 255 255 / 0.1));
+  }
+  :where(.gm-table-filter-menu small) {
+    color: var(--gm-ink-muted);
+    font-variant-numeric: tabular-nums;
+  }
+  :where(.gm-table-filter-menu > .gm-chip) {
+    width: 100%;
+    margin-top: var(--gm-space-xs, 4px);
+  }
+
+  /* Pinned first column(s), for wide tables that scroll sideways. */
+  :where(gm-table[pin] :is(th, td):first-child) {
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    background: var(--gm-table-pin, var(--gm-tint-solid, rgb(28 28 36 / 0.88)));
+  }
+
+  /* On a phone, with `stack`: each row a card, each cell labeled with its column. */
+  @media (max-width: 40rem) {
+    :where(gm-table[stack]) {
+      overflow: visible;
+    }
+    :where(gm-table[stack] :is(table, tbody, tr, td)) {
+      display: block;
+    }
+    :where(gm-table[stack] thead tr) {
+      display: flex;
+      align-items: center;
+      gap: var(--gm-space-sm, 8px);
+    }
+    :where(gm-table[stack] thead th:not(:has(> .gm-check))) {
+      display: none;
+    }
+    :where(gm-table[stack] tbody tr) {
+      position: relative;
+      padding: var(--gm-space-sm, 8px) 0;
+      border-top: 1px solid var(--gm-table-line, var(--gm-chip-fill, rgb(255 255 255 / 0.1)));
+    }
+    :where(gm-table[stack] td) {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: var(--gm-space-md, 12px);
+      height: auto;
+      min-height: 2rem;
+      border: 0;
+      white-space: normal;
+      text-align: end;
+    }
+    :where(gm-table[stack] td[data-label])::before {
+      content: attr(data-label);
+      color: var(--gm-ink-muted);
+      font-size: var(--gm-text-sm, 0.875rem);
+      text-align: start;
+    }
+    /* The card itself is what's selected or hovered, checkbox included. */
+    :where(gm-table[stack] tbody tr > td) {
+      background: none;
+    }
+    :where(gm-table[stack] tbody tr[aria-selected='true']) {
+      background: var(--gm-table-selected, var(--gm-chip-fill));
+    }
+    /* The checkbox sits at the card's start, beside its first line, with room made for it. */
+    :where(gm-table[stack] tbody tr:has(> td > .gm-check:only-child)) {
+      padding-inline-start: 2rem;
+    }
+    :where(gm-table[stack] td:has(> .gm-check:only-child)) {
+      position: absolute;
+      top: calc(var(--gm-space-sm, 8px) + 0.375rem);
+      left: 0;
+      width: auto;
+      min-height: 0;
+      padding: 0;
+    }
+    :where(gm-table[stack] td:has(> .gm-check:only-child))::before {
+      content: none;
+    }
+  }
+}
+
+@layer gm-base, gm-components, gm-overrides;
+
+@layer gm-components {
+  /*
+ * Badge: a short status, its color only where it means something. A dot and a tinted fill;
+ * the word carries the meaning, so it reads without the color too.
+ */
+  :where(.gm-badge) {
+    --gm-badge-tone: var(--gm-ink-muted);
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45em;
+    padding: 0.2em 0.65em;
+    border-radius: var(--gm-radius-pill, 999px);
+    background: color-mix(in srgb, var(--gm-badge-tone) 16%, transparent);
+    color: var(--gm-ink);
+    font-size: var(--gm-text-xs, 0.75rem);
+    font-weight: 600;
+    line-height: 1.5;
+    white-space: nowrap;
+  }
+  :where(.gm-badge)::before {
+    content: '';
+    width: 0.45em;
+    height: 0.45em;
+    border-radius: var(--gm-radius-pill, 999px);
+    background: var(--gm-badge-tone);
+  }
+  :where(.gm-badge[data-tone='info']) {
+    --gm-badge-tone: var(--gm-status-info, rgb(120 170 255));
+  }
+  :where(.gm-badge[data-tone='success']) {
+    --gm-badge-tone: var(--gm-status-success, rgb(90 210 150));
+  }
+  :where(.gm-badge[data-tone='warning']) {
+    --gm-badge-tone: var(--gm-status-warning, rgb(255 196 90));
+  }
+  :where(.gm-badge[data-tone='danger']) {
+    --gm-badge-tone: var(--gm-status-danger, rgb(255 110 110));
+  }
+
+  /* Avatar: a picture, or initials on a tint, in a circle. */
+  :where(.gm-avatar) {
+    display: inline-grid;
+    place-items: center;
+    flex: none;
+    width: var(--gm-avatar-size, 2rem);
+    height: var(--gm-avatar-size, 2rem);
+    overflow: hidden;
+    border-radius: var(--gm-radius-pill, 999px);
+    background: var(--gm-avatar-fill, var(--gm-chip-fill-on, rgb(255 255 255 / 0.22)));
+    color: var(--gm-ink);
+    font-size: calc(var(--gm-avatar-size, 2rem) * 0.4);
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    user-select: none;
+  }
+  :where(.gm-avatar[data-size='sm']) {
+    --gm-avatar-size: 1.5rem;
+  }
+  :where(.gm-avatar[data-size='lg']) {
+    --gm-avatar-size: 3rem;
+  }
+  :where(.gm-avatar > img) {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  /* A few avatars, overlapped. */
+  :where(.gm-avatar-group) {
+    display: inline-flex;
+  }
+  :where(.gm-avatar-group > .gm-avatar + .gm-avatar) {
+    margin-left: calc(var(--gm-avatar-size, 2rem) * -0.3);
+    box-shadow: 0 0 0 2px var(--gm-avatar-ring, var(--gm-tint-solid, rgb(28 28 36)));
+  }
+
+  /* Skeleton: where content will be, while it loads. */
+  :where(.gm-skeleton) {
+    display: block;
+    min-height: 1em;
+    border-radius: var(--gm-radius-sm, 10px);
+    background: linear-gradient(
+        100deg,
+        transparent 30%,
+        var(--gm-chip-fill, rgb(255 255 255 / 0.1)) 50%,
+        transparent 70%
+      )
+      var(--gm-chip-fill, rgb(255 255 255 / 0.1));
+    background-size: 200% 100%;
+    animation: gm-shimmer 1.4s ease-in-out infinite;
+  }
+  :where(.gm-skeleton-text) {
+    height: 0.8em;
+    border-radius: 4px;
+  }
+  :where(.gm-skeleton-round) {
+    border-radius: var(--gm-radius-pill, 999px);
+  }
+  @keyframes gm-shimmer {
+    from {
+      background-position: 150% 0;
+    }
+    to {
+      background-position: -50% 0;
+    }
+  }
+
+  /* Pagination: chips for pages, the current one on. */
+  :where(.gm-pagination) {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--gm-space-xs, 4px);
+  }
+  :where(.gm-pagination .gm-chip) {
+    min-width: 2.5em;
+    padding-inline: 0.75em;
+    font-variant-numeric: tabular-nums;
+  }
+  :where(.gm-pagination-gap) {
+    min-width: 1.5em;
+    color: var(--gm-ink-muted);
+    text-align: center;
+  }
+}
+
+@layer gm-overrides {
+  @media (prefers-reduced-motion: reduce) {
+    :where(.gm-skeleton) {
+      animation: none;
+    }
+  }
+}
+
+@layer gm-base, gm-components, gm-overrides;
+
+@layer gm-components {
+  /*
+ * Stat: one number, what it is, how it moved, and its recent shape. Content, not glass: a plain
+ * fill. The change is colored by whether it's good, with an arrow for its direction, so it reads
+ * without the color.
+ */
+  :where(.gm-stat) {
+    display: grid;
+    align-content: start;
+    gap: var(--gm-space-xs, 4px);
+    min-width: 0;
+    padding: var(--gm-space-lg, 16px);
+    border-radius: var(--gm-radius-md, 18px);
+    background: var(--gm-stat-fill, var(--gm-chip-fill, rgb(255 255 255 / 0.1)));
+    color: var(--gm-ink);
+  }
+  :where(.gm-stat-label) {
+    margin: 0;
+    color: var(--gm-ink-muted);
+    font-size: var(--gm-text-sm, 0.875rem);
+  }
+  :where(.gm-stat-value) {
+    margin: 0;
+    font-size: var(--gm-text-2xl, 1.75rem);
+    font-weight: 600;
+    line-height: 1.15;
+    letter-spacing: -0.01em;
+  }
+  /* data-tone on the stat colours its value: errors in red, warnings in amber. */
+  :where(.gm-stat[data-tone='good'] .gm-stat-value) {
+    color: var(--gm-status-success, rgb(90 210 150));
+  }
+  :where(.gm-stat[data-tone='warning'] .gm-stat-value) {
+    color: var(--gm-status-warning, rgb(255 196 90));
+  }
+  :where(.gm-stat[data-tone='bad'] .gm-stat-value) {
+    color: var(--gm-status-danger, rgb(255 110 110));
+  }
+  /* A grid of stats: as many to a row as fit at --gm-stat-min, or data-columns of them. */
+  :where(.gm-stat-grid) {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(var(--gm-stat-min, 10rem), 1fr));
+    gap: var(--gm-space-sm, 8px);
+  }
+  :where(.gm-stat-grid[data-columns='2']) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  :where(.gm-stat-grid[data-columns='3']) {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  :where(.gm-stat-grid[data-columns='4']) {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+  /* Compact: smaller numbers and padding, for many stats in a narrow column. */
+  :where(.gm-stat-grid[data-density='compact'] .gm-stat, .gm-stat[data-density='compact']) {
+    padding: var(--gm-space-md, 12px);
+  }
+  :where(
+    .gm-stat-grid[data-density='compact'] .gm-stat-value,
+    .gm-stat[data-density='compact'] .gm-stat-value
+  ) {
+    font-size: var(--gm-text-xl, 1.375rem);
+  }
+  :where(.gm-stat-delta) {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3em;
+    color: var(--gm-ink-muted);
+    font-size: var(--gm-text-xs, 0.75rem);
+    font-weight: 600;
+  }
+  :where(.gm-stat-delta[data-direction])::before {
+    content: '';
+    width: 0.6em;
+    height: 0.6em;
+    background: currentColor;
+    clip-path: polygon(50% 0, 100% 100%, 0 100%);
+  }
+  :where(.gm-stat-delta[data-direction='down'])::before {
+    rotate: 180deg;
+  }
+  :where(.gm-stat-delta[data-tone='good']) {
+    color: var(--gm-status-success, rgb(90 210 150));
+  }
+  :where(.gm-stat-delta[data-tone='bad']) {
+    color: var(--gm-status-danger, rgb(255 110 110));
+  }
+  :where(.gm-stat-delta > span) {
+    color: var(--gm-ink-muted);
+    font-weight: 400;
+  }
+  :where(.gm-stat-trend) {
+    display: block;
+    width: 100%;
+    height: 2rem;
+    margin-top: var(--gm-space-xs, 4px);
+    overflow: visible;
+  }
+
+  /*
+ * Meter: a share of a whole, on a track of the same color, lighter. data-tone moves it to a
+ * status color when the value means trouble.
+ */
+  :where(.gm-meter) {
+    --gm-meter-fill: var(--gm-ink);
+    display: block;
+    height: 0.4rem;
+    border-radius: var(--gm-radius-pill, 999px);
+    background: color-mix(in srgb, var(--gm-meter-fill) 22%, transparent);
+    overflow: hidden;
+  }
+  :where(.gm-meter)::before {
+    content: '';
+    display: block;
+    width: calc(var(--value, 0) * 100%);
+    height: 100%;
+    border-radius: inherit;
+    background: var(--gm-meter-fill);
+  }
+  :where(.gm-meter[data-tone='success']) {
+    --gm-meter-fill: var(--gm-status-success, rgb(90 210 150));
+  }
+  :where(.gm-meter[data-tone='warning']) {
+    --gm-meter-fill: var(--gm-status-warning, rgb(255 196 90));
+  }
+  :where(.gm-meter[data-tone='danger']) {
+    --gm-meter-fill: var(--gm-status-danger, rgb(255 110 110));
+  }
+  /*
+   * Indeterminate: work under way whose size isn't known yet. aria-busy="true" (or
+   * data-state="indeterminate") slides a segment along the track; leave aria-valuenow out
+   * meanwhile. With reduced motion it pulses in place instead.
+   */
+  :where(.gm-meter:is([aria-busy='true'], [data-state='indeterminate']))::before {
+    width: 35%;
+    animation: gm-meter-slide 1.4s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+  }
+  @keyframes gm-meter-slide {
+    from {
+      translate: -100%;
+    }
+    to {
+      translate: 290%;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    :where(.gm-meter:is([aria-busy='true'], [data-state='indeterminate']))::before {
+      width: 100%;
+      animation: gm-meter-pulse 1.6s ease-in-out infinite;
+    }
+  }
+  @keyframes gm-meter-pulse {
+    50% {
+      opacity: 0.35;
+    }
+  }
+  /* A label on the track (data-label="12 / 514"): the meter grows to hold it. */
+  :where(.gm-meter[data-label]) {
+    position: relative;
+    height: 1.25rem;
+  }
+  :where(.gm-meter[data-label])::after {
+    content: attr(data-label);
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    color: var(--gm-ink);
+    font-size: var(--gm-text-xs, 0.75rem);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    mix-blend-mode: difference;
+  }
+}
+
+@layer gm-base, gm-components, gm-overrides;
+
+@layer gm-components {
+  /* Quantity: a pill of fill, a step button at each end, the number in the middle. */
+  :where(gm-quantity) {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.2rem;
+    border-radius: var(--gm-radius-pill, 999px);
+    background: var(--gm-chip-fill, rgb(255 255 255 / 0.1));
+    color: var(--gm-ink);
+  }
+  :where(gm-quantity > input) {
+    width: 2.75rem;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    text-align: center;
+    appearance: textfield;
+  }
+  :where(gm-quantity > input)::-webkit-inner-spin-button,
+  :where(gm-quantity > input)::-webkit-outer-spin-button {
+    margin: 0;
+    appearance: none;
+  }
+  :where(gm-quantity > input:focus-visible) {
+    outline: 0;
+    border-radius: 6px;
+    box-shadow: var(--gm-focus);
+  }
+  :where(.gm-quantity-step) {
+    display: grid;
+    place-items: center;
+    width: 2.25rem;
+    height: 2.25rem;
+    padding: 0;
+    border: 0;
+    border-radius: var(--gm-radius-pill, 999px);
+    background: none;
+    color: inherit;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+  :where(.gm-quantity-step:hover) {
+    background: var(--gm-chip-fill-hover, rgb(255 255 255 / 0.16));
+  }
+  :where(.gm-quantity-step:disabled) {
+    opacity: 0.35;
+    cursor: default;
+    background: none;
+  }
+  :where(.gm-quantity-step:focus-visible) {
+    outline: 0;
+    box-shadow: var(--gm-focus);
+  }
+  :where(.gm-quantity-step svg) {
+    width: 1rem;
+    height: 1rem;
+  }
+}
+
+@layer gm-base, gm-components, gm-overrides;
+
+@layer gm-components {
+  /*
+ * Choices: native radios (or checkboxes) dressed three ways, so a group keeps the keyboard, forms
+ * and screen readers for free. A swatch is a dot of a color; a choice is a chip with a word on
+ * it; an option is a row with a title, a note and a price. The one that's on gets the rim.
+ */
+  :where(.gm-swatches, .gm-choices) {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--gm-space-sm, 8px);
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+
+  /* Swatch: <input type="radio" class="gm-swatch" style="--gm-swatch: #5fae9c" aria-label="…">. */
+  :where(.gm-swatch) {
+    flex: none;
+    width: var(--gm-swatch-size, 2rem);
+    height: var(--gm-swatch-size, 2rem);
+    margin: 0;
+    border-radius: var(--gm-radius-pill, 999px);
+    background: var(--gm-swatch, var(--gm-chip-fill));
+    background-size: cover;
+    box-shadow:
+      inset 0 0 0 1px rgb(255 255 255 / 0.2),
+      0 0 0 1px rgb(0 0 0 / 0.25);
+    outline: 1.5px solid transparent;
+    outline-offset: 3px;
+    cursor: pointer;
+    appearance: none;
+    transition: outline-color 0.15s;
+  }
+  :where(.gm-swatch[data-size='sm']) {
+    --gm-swatch-size: 1.4rem;
+  }
+  :where(.gm-swatch[data-size='lg']) {
+    --gm-swatch-size: 2.6rem;
+  }
+  :where(.gm-swatch:hover) {
+    outline-color: color-mix(in srgb, var(--gm-ink) 20%, transparent);
+  }
+  :where(.gm-swatch:checked) {
+    outline-color: var(--gm-ink);
+  }
+  :where(.gm-swatch:focus-visible) {
+    outline-color: var(--gm-ink);
+    box-shadow: var(--gm-focus);
+  }
+  /* Sold out: still choosable (to see it, or to be told when it's back), struck through. */
+  :where(.gm-swatch[data-unavailable], .gm-swatch:disabled) {
+    background:
+      linear-gradient(
+        to top right,
+        transparent calc(50% - 1px),
+        var(--gm-ink) calc(50% - 1px) calc(50% + 1px),
+        transparent calc(50% + 1px)
+      ),
+      var(--gm-swatch, var(--gm-chip-fill));
+  }
+  :where(.gm-swatch:disabled) {
+    opacity: 0.5;
+    cursor: default;
+  }
+
+  /* Choice: <label class="gm-choice"><input type="radio" name="size" value="m">M</label>. */
+  :where(.gm-choice) {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4em;
+    min-width: 2.75rem;
+    min-height: 2.25rem;
+    padding: 0.35rem 0.9rem;
+    border-radius: var(--gm-radius-pill, 999px);
+    background: var(--gm-chip-fill, rgb(255 255 255 / 0.1));
+    color: var(--gm-ink);
+    font-size: var(--gm-text-sm, 0.875rem);
+    font-weight: 500;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.15s;
+  }
+  :where(.gm-choice > input) {
+    position: absolute;
+    inset: 0;
+    margin: 0;
+    opacity: 0;
+    cursor: inherit;
+  }
+  :where(.gm-choice:hover) {
+    background: var(--gm-chip-fill-hover, rgb(255 255 255 / 0.16));
+  }
+  :where(.gm-choice:has(> input:checked)) {
+    background: var(--gm-chip-fill-on, rgb(255 255 255 / 0.22));
+    box-shadow: var(--gm-rim);
+  }
+  :where(.gm-choice:has(> input:focus-visible)) {
+    box-shadow: var(--gm-focus);
+  }
+  :where(.gm-choice:has(> input[data-unavailable])) {
+    color: var(--gm-ink-muted);
+    text-decoration: line-through;
+  }
+  :where(.gm-choice:has(> input:disabled)) {
+    opacity: 0.5;
+    cursor: default;
+  }
+
+  /*
+ * Option: a row to pick, for delivery speeds, payment methods, saved addresses.
+ * <label class="gm-option"><input type="radio" class="gm-check" …><span>Standard<small>3–5
+ * days</small></span><span>Free</span></label>. Everything after the title is quieter.
+ */
+  :where(.gm-options) {
+    display: grid;
+    gap: var(--gm-space-sm, 8px);
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+  :where(.gm-option) {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: var(--gm-space-md, 12px);
+    padding: var(--gm-space-md, 12px) var(--gm-space-lg, 16px);
+    border-radius: var(--gm-radius-md, 16px);
+    background: var(--gm-chip-fill, rgb(255 255 255 / 0.1));
+    color: var(--gm-ink);
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  :where(.gm-option:hover) {
+    background: var(--gm-chip-fill-hover, rgb(255 255 255 / 0.16));
+  }
+  :where(.gm-option:has(> input:checked)) {
+    background: var(--gm-chip-fill-on, rgb(255 255 255 / 0.22));
+    box-shadow: var(--gm-rim);
+  }
+  :where(.gm-option:has(> input:focus-visible)) {
+    box-shadow: var(--gm-focus);
+  }
+  :where(.gm-option > span) {
+    display: grid;
+    gap: 0.15rem;
+    font-weight: 500;
+  }
+  :where(.gm-option small) {
+    color: var(--gm-ink-muted);
+    font-size: var(--gm-text-sm, 0.875rem);
+    font-weight: 400;
+  }
+  :where(.gm-option > span:last-child:not(:nth-child(2))) {
+    font-variant-numeric: tabular-nums;
+    text-align: end;
+  }
+  :where(.gm-option:has(> input:disabled)) {
+    opacity: 0.5;
+    cursor: default;
+  }
+}
+
+@layer gm-base, gm-components, gm-overrides;
+
+@layer gm-components {
+  /*
+ * Price: what it costs now, what it cost before, and how much that saves, on one baseline.
+ * <p class="gm-price"><data value="349">$349</data><s>$449</s><span class="gm-price-off">−22%</span></p>.
+ * Screen readers read <s> as plain text, so say "was" in it (or in a hidden span) when it matters.
+ */
+  :where(.gm-price) {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.25em 0.55em;
+    margin: 0;
+    color: var(--gm-ink);
+    font-variant-numeric: tabular-nums;
+  }
+  :where(.gm-price > data, .gm-price > strong) {
+    font-weight: 600;
+  }
+  :where(.gm-price > s, .gm-price > del) {
+    color: var(--gm-ink-muted);
+    font-size: 0.85em;
+    text-decoration-thickness: 1px;
+  }
+  :where(.gm-price-off) {
+    padding: 0.1em 0.5em;
+    border-radius: var(--gm-radius-pill, 999px);
+    background: color-mix(
+      in srgb,
+      var(--gm-price-sale, var(--gm-accent, currentColor)) 18%,
+      transparent
+    );
+    color: var(--gm-ink);
+    font-size: 0.75em;
+    font-weight: 600;
+  }
+  /* "From $229", "/ month", "incl. tax": the quiet words around a price. */
+  :where(.gm-price > small) {
+    color: var(--gm-ink-muted);
+    font-size: 0.8em;
+  }
+
+  /*
+ * Totals: the lines of a bill, as a <dl class="gm-totals">: labels on the left, amounts lined up
+ * on the right. Mark the last pair with .gm-totals-total; it gets a hairline and the weight.
+ */
+  :where(.gm-totals) {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: var(--gm-space-sm, 8px) 0;
+    margin: 0;
+    font-size: var(--gm-text-sm, 0.875rem);
+  }
+  :where(.gm-totals > dt) {
+    color: var(--gm-ink-muted);
+  }
+  :where(.gm-totals > dd) {
+    margin: 0;
+    padding-inline-start: var(--gm-space-lg, 16px);
+    color: var(--gm-ink);
+    font-variant-numeric: tabular-nums;
+    text-align: end;
+  }
+  :where(.gm-totals > .gm-totals-total) {
+    padding-top: var(--gm-space-sm, 8px);
+    border-top: 1px solid color-mix(in srgb, var(--gm-ink) 20%, transparent);
+    color: var(--gm-ink);
+    font-size: var(--gm-text-md, 1rem);
+    font-weight: 600;
+  }
+  :where(.gm-totals > dd > small) {
+    display: block;
+    color: var(--gm-ink-muted);
+    font-size: var(--gm-text-xs, 0.75rem);
+    font-weight: 400;
+  }
+}
+
+@layer gm-base, gm-components, gm-overrides;
+
+@layer gm-components {
+  /*
+ * Rating: five stars, filled to a value. To show one, a span that says it in words:
+ * <span class="gm-rating" style="--gm-rating: 4.6" role="img" aria-label="4.6 out of 5"></span>.
+ * The stars are a mask over a fill, so any value works (4.6 fills most of the fifth) and the size
+ * follows the font.
+ */
+  :where(.gm-rating, .gm-rating-input) {
+    --gm-rating-star: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 20'%3E%3Cpath d='M12 1.2l2.8 5.8 6.3.8-4.6 4.4 1.2 6.3L12 15.4l-5.7 3.1 1.2-6.3-4.6-4.4 6.3-.8z'/%3E%3C/svg%3E");
+  }
+  :where(.gm-rating) {
+    display: inline-block;
+    flex: none;
+    width: 6em;
+    height: 1em;
+    background: linear-gradient(
+      to right,
+      var(--gm-rating-fill, var(--gm-ink)) calc(var(--gm-rating, 0) / 5 * 100%),
+      var(
+          --gm-rating-empty,
+          color-mix(in srgb, var(--gm-rating-fill, var(--gm-ink)) 22%, transparent)
+        )
+        calc(var(--gm-rating, 0) / 5 * 100%)
+    );
+    vertical-align: -0.12em;
+    mask: var(--gm-rating-star) left / 1.2em 1em repeat-x;
+  }
+
+  /*
+ * To choose one: five radios, 1 to 5, in order, each with its label.
+ * <fieldset class="gm-rating-input"><legend>Your rating</legend><input type="radio" name="stars"
+ * value="1" aria-label="1 star">…</fieldset>. The checked star and those before it fill; hovering
+ * previews. Arrow keys move between them, as with any radio group.
+ */
+  :where(.gm-rating-input) {
+    display: inline-flex;
+    gap: 0.15em;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    font-size: var(--gm-rating-size, 1.75rem);
+  }
+  :where(.gm-rating-input > legend) {
+    margin-bottom: var(--gm-space-xs, 4px);
+    color: var(--gm-ink-muted);
+    font-size: var(--gm-text-sm, 0.875rem);
+  }
+  :where(.gm-rating-input > input) {
+    width: 1.2em;
+    height: 1em;
+    margin: 0;
+    background: var(--gm-rating-fill, var(--gm-ink));
+    font-size: inherit;
+    cursor: pointer;
+    appearance: none;
+    mask: var(--gm-rating-star) center / contain no-repeat;
+    transition:
+      background 0.15s,
+      scale 0.15s;
+  }
+  /* After the checked one, and all of them before any is checked: empty. */
+  :where(.gm-rating-input > input:checked ~ input, .gm-rating-input:not(:has(:checked)) > input) {
+    background: var(
+      --gm-rating-empty,
+      color-mix(in srgb, var(--gm-rating-fill, var(--gm-ink)) 22%, transparent)
+    );
+  }
+  /* While hovering: fill up to the pointer, whatever is checked. */
+  @media (hover: hover) {
+    :where(.gm-rating-input:has(> input:hover) > input) {
+      background: var(--gm-rating-fill, var(--gm-ink));
+    }
+    :where(.gm-rating-input > input:hover ~ input) {
+      background: var(
+        --gm-rating-empty,
+        color-mix(in srgb, var(--gm-rating-fill, var(--gm-ink)) 22%, transparent)
+      );
+    }
+    :where(.gm-rating-input > input:hover) {
+      scale: 1.12;
+    }
+  }
+  :where(.gm-rating-input > input:focus-visible) {
+    outline: 0;
+    scale: 1.12;
+    filter: drop-shadow(0 0 2px var(--gm-ink));
+  }
+  @media (forced-colors: active) {
+    :where(.gm-rating, .gm-rating-input > input) {
+      forced-color-adjust: none;
+      background: CanvasText;
+    }
+  }
+}
+
+@layer gm-base, gm-components, gm-overrides;
+
+@layer gm-components {
+  /*
+ * Steps: where a process is, as a track. <ol class="gm-steps"><li data-state="done">Ordered
+ * <small>Oct 21</small></li><li aria-current="step">Shipped</li><li>Delivered</li></ol>.
+ * Done steps and the line up to the current one fill with the ink; the current one is ringed.
+ * Across by default; data-orientation="vertical" stacks them, and so does a narrow screen.
+ */
+  :where(.gm-steps) {
+    --gm-steps-dot: 0.8rem;
+    --gm-steps-line: color-mix(in srgb, var(--gm-ink) 20%, transparent);
+    --gm-steps-on: var(--gm-steps-fill, var(--gm-ink));
+    display: grid;
+    grid-auto-columns: 1fr;
+    grid-auto-flow: column;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  :where(.gm-steps > li) {
+    position: relative;
+    display: grid;
+    align-content: start;
+    gap: 0.15rem;
+    padding: calc(var(--gm-steps-dot) + var(--gm-space-sm, 8px)) var(--gm-space-sm, 8px) 0 0;
+    color: var(--gm-ink-muted);
+    font-size: var(--gm-text-sm, 0.875rem);
+  }
+  :where(.gm-steps > li[data-state='done'], .gm-steps > li[aria-current]) {
+    color: var(--gm-ink);
+  }
+  :where(.gm-steps > li[aria-current]) {
+    font-weight: 600;
+  }
+  :where(.gm-steps small) {
+    color: var(--gm-ink-muted);
+    font-size: var(--gm-text-xs, 0.75rem);
+    font-weight: 400;
+  }
+  /* The line, from this dot to the next. */
+  :where(.gm-steps > li:not(:last-child))::before {
+    content: '';
+    position: absolute;
+    top: calc(var(--gm-steps-dot) / 2 - 1px);
+    left: calc(var(--gm-steps-dot) + 3px);
+    right: 3px;
+    height: 2px;
+    background: var(--gm-steps-line);
+  }
+  :where(.gm-steps > li[data-state='done']:not(:last-child))::before {
+    background: var(--gm-steps-on);
+  }
+  /* The dot: hollow ahead, filled when done, ringed where we are. */
+  :where(.gm-steps > li)::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: var(--gm-steps-dot);
+    height: var(--gm-steps-dot);
+    border-radius: var(--gm-radius-pill, 999px);
+    background: var(--gm-steps-bg, transparent);
+    box-shadow: inset 0 0 0 2px var(--gm-steps-line);
+  }
+  :where(.gm-steps > li[data-state='done'])::after {
+    background: var(--gm-steps-on);
+    box-shadow: none;
+  }
+  :where(.gm-steps > li[aria-current])::after {
+    background: var(--gm-steps-on);
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--gm-steps-on) 25%, transparent);
+  }
+  :where(.gm-steps > li[data-state='problem'])::after {
+    background: var(--gm-status-danger, rgb(255 110 110));
+    box-shadow: none;
+  }
+
+  :where(.gm-steps[data-orientation='vertical']) {
+    grid-auto-flow: row;
+    gap: var(--gm-space-lg, 16px);
+  }
+  :where(.gm-steps[data-orientation='vertical'] > li) {
+    padding: 0 0 0 calc(var(--gm-steps-dot) + var(--gm-space-md, 12px));
+  }
+  :where(.gm-steps[data-orientation='vertical'] > li:not(:last-child))::before {
+    top: calc(0.25em + var(--gm-steps-dot) + 3px);
+    bottom: calc(3px - var(--gm-space-lg, 16px) - 0.25em);
+    left: calc(var(--gm-steps-dot) / 2 - 1px);
+    right: auto;
+    width: 2px;
+    height: auto;
+  }
+  :where(.gm-steps[data-orientation='vertical'] > li)::after {
+    top: 0.25em;
+  }
+  @media (max-width: 36rem) {
+    :where(.gm-steps:not([data-orientation='horizontal'])) {
+      grid-auto-flow: row;
+      gap: var(--gm-space-lg, 16px);
+    }
+    :where(.gm-steps:not([data-orientation='horizontal']) > li) {
+      padding: 0 0 0 calc(var(--gm-steps-dot) + var(--gm-space-md, 12px));
+    }
+    :where(.gm-steps:not([data-orientation='horizontal']) > li:not(:last-child))::before {
+      top: calc(0.25em + var(--gm-steps-dot) + 3px);
+      bottom: calc(3px - var(--gm-space-lg, 16px) - 0.25em);
+      left: calc(var(--gm-steps-dot) / 2 - 1px);
+      right: auto;
+      width: 2px;
+      height: auto;
+    }
+    :where(.gm-steps:not([data-orientation='horizontal']) > li)::after {
+      top: 0.25em;
+    }
+  }
+
+  /*
+ * Timeline: what happened, newest first or oldest first, each with when.
+ * <ol class="gm-timeline"><li><time datetime="…">Oct 21, 14:02</time><p>Paid with a card</p></li>
+ * </ol>. A thin rail joins the dots; data-tone colors a dot that means something (a refund, a
+ * problem) and a note in .gm-timeline-note reads as quoted.
+ */
+  :where(.gm-timeline) {
+    display: grid;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  :where(.gm-timeline > li) {
+    --gm-timeline-tone: var(--gm-ink-muted);
+    position: relative;
+    display: grid;
+    gap: 0.2rem;
+    padding: 0 0 var(--gm-space-lg, 16px) calc(0.6rem + var(--gm-space-md, 12px));
+    color: var(--gm-ink);
+    font-size: var(--gm-text-sm, 0.875rem);
+  }
+  :where(.gm-timeline > li:not(:last-child))::before {
+    content: '';
+    position: absolute;
+    top: 0.9em;
+    bottom: -0.25em;
+    left: calc(0.3rem - 0.5px);
+    width: 1px;
+    background: color-mix(in srgb, var(--gm-ink) 20%, transparent);
+  }
+  :where(.gm-timeline > li)::after {
+    content: '';
+    position: absolute;
+    top: 0.4em;
+    left: 0;
+    width: 0.6rem;
+    height: 0.6rem;
+    border-radius: var(--gm-radius-pill, 999px);
+    background: var(--gm-timeline-tone);
+  }
+  :where(.gm-timeline > li[data-tone='success']) {
+    --gm-timeline-tone: var(--gm-status-success, rgb(90 210 150));
+  }
+  :where(.gm-timeline > li[data-tone='warning']) {
+    --gm-timeline-tone: var(--gm-status-warning, rgb(255 196 90));
+  }
+  :where(.gm-timeline > li[data-tone='danger']) {
+    --gm-timeline-tone: var(--gm-status-danger, rgb(255 110 110));
+  }
+  :where(.gm-timeline > li[data-tone='info']) {
+    --gm-timeline-tone: var(--gm-status-info, rgb(120 170 255));
+  }
+  :where(.gm-timeline time) {
+    color: var(--gm-ink-muted);
+    font-size: var(--gm-text-xs, 0.75rem);
+    font-variant-numeric: tabular-nums;
+  }
+  :where(.gm-timeline p) {
+    margin: 0;
+  }
+  :where(.gm-timeline-note) {
+    margin-top: var(--gm-space-xs, 4px);
+    padding: var(--gm-space-sm, 8px) var(--gm-space-md, 12px);
+    border-radius: var(--gm-radius-sm, 10px);
+    background: var(--gm-chip-fill, rgb(255 255 255 / 0.1));
+    color: var(--gm-ink);
+  }
+}
+
+@layer gm-base, gm-components, gm-overrides;
+
+@layer gm-components {
+  /*
+ * Accordion: native <details> in a .gm-accordion, hairlines between them and a chevron that
+ * turns. Give them one `name` and only one stays open at a time; the browser does the keyboard
+ * and find-in-page. Where it can animate to auto height, the content slides open.
+ */
+  :where(.gm-accordion) {
+    interpolate-size: allow-keywords;
+  }
+  :where(.gm-accordion > details) {
+    border-bottom: 1px solid color-mix(in srgb, var(--gm-ink) 20%, transparent);
+  }
+  :where(.gm-accordion > details:last-child) {
+    border-bottom: 0;
+  }
+  :where(.gm-accordion > details > summary) {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--gm-space-md, 12px);
+    padding: var(--gm-space-lg, 16px) 0;
+    border-radius: 4px;
+    color: var(--gm-ink);
+    font-weight: 600;
+    cursor: pointer;
+    list-style: none;
+  }
+  :where(.gm-accordion > details > summary)::-webkit-details-marker {
+    display: none;
+  }
+  :where(.gm-accordion > details > summary)::after {
+    content: '';
+    flex: none;
+    width: 1rem;
+    height: 1rem;
+    background: currentColor;
+    opacity: 0.7;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M3.5 6L8 10.5 12.5 6' fill='none' stroke='%23000' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")
+      center / contain no-repeat;
+    transition: rotate 0.25s;
+  }
+  :where(.gm-accordion > details[open] > summary)::after {
+    rotate: 180deg;
+  }
+  :where(.gm-accordion > details > summary:focus-visible) {
+    outline: 0;
+    box-shadow: var(--gm-focus);
+  }
+  :where(.gm-accordion > details > :not(summary)) {
+    margin: 0 0 var(--gm-space-lg, 16px);
+    color: var(--gm-ink-muted);
+  }
+  :where(.gm-accordion > details)::details-content {
+    height: 0;
+    overflow: clip;
+    transition:
+      height 0.3s cubic-bezier(0.2, 0.8, 0.2, 1),
+      content-visibility 0.3s allow-discrete;
+  }
+  :where(.gm-accordion > details[open])::details-content {
+    height: auto;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    :where(.gm-accordion > details)::details-content,
+    :where(.gm-accordion > details > summary)::after {
+      transition: none;
+    }
+  }
+}
+
+@layer gm-base, gm-components, gm-overrides;
+
+@layer gm-components {
+  /*
+ * Breadcrumbs: where this page sits, one line, quiet.
+ * <nav class="gm-breadcrumbs" aria-label="Breadcrumb"><ol><li><a href="/">Home</a></li>…
+ * <li><span aria-current="page">Tide</span></li></ol></nav>. A chevron between the steps; the
+ * last one shortens with an ellipsis rather than wrap.
+ */
+  :where(.gm-breadcrumbs ol) {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    color: var(--gm-ink-muted);
+    font-size: var(--gm-text-sm, 0.875rem);
+    list-style: none;
+  }
+  :where(.gm-breadcrumbs li) {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    white-space: nowrap;
+  }
+  :where(.gm-breadcrumbs li:last-child) {
+    flex: 0 1 auto;
+    min-width: 0;
+  }
+  :where(.gm-breadcrumbs li + li)::before {
+    content: '';
+    flex: none;
+    width: 0.9em;
+    height: 0.9em;
+    margin: 0 0.35em;
+    background: currentColor;
+    opacity: 0.6;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M6 3.5L10.5 8 6 12.5' fill='none' stroke='%23000' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")
+      center / contain no-repeat;
+  }
+  :where(.gm-breadcrumbs a) {
+    border-radius: 4px;
+    color: inherit;
+    text-decoration: none;
+  }
+  :where(.gm-breadcrumbs a:hover) {
+    color: var(--gm-ink);
+    text-decoration: underline;
+    text-underline-offset: 0.2em;
+  }
+  :where(.gm-breadcrumbs a:focus-visible) {
+    outline: 0;
+    box-shadow: var(--gm-focus);
+  }
+  :where(.gm-breadcrumbs [aria-current]) {
+    overflow: hidden;
+    color: var(--gm-ink);
+    text-overflow: ellipsis;
+  }
+}
+
+@layer gm-base, gm-components, gm-overrides;
+
+@layer gm-components {
+  /*
+ * Empty state: nothing here yet, said kindly, with the one thing to do about it.
+ * <div class="gm-empty"><svg class="gm-empty-art">…</svg><h2>No orders yet</h2><p>…</p>
+ * <a class="gm-chip" href="…">Start shopping</a></div>. Centered, at a reading width.
+ */
+  :where(.gm-empty) {
+    display: grid;
+    justify-items: center;
+    gap: var(--gm-space-sm, 8px);
+    max-width: 28rem;
+    margin: 0 auto;
+    padding: var(--gm-space-3xl, 48px) var(--gm-space-lg, 16px);
+    color: var(--gm-ink);
+    text-align: center;
+  }
+  :where(.gm-empty-art) {
+    width: var(--gm-empty-art, 4rem);
+    height: var(--gm-empty-art, 4rem);
+    margin-bottom: var(--gm-space-sm, 8px);
+    color: var(--gm-ink-muted);
+  }
+  :where(.gm-empty > :is(h2, h3, strong)) {
+    margin: 0;
+    font-size: var(--gm-text-lg, 1.125rem);
+    font-weight: 600;
+  }
+  :where(.gm-empty > p) {
+    margin: 0;
+    color: var(--gm-ink-muted);
+  }
+  :where(.gm-empty > :is(a, button, div):last-child) {
+    margin-top: var(--gm-space-md, 12px);
+  }
+  :where(.gm-empty-actions) {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: var(--gm-space-sm, 8px);
+  }
+}
+
+@layer gm-base, gm-components, gm-overrides;
+
+@layer gm-components {
+  /*
+ * Gallery: content, not glass. One picture at a time on a snapping track, round arrows over its
+ * edges (hidden on touch screens, where a swipe does it), thumbnails under it, the current one
+ * ringed. The large view is a plain dark dialog, so nothing competes with the picture.
+ */
+  :where(gm-gallery) {
+    display: grid;
+    gap: var(--gm-space-md, 12px);
+    min-width: 0;
+  }
+  :where(.gm-gallery-stage) {
+    position: relative;
+  }
+  :where(.gm-gallery-track) {
+    display: flex;
+    overflow-x: auto;
+    border-radius: var(--gm-gallery-radius, var(--gm-radius-lg, 28px));
+    background: var(--gm-gallery-fill, var(--gm-chip-fill, rgb(255 255 255 / 0.1)));
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+    overscroll-behavior-x: contain;
+  }
+  :where(.gm-gallery-track)::-webkit-scrollbar {
+    display: none;
+  }
+  :where(.gm-gallery-track:focus-visible) {
+    outline: 0;
+    box-shadow: var(--gm-focus);
+  }
+  :where(.gm-gallery-track > *) {
+    flex: 0 0 100%;
+    width: 100%;
+    min-width: 0;
+    margin: 0;
+    scroll-snap-align: start;
+    scroll-snap-stop: always;
+  }
+  :where(.gm-gallery-track > img, .gm-gallery-track img) {
+    display: block;
+    width: 100%;
+    height: auto;
+    aspect-ratio: var(--gm-gallery-ratio, auto);
+    object-fit: cover;
+  }
+  :where(gm-gallery[zoom] .gm-gallery-track > *) {
+    cursor: zoom-in;
+  }
+
+  :where(.gm-gallery-arrow) {
+    position: absolute;
+    top: 50%;
+    display: grid;
+    place-items: center;
+    width: 2.5rem;
+    height: 2.5rem;
+    padding: 0;
+    border: 0;
+    border-radius: var(--gm-radius-pill, 999px);
+    background: color-mix(in srgb, var(--gm-tint-solid, rgb(20 20 28)) 70%, transparent);
+    color: var(--gm-ink);
+    cursor: pointer;
+    translate: 0 -50%;
+    transition:
+      opacity 0.2s,
+      background 0.2s;
+  }
+  :where(.gm-gallery-previous) {
+    left: var(--gm-space-md, 12px);
+  }
+  :where(.gm-gallery-next) {
+    right: var(--gm-space-md, 12px);
+  }
+  :where(.gm-gallery-arrow svg) {
+    width: 1.1rem;
+    height: 1.1rem;
+  }
+  :where(.gm-gallery-arrow:disabled) {
+    opacity: 0;
+    pointer-events: none;
+  }
+  :where(.gm-gallery-arrow:focus-visible) {
+    outline: 0;
+    box-shadow: var(--gm-focus);
+  }
+  @media (hover: none) {
+    :where(.gm-gallery-arrow) {
+      display: none;
+    }
+  }
+
+  :where(.gm-gallery-thumbs) {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(4.5rem, 22%), 1fr));
+    gap: var(--gm-space-sm, 8px);
+  }
+  :where(gm-gallery[data-single] :is(.gm-gallery-thumbs, .gm-gallery-arrow)) {
+    display: none;
+  }
+  :where(.gm-gallery-thumbs > button) {
+    padding: 0;
+    overflow: hidden;
+    border: 0;
+    border-radius: var(--gm-radius-sm, 10px);
+    background: var(--gm-gallery-fill, var(--gm-chip-fill, rgb(255 255 255 / 0.1)));
+    cursor: pointer;
+    opacity: 0.6;
+    transition: opacity 0.2s;
+  }
+  :where(.gm-gallery-thumbs > button:hover, .gm-gallery-thumbs > button[aria-current]) {
+    opacity: 1;
+  }
+  :where(.gm-gallery-thumbs > button[aria-current]) {
+    box-shadow: 0 0 0 2px var(--gm-ink);
+  }
+  :where(.gm-gallery-thumbs > button:focus-visible) {
+    outline: 0;
+    box-shadow: var(--gm-focus);
+  }
+  :where(.gm-gallery-thumbs img) {
+    display: block;
+    width: 100%;
+    aspect-ratio: 1;
+    object-fit: cover;
+  }
+
+  :where(.gm-gallery-zoom) {
+    width: 100vw;
+    max-width: none;
+    height: 100dvh;
+    max-height: none;
+    margin: 0;
+    padding: var(--gm-space-xl, 24px);
+    overflow: hidden;
+    border: 0;
+    background: rgb(8 8 12 / 0.94);
+    color: #fff;
+  }
+  :where(.gm-gallery-zoom[open]) {
+    display: grid;
+    place-items: center;
+  }
+  :where(.gm-gallery-zoom)::backdrop {
+    background: transparent;
+  }
+  :where(.gm-gallery-zoom > img) {
+    width: auto;
+    height: auto;
+    max-width: min(100%, 72rem);
+    max-height: calc(100dvh - 2 * var(--gm-space-xl, 24px));
+    border-radius: var(--gm-radius-md, 18px);
+    cursor: zoom-in;
+    transition: scale 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+  :where(.gm-gallery-zoom > img[data-magnified]) {
+    scale: 2;
+    cursor: zoom-out;
+  }
+  :where(.gm-gallery-close) {
+    position: absolute;
+    top: calc(var(--gm-space-lg, 16px) + env(safe-area-inset-top));
+    right: var(--gm-space-lg, 16px);
+    display: grid;
+    place-items: center;
+    width: 2.75rem;
+    height: 2.75rem;
+    padding: 0;
+    border: 0;
+    border-radius: var(--gm-radius-pill, 999px);
+    background: rgb(255 255 255 / 0.14);
+    color: inherit;
+    cursor: pointer;
+  }
+  :where(.gm-gallery-zoom .gm-gallery-arrow) {
+    display: grid;
+    width: 2.75rem;
+    height: 2.75rem;
+    background: rgb(255 255 255 / 0.14);
+    color: #fff;
+  }
+  :where(.gm-gallery-zoom .gm-gallery-arrow:focus-visible) {
+    box-shadow: 0 0 0 2px #fff;
+  }
+  :where(.gm-gallery-close svg) {
+    width: 1.2rem;
+    height: 1.2rem;
+  }
+  :where(.gm-gallery-close:focus-visible) {
+    outline: 0;
+    box-shadow: 0 0 0 2px #fff;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    :where(.gm-gallery-zoom > img) {
+      transition: none;
+    }
+  }
+}
+
+@layer gm-base, gm-components, gm-overrides;
+
+@layer gm-components {
+  /*
+ * Upload: a dashed place to drop files, which lights up while something is held over it, and
+ * the chosen files under it as rows: a preview, the name and size, a button to take it off.
+ */
+  :where(gm-upload) {
+    display: grid;
+    gap: var(--gm-space-sm, 8px);
+  }
+  :where(.gm-upload-zone) {
+    position: relative;
+    display: grid;
+    justify-items: center;
+    gap: var(--gm-space-xs, 4px);
+    padding: var(--gm-space-xl, 24px) var(--gm-space-lg, 16px);
+    border: 1.5px dashed color-mix(in srgb, var(--gm-ink) 20%, transparent);
+    border-radius: var(--gm-radius-md, 18px);
+    background: var(--gm-chip-fill, rgb(255 255 255 / 0.1));
+    color: var(--gm-ink);
+    font-size: var(--gm-text-sm, 0.875rem);
+    text-align: center;
+    cursor: pointer;
+    transition:
+      background 0.15s,
+      border-color 0.15s;
+  }
+  :where(.gm-upload-zone u) {
+    text-underline-offset: 0.2em;
+  }
+  :where(.gm-upload-zone small) {
+    color: var(--gm-ink-muted);
+    font-size: var(--gm-text-xs, 0.75rem);
+  }
+  :where(.gm-upload-zone > input[type='file']) {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+    pointer-events: none;
+  }
+  :where(.gm-upload-zone:hover, gm-upload[data-dragging] .gm-upload-zone) {
+    border-color: var(--gm-ink);
+    background: var(--gm-chip-fill-hover, rgb(255 255 255 / 0.16));
+  }
+  :where(.gm-upload-zone:has(> input:focus-visible)) {
+    box-shadow: var(--gm-focus);
+  }
+  :where(.gm-upload-zone:has(> input:disabled)) {
+    opacity: 0.5;
+    cursor: default;
+  }
+  :where(.gm-upload-zone:has(> input[aria-invalid='true'])) {
+    border-color: var(--gm-status-danger, rgb(255 110 110));
+  }
+
+  :where(.gm-upload-list) {
+    display: grid;
+    gap: var(--gm-space-xs, 4px);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  :where(.gm-upload-list > li) {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: var(--gm-space-md, 12px);
+    padding: var(--gm-space-xs, 4px);
+    padding-inline-end: var(--gm-space-xs, 4px);
+    border-radius: var(--gm-radius-sm, 10px);
+    background: var(--gm-chip-fill, rgb(255 255 255 / 0.1));
+  }
+  :where(.gm-upload-preview) {
+    display: grid;
+    place-items: center;
+    width: 2.75rem;
+    height: 2.75rem;
+    overflow: hidden;
+    border-radius: 8px;
+    background: var(--gm-chip-fill-hover, rgb(255 255 255 / 0.16));
+    color: var(--gm-ink-muted);
+    font-size: var(--gm-text-xs, 0.75rem);
+    font-weight: 600;
+    text-transform: uppercase;
+  }
+  :where(.gm-upload-preview img) {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  :where(.gm-upload-name) {
+    display: block;
+    overflow: hidden;
+    font-size: var(--gm-text-sm, 0.875rem);
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+  :where(.gm-upload-name small) {
+    display: block;
+    color: var(--gm-ink-muted);
+    font-size: var(--gm-text-xs, 0.75rem);
+  }
+  :where(.gm-upload-remove) {
+    display: grid;
+    place-items: center;
+    width: 2.25rem;
+    height: 2.25rem;
+    padding: 0;
+    border: 0;
+    border-radius: var(--gm-radius-pill, 999px);
+    background: none;
+    color: var(--gm-ink-muted);
+    cursor: pointer;
+  }
+  :where(.gm-upload-remove:hover) {
+    background: var(--gm-chip-fill-hover, rgb(255 255 255 / 0.16));
+    color: var(--gm-ink);
+  }
+  :where(.gm-upload-remove:focus-visible) {
+    outline: 0;
+    box-shadow: var(--gm-focus);
+  }
+  :where(.gm-upload-remove svg) {
+    width: 1rem;
+    height: 1rem;
+  }
+}
+
+@layer gm-base, gm-components, gm-overrides;
+
+@layer gm-components {
+  /* Nav */
+  :where(gm-nav) {
+    position: relative;
+    display: flex;
+    gap: 0.125rem;
+    padding: 0.375rem;
+    border-radius: var(--gm-radius-lg, 28px);
+  }
+  :where(gm-nav[orientation='vertical']) {
+    flex-direction: column;
+  }
+  :where(gm-nav a) {
+    position: relative;
+    z-index: 1;
+    padding: 0.5rem 0.9rem;
+    border-radius: var(--gm-radius-pill, 999px);
+    color: var(--gm-ink-muted);
+    text-decoration: none;
+    transition: color 0.2s;
+  }
+  :where(gm-nav a[aria-current]) {
+    color: var(--gm-ink);
+  }
+}
+
+@layer gm-base, gm-components, gm-overrides;
+
+@layer gm-components {
+  /* Search */
+  :where(gm-search) {
+    position: relative;
+    display: block;
+  }
+  :where(.gm-search-field) {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.6rem 1rem;
+    border-radius: var(--gm-radius-pill, 999px);
+  }
+  :where(.gm-search-field svg) {
+    flex: none;
+    width: 1.1rem;
+    height: 1.1rem;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    opacity: 0.7;
+  }
+  :where(.gm-search-field input) {
+    flex: 1;
+    min-width: 0;
+    border: 0;
+    outline: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+  }
+  :where(.gm-search-field input)::placeholder {
+    color: var(--gm-ink-muted);
+  }
+  :where(.gm-search-field input)::-webkit-search-cancel-button {
+    display: none;
+  }
+  :where(.gm-search-field:focus-within) {
+    box-shadow: var(--gm-rim), var(--gm-focus), var(--gm-lift);
+  }
+  :where(.gm-search-field kbd) {
+    padding: 0.1rem 0.45rem;
+    border-radius: var(--gm-radius-sm, 10px);
+    box-shadow: var(--gm-rim);
+    color: var(--gm-ink-muted);
+    font: inherit;
+    font-size: 0.7rem;
+  }
+  :where(.gm-search-results) {
+    position: absolute;
+    top: calc(100% + 0.5rem);
+    left: 0;
+    right: 0;
+    z-index: 10;
+    max-height: min(60vh, 26rem);
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: rgb(255 255 255 / 0.25) transparent;
+    padding: 0.375rem;
+    border-radius: 24px;
+  }
+  :where(.gm-search-results[hidden]) {
+    display: none;
+  }
+  :where(.gm-search-result) {
+    display: flex;
+    flex-direction: column;
+    padding: 0.55rem 0.85rem;
+    border-radius: var(--gm-radius-md, 18px);
+    cursor: pointer;
+  }
+  :where(.gm-search-result[aria-selected='true']) {
+    background: var(--gm-highlight-glow, rgb(255 255 255 / 0.12));
+    box-shadow: var(--gm-rim);
+  }
+  :where(.gm-search-result small) {
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    color: var(--gm-ink-muted);
+  }
+  :where(.gm-search-empty) {
+    margin: 0;
+    padding: 0.55rem 0.85rem;
+    color: var(--gm-ink-muted);
+  }
+}
+
+@layer gm-base, gm-components, gm-overrides;
+
+@layer gm-components {
+  /*
+ * Scrollbar: the glass thumb takes over from the native bar with a mouse. It should go almost
+ * unnoticed: no rim or shadow (those mark what deserves attention), faint while the page rests,
+ * clear while it scrolls or under the pointer. Touch screens keep their native indicator.
+ */
+  :where(gm-scrollbar) {
+    position: fixed;
+    top: 0;
+    right: 3px;
+    z-index: 100;
+    width: 8px;
+    border-radius: var(--gm-radius-pill, 999px);
+    background: var(--gm-scrollbar-tint, rgb(255 255 255 / 0.22));
+    opacity: 0.35;
+    cursor: grab;
+    touch-action: none;
+    transition:
+      width 0.2s,
+      opacity 0.4s;
+  }
+  :where(gm-scrollbar[active], gm-scrollbar:hover, gm-scrollbar[dragging]) {
+    opacity: 1;
+    transition:
+      width 0.2s,
+      opacity 0.15s;
+  }
+  :where(gm-scrollbar:hover, gm-scrollbar[dragging]) {
+    width: 12px;
+  }
+  :where(gm-scrollbar[dragging]) {
+    cursor: grabbing;
+  }
+  :where(gm-scrollbar[hidden]) {
+    display: none;
+  }
+  @media (pointer: coarse), (hover: none) {
+    :where(gm-scrollbar) {
+      display: none;
+    }
+  }
+  @media (pointer: fine) and (hover: hover) {
+    :where(html:has(gm-scrollbar)) {
+      scrollbar-width: none;
+    }
+    :where(html:has(gm-scrollbar))::-webkit-scrollbar {
+      display: none;
+    }
+  }
+}
+
+@layer gm-base, gm-components, gm-overrides;
+
+@layer gm-components {
+  /*
+ * Tip: a card of glass with an optional icon, a heading, the message, actions and a close button.
+ * Anchored, it floats next to its target with an arrow, which has its own frost: it's a sibling of
+ * the card, since glass inside glass can't see the page.
+ */
+  :where(gm-tip) {
+    display: block;
+    margin-block: 1.25rem;
+  }
+  :where(gm-tip[hidden]) {
+    display: none;
+  }
+  :where(gm-tip[anchor]) {
+    position: fixed;
+    z-index: 60;
+    width: max-content;
+    max-width: min(22rem, calc(100vw - 16px));
+    margin: 0;
+  }
+  :where(.gm-tip-card) {
+    position: relative;
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    column-gap: 0.75rem;
+    align-items: start;
+    padding: 0.9rem 0.9rem 0.9rem 1.1rem;
+    border-radius: 22px;
+  }
+  /* Everything that isn't the icon or the close button sits in the middle column. */
+  :where(.gm-tip-card > *) {
+    grid-column: 2;
+    margin: 0;
+  }
+  :where(.gm-tip-card > [slot='icon']) {
+    grid-column: 1;
+    grid-row: 1 / span 9;
+    width: 1.6rem;
+    height: 1.6rem;
+    color: var(--gm-tip-accent, var(--gm-callout-tip));
+  }
+  :where(.gm-tip-heading) {
+    font-weight: 600;
+  }
+  :where(.gm-tip-card > :not(.gm-tip-heading, .gm-tip-close, [slot='icon'])) {
+    color: var(--gm-ink-muted);
+  }
+  :where(.gm-tip-heading + *) {
+    margin-top: 0.2rem;
+  }
+  :where(.gm-tip-actions) {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin-top: 0.75rem;
+  }
+  :where(.gm-tip-close) {
+    grid-column: 3;
+    grid-row: 1;
+    display: grid;
+    place-items: center;
+    width: 1.75rem;
+    height: 1.75rem;
+    margin: -0.2rem -0.2rem 0 0;
+    padding: 0;
+    border: 0;
+    border-radius: var(--gm-radius-pill, 999px);
+    background: none;
+    color: var(--gm-ink-muted);
+    cursor: pointer;
+  }
+  :where(.gm-tip-close:hover) {
+    background: var(--gm-chip-fill);
+    color: var(--gm-ink);
+  }
+  :where(.gm-tip-close svg) {
+    width: 0.95rem;
+    height: 0.95rem;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+  }
+  :where(.gm-tip-arrow) {
+    position: absolute;
+    top: -8px;
+    left: calc(var(--gm-tip-arrow, 50%) - 8px);
+    width: 16px;
+    height: 16px;
+    border-radius: 3px;
+    background: var(--gm-tint-light, rgb(255 255 255 / 0.18));
+    box-shadow: var(--gm-rim);
+    -webkit-backdrop-filter: blur(var(--gm-blur-lg, 28px)) saturate(var(--gm-saturation-md, 160%));
+    backdrop-filter: blur(var(--gm-blur-lg, 28px)) saturate(var(--gm-saturation-md, 160%));
+    rotate: 45deg;
+  }
+  :where(gm-tip[material='frost'] > .gm-tip-arrow) {
+    background: var(--gm-frost-tint);
+  }
+  :where(gm-tip[data-side='top'] > .gm-tip-arrow) {
+    top: auto;
+    bottom: -8px;
+  }
+  /* With no backdrop effect, the arrow matches the card's opaque tint. */
+  :where(gm-tip:has(> .gm-tip-card[data-glass-tier='solid']) > .gm-tip-arrow) {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    background: var(--gm-tint-solid, rgb(28 28 36 / 0.88));
+  }
+}
+
+@layer gm-base, gm-components, gm-overrides;
+
+@layer gm-components {
+  /*
+ * Panel: the container that may hold glass. Glass can't sit inside glass (its backdrop-filter
+ * would hide the page from the glass within), so a block that holds a segmented control, a
+ * select or a quantity is a plain translucent fill with a rim, not a gm-surface. The fill is dense,
+ * so text reads over any page; over a backdrop the system already blurs, lighten it (os-backdrop).
+ * <section class="gm-panel"><header class="gm-panel-header"><h2>Options</h2>
+ * <div class="gm-panel-actions">…chips…</div></header>…</section>
+ */
+  :where(.gm-panel) {
+    display: grid;
+    align-content: start;
+    gap: var(--gm-space-lg, 16px);
+    min-width: 0;
+    padding: var(--gm-space-xl, 24px);
+    border-radius: var(--gm-radius-lg, 28px);
+    background: var(--gm-panel-fill, rgb(16 16 24 / 0.8));
+    box-shadow:
+      var(--gm-panel-rim, inset 0 0 0 0.5px rgb(255 255 255 / 0.18)),
+      var(--gm-lift, 0 10px 34px rgb(0 0 0 / 0.24));
+    color: var(--gm-ink);
+  }
+  :where(.gm-panel-header) {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--gm-space-sm, 8px) var(--gm-space-lg, 16px);
+  }
+  :where(.gm-panel-header > :is(h1, h2, h3, h4)) {
+    margin: 0;
+    font-size: var(--gm-text-md, 1rem);
+    font-weight: 600;
+  }
+  :where(.gm-panel-actions) {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--gm-space-xs, 4px);
+    margin-left: auto;
+  }
+}
+
+@layer gm-base, gm-components, gm-overrides;
+
+@layer gm-components {
+  /*
+ * Note: an inline alert that isn't glass, for where gm-callout can't go: inside a gm-dialog, a
+ * gm-surface or a panel. A tint of its status colour and a hairline rim of the same, so it reads
+ * on any fill; the words carry the meaning, the colour only confirms it.
+ * <p class="gm-note" data-tone="warning">…</p>, or a <div> with a <strong class="gm-note-heading">.
+ * data-lines keeps the line breaks of a message as it came (a server's, a log's).
+ */
+  :where(.gm-note) {
+    --gm-note-tone: var(--gm-ink-muted);
+    display: grid;
+    gap: var(--gm-space-2xs, 2px);
+    margin: 0;
+    padding: var(--gm-space-md, 12px) var(--gm-space-lg, 16px);
+    border-radius: var(--gm-radius-sm, 10px);
+    background: color-mix(in srgb, var(--gm-note-tone) 14%, transparent);
+    box-shadow: inset 0 0 0 0.5px color-mix(in srgb, var(--gm-note-tone) 60%, transparent);
+    color: var(--gm-ink);
+    font-size: var(--gm-text-sm, 0.875rem);
+    line-height: 1.5;
+  }
+  :where(.gm-note[data-tone='info']) {
+    --gm-note-tone: var(--gm-status-info, rgb(120 170 255));
+  }
+  :where(.gm-note[data-tone='success']) {
+    --gm-note-tone: var(--gm-status-success, rgb(90 210 150));
+  }
+  :where(.gm-note[data-tone='warning']) {
+    --gm-note-tone: var(--gm-status-warning, rgb(255 196 90));
+  }
+  :where(.gm-note[data-tone='danger']) {
+    --gm-note-tone: var(--gm-status-danger, rgb(255 110 110));
+  }
+  :where(.gm-note-heading) {
+    font-weight: 600;
+  }
+  :where(.gm-note > p) {
+    margin: 0;
+  }
+  :where(.gm-note[data-lines]) {
+    white-space: pre-line;
+  }
+}
+
+@layer gm-base, gm-components, gm-overrides;
+
+@layer gm-components {
+  /*
+ * Media grid: thumbnails at a steady size, as many to a row as fit. gm-gallery shows one
+ * picture at a time; this shows many, for a downloader, a file browser, an album.
+ * <div class="gm-media-grid" style="--gm-media-min: 150px" role="list">
+ *   <button class="gm-media-tile" data-ratio="3/4"><img src="…" alt="">
+ *   <span class="gm-badge" data-corner="bottom-start">3072×4096</span></button></div>
+ * Badges and small labels go in a corner with data-corner (top-start, top-end, bottom-start,
+ * bottom-end), on a frosted pill so they read over any picture. data-tone rings the tile.
+ */
+  :where(.gm-media-grid) {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(var(--gm-media-min, 150px), 1fr));
+    gap: var(--gm-space-md, 12px);
+  }
+  :where(.gm-media-tile) {
+    --gm-media-ring: transparent;
+    position: relative;
+    display: block;
+    aspect-ratio: 3 / 4;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    border: 0;
+    border-radius: var(--gm-radius-md, 18px);
+    background: var(--gm-chip-fill, rgb(255 255 255 / 0.1));
+    box-shadow: inset 0 0 0 1.5px var(--gm-media-ring);
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+    animation: gm-media-in 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+  :where(.gm-media-tile[data-ratio='1/1']) {
+    aspect-ratio: 1;
+  }
+  :where(.gm-media-tile[data-ratio='4/5']) {
+    aspect-ratio: 4 / 5;
+  }
+  :where(.gm-media-tile[data-ratio='16/9']) {
+    aspect-ratio: 16 / 9;
+  }
+  :where(.gm-media-tile > :is(img, video)) {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: scale 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  :where(.gm-media-tile:is(:hover, :focus-visible) > :is(img, video)) {
+    scale: 1.04;
+  }
+  :where(.gm-media-tile:focus-visible) {
+    outline: 0;
+    box-shadow:
+      inset 0 0 0 1.5px var(--gm-media-ring),
+      var(--gm-focus, 0 0 0 2px rgb(255 255 255 / 0.85));
+  }
+  /* The ring sits over the picture, so it's drawn again on top of it. */
+  :where(.gm-media-tile)::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    box-shadow: inset 0 0 0 2px var(--gm-media-ring);
+    pointer-events: none;
+  }
+  :where(.gm-media-tile[data-tone='success']) {
+    --gm-media-ring: var(--gm-status-success, rgb(90 210 150));
+  }
+  :where(.gm-media-tile[data-tone='warning']) {
+    --gm-media-ring: var(--gm-status-warning, rgb(255 196 90));
+  }
+  :where(.gm-media-tile[data-tone='danger']) {
+    --gm-media-ring: var(--gm-status-danger, rgb(255 110 110));
+  }
+  :where(.gm-media-tile > [data-corner]) {
+    position: absolute;
+    z-index: 1;
+    background: var(--gm-media-pill, rgb(10 10 18 / 0.55));
+    color: #fff;
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+  }
+  :where(.gm-media-tile > [data-corner^='top']) {
+    top: var(--gm-space-sm, 8px);
+  }
+  :where(.gm-media-tile > [data-corner^='bottom']) {
+    bottom: var(--gm-space-sm, 8px);
+  }
+  :where(.gm-media-tile > [data-corner$='start']) {
+    left: var(--gm-space-sm, 8px);
+  }
+  :where(.gm-media-tile > [data-corner$='end']) {
+    right: var(--gm-space-sm, 8px);
+  }
+  /* A small label that isn't a badge: a slide number, a count. */
+  :where(.gm-media-tile > span[data-corner]:not(.gm-badge)) {
+    padding: 0.1em 0.55em;
+    border-radius: var(--gm-radius-pill, 999px);
+    font-size: var(--gm-text-xs, 0.75rem);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+  @keyframes gm-media-in {
+    from {
+      opacity: 0;
+      translate: 0 6px;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    :where(.gm-media-tile) {
+      animation: none;
+    }
+    :where(.gm-media-tile > :is(img, video)) {
+      transition: none;
+    }
+  }
+}
+
+@layer gm-base, gm-components, gm-overrides;
+
+@layer gm-components {
+  /*
+ * Log: an activity feed, one line per event, newest at the bottom. Monospace, so times and
+ * counts line up; each line can carry a tone and a time.
+ * <ol class="gm-log" aria-live="polite"><li data-tone="success"><time>12:04:31</time>Saved</li></ol>
+ * Keep the newest line in view as lines arrive unless the reader has scrolled up to read; how
+ * many lines to keep is up to the page.
+ */
+  :where(.gm-log) {
+    display: grid;
+    align-content: start;
+    gap: 2px;
+    max-height: var(--gm-log-height, 16rem);
+    margin: 0;
+    padding: 0;
+    overflow: auto;
+    color: var(--gm-ink);
+    font: 0.82rem/1.55 var(--gm-font-mono, ui-monospace, 'Cascadia Code', Consolas, monospace);
+    list-style: none;
+    overscroll-behavior: contain;
+  }
+  :where(.gm-log > li) {
+    display: flex;
+    gap: var(--gm-space-md, 12px);
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+  :where(.gm-log > li > time) {
+    flex: none;
+    color: var(--gm-ink-muted);
+    font-variant-numeric: tabular-nums;
+  }
+  :where(.gm-log > li[data-tone='info']) {
+    color: var(--gm-status-info, rgb(120 170 255));
+  }
+  :where(.gm-log > li[data-tone='success']) {
+    color: var(--gm-status-success, rgb(90 210 150));
+  }
+  :where(.gm-log > li[data-tone='warning']) {
+    color: var(--gm-status-warning, rgb(255 196 90));
+  }
+  :where(.gm-log > li[data-tone='danger']) {
+    color: var(--gm-status-danger, rgb(255 110 110));
+  }
+  :where(.gm-log > li[data-tone='muted']) {
+    color: var(--gm-ink-muted);
+  }
+}
+
+@layer gm-base, gm-components, gm-overrides;
+
+@layer gm-components {
+  /*
+ * Small pieces of running text: a key to press, a bit of code, a button that reads as a link,
+ * and a label for a control that isn't in a .gm-field (a segmented control, a quantity).
+ * <kbd class="gm-kbd">F12</kbd> · <code class="gm-code-inline">access_key</code> ·
+ * <button class="gm-link">your account</button> · <span class="gm-label">Quality <span>(max)</span></span>
+ */
+  :where(.gm-kbd, .gm-code-inline) {
+    padding: 0.1em 0.4em;
+    border-radius: 6px;
+    background: var(--gm-chip-fill, rgb(255 255 255 / 0.1));
+    color: var(--gm-ink);
+    font: 0.82em/1.4 var(--gm-font-mono, ui-monospace, 'Cascadia Code', Consolas, monospace);
+    overflow-wrap: anywhere;
+  }
+  :where(.gm-kbd) {
+    box-shadow: inset 0 -1px 0 color-mix(in srgb, var(--gm-ink) 22%, transparent);
+    white-space: nowrap;
+  }
+  :where(.gm-link) {
+    display: inline;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 2px;
+    background: none;
+    color: inherit;
+    font: inherit;
+    text-decoration: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 3px;
+    cursor: pointer;
+  }
+  :where(.gm-link:hover) {
+    text-decoration-thickness: 2px;
+  }
+  :where(.gm-link:focus-visible) {
+    outline: 0;
+    box-shadow: var(--gm-focus, 0 0 0 2px rgb(255 255 255 / 0.85));
+  }
+  :where(.gm-label) {
+    display: block;
+    color: var(--gm-ink);
+    font-size: var(--gm-text-sm, 0.875rem);
+    font-weight: 600;
+  }
+  :where(.gm-label > span) {
+    color: var(--gm-ink-muted);
+    font-weight: 400;
+  }
+}
+
+@layer gm-base, gm-components, gm-overrides;
+
+@layer gm-components {
+  /*
+ * Action bar: what can be done with the items chosen in a list, in the place of the list's
+ * filters while choosing (not stacked under them). A pill with the count and the actions; it
+ * sticks to the top of a scrolling list, so it's dense enough that the list doesn't show
+ * through. Not glass: it sits inside the surface that holds the list.
+ * <div class="gm-actionbar"><strong class="gm-actionbar-count">3 chosen</strong>
+ * <div class="gm-actionbar-actions">…chips… <button class="gm-chip gm-chip-primary">Done</button></div></div>
+ */
+  :where(.gm-actionbar) {
+    position: sticky;
+    top: 0;
+    z-index: 4;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--gm-space-xs, 4px) var(--gm-space-md, 12px);
+    min-height: 2.6rem;
+    padding: 0.25rem 0.3rem 0.25rem var(--gm-space-lg, 16px);
+    border-radius: var(--gm-radius-pill, 999px);
+    background: var(--gm-actionbar-fill, rgb(36 33 50 / 0.94));
+    box-shadow: var(--gm-actionbar-rim, inset 0 0 0 0.5px rgb(255 255 255 / 0.14));
+    color: var(--gm-ink);
+  }
+  :where(.gm-actionbar[hidden]) {
+    display: none;
+  }
+  :where(.gm-actionbar-count) {
+    font-size: var(--gm-text-sm, 0.875rem);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+  :where(.gm-actionbar-actions) {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 2px;
+    margin-left: auto;
+  }
+  :where(.gm-actionbar-actions > .gm-chip) {
+    min-height: 2rem;
+  }
+}
+
+/*
+ * Theme for a transparent window over the operating system's own backdrop (Windows Acrylic or
+ * Mica, macOS vibrancy) in a desktop webview. Glass can only bend what's in the page, not the
+ * desktop behind the window, so there it reads by its tint: denser tints, a firmer rim, a
+ * heavier lift, light ink. <html data-gm-theme="os-backdrop">. Large surfaces read best with
+ * variant="lite" (the blur tier).
+ *
+ * Outside the cascade layers and on :root[…] on purpose: tokensToCss() writes the default tokens
+ * on :root, unlayered, and the theme has to win over them.
+ */
+:root[data-gm-theme='os-backdrop'] {
+  color-scheme: dark;
+  --gm-ink: rgb(255 255 255 / 0.94);
+  --gm-ink-muted: rgb(255 255 255 / 0.66);
+  --gm-tint-light: rgb(255 255 255 / 0.1);
+  --gm-frost-tint: rgb(14 14 22 / 0.45);
+  --gm-highlight-edge: rgb(255 255 255 / 0.4);
+  --gm-lift: 0 8px 28px rgb(0 0 0 / 0.28);
+  --gm-panel-fill: rgb(16 16 24 / 0.42);
+  --gm-panel-rim: inset 0 0 0 0.5px rgb(255 255 255 / 0.18);
+  --gm-chip-fill: rgb(255 255 255 / 0.08);
+  --gm-chip-fill-hover: rgb(255 255 255 / 0.14);
+}

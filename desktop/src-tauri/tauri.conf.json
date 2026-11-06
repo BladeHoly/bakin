@@ -1,0 +1,89 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Bakin",
+  "version": "0.13.2",
+  "identifier": "dev.bakin.desktop",
+  "build": {
+    "frontendDist": "../ui"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [
+      {
+        "label": "main",
+        "title": "Bakin",
+        "width": 1280,
+        "height": 840,
+        "minWidth": 520,
+        "minHeight": 560,
+        "center": true,
+        "resizable": true,
+        "decorations": false,
+        "transparent": false,
+        "backgroundColor": "#0d0c14",
+        "shadow": true,
+        "visible": false,
+        "additionalBrowserArgs": "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection --enable-smooth-scrolling"
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; script-src 'self' 'sha256-lOSZGG93Ko5nZhJX1Eh5/uypWHZG89a4Hwh6Cszto7s='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: asset: http://asset.localhost https://i.ytimg.com https://th.wallhaven.cc https://w.wallhaven.cc; media-src asset: http://asset.localhost; connect-src 'self' ipc: http://ipc.localhost; object-src 'none'; base-uri 'none'; form-action 'none'",
+      "assetProtocol": {
+        "enable": true,
+        "scope": []
+      }
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": [
+      "nsis"
+    ],
+    "publisher": "BladeHoly",
+    "shortDescription": "Tu biblioteca de fotos y música, en tu PC",
+    "longDescription": "Bakin baja fondos de pantalla de Wallhaven y música o video, y los organiza en una biblioteca con un reproductor liviano.",
+    "category": "Photography",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.ico"
+    ],
+    "resources": {
+      "engine-dist/bakin-engine/": "engine/",
+      "../../extension/": "extension/",
+      "../../LICENSE": "LICENSE.txt",
+      "../../THIRD-PARTY-NOTICES.md": "THIRD-PARTY-NOTICES.md",
+      "../../licenses/": "licenses/"
+    },
+    "windows": {
+      "nsis": {
+        "installMode": "currentUser",
+        "displayLanguageSelector": false,
+        "languages": [
+          "Spanish",
+          "English"
+        ]
+      }
+    },
+    "createUpdaterArtifacts": true
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDcxQTM4REZDOEJBMDg2REYKUldUZmhxQ0wvSTJqY1FNZk1RaEYvaG1JQUp6c3E4OTNPNUtURkJvSXJzTldpRmxXRFRhWmtLMmYK",
+      "endpoints": [
+        "https://github.com/BladeHoly/bakin/releases/latest/download/latest.json"
+      ],
+      "windows": {
+        "installMode": "passive"
+      }
+    },
+    "deep-link": {
+      "desktop": {
+        "schemes": [
+          "bakin"
+        ]
+      }
+    }
+  }
+}

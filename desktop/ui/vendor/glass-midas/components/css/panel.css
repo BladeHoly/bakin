@@ -1,0 +1,44 @@
+@layer gm-base, gm-components, gm-overrides;
+
+@layer gm-components {
+  /*
+ * Panel: the container that may hold glass. Glass can't sit inside glass (its backdrop-filter
+ * would hide the page from the glass within), so a block that holds a segmented control, a
+ * select or a quantity is a plain translucent fill with a rim, not a gm-surface. The fill is dense,
+ * so text reads over any page; over a backdrop the system already blurs, lighten it (os-backdrop).
+ * <section class="gm-panel"><header class="gm-panel-header"><h2>Options</h2>
+ * <div class="gm-panel-actions">…chips…</div></header>…</section>
+ */
+  :where(.gm-panel) {
+    display: grid;
+    align-content: start;
+    gap: var(--gm-space-lg, 16px);
+    min-width: 0;
+    padding: var(--gm-space-xl, 24px);
+    border-radius: var(--gm-radius-lg, 28px);
+    background: var(--gm-panel-fill, rgb(16 16 24 / 0.8));
+    box-shadow:
+      var(--gm-panel-rim, inset 0 0 0 0.5px rgb(255 255 255 / 0.18)),
+      var(--gm-lift, 0 10px 34px rgb(0 0 0 / 0.24));
+    color: var(--gm-ink);
+  }
+  :where(.gm-panel-header) {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--gm-space-sm, 8px) var(--gm-space-lg, 16px);
+  }
+  :where(.gm-panel-header > :is(h1, h2, h3, h4)) {
+    margin: 0;
+    font-size: var(--gm-text-md, 1rem);
+    font-weight: 600;
+  }
+  :where(.gm-panel-actions) {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--gm-space-xs, 4px);
+    margin-left: auto;
+  }
+}

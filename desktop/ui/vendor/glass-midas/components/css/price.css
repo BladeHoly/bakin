@@ -1,0 +1,78 @@
+@layer gm-base, gm-components, gm-overrides;
+
+@layer gm-components {
+  /*
+ * Price: what it costs now, what it cost before, and how much that saves, on one baseline.
+ * <p class="gm-price"><data value="349">$349</data><s>$449</s><span class="gm-price-off">−22%</span></p>.
+ * Screen readers read <s> as plain text, so say "was" in it (or in a hidden span) when it matters.
+ */
+  :where(.gm-price) {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.25em 0.55em;
+    margin: 0;
+    color: var(--gm-ink);
+    font-variant-numeric: tabular-nums;
+  }
+  :where(.gm-price > data, .gm-price > strong) {
+    font-weight: 600;
+  }
+  :where(.gm-price > s, .gm-price > del) {
+    color: var(--gm-ink-muted);
+    font-size: 0.85em;
+    text-decoration-thickness: 1px;
+  }
+  :where(.gm-price-off) {
+    padding: 0.1em 0.5em;
+    border-radius: var(--gm-radius-pill, 999px);
+    background: color-mix(
+      in srgb,
+      var(--gm-price-sale, var(--gm-accent, currentColor)) 18%,
+      transparent
+    );
+    color: var(--gm-ink);
+    font-size: 0.75em;
+    font-weight: 600;
+  }
+  /* "From $229", "/ month", "incl. tax": the quiet words around a price. */
+  :where(.gm-price > small) {
+    color: var(--gm-ink-muted);
+    font-size: 0.8em;
+  }
+
+  /*
+ * Totals: the lines of a bill, as a <dl class="gm-totals">: labels on the left, amounts lined up
+ * on the right. Mark the last pair with .gm-totals-total; it gets a hairline and the weight.
+ */
+  :where(.gm-totals) {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: var(--gm-space-sm, 8px) 0;
+    margin: 0;
+    font-size: var(--gm-text-sm, 0.875rem);
+  }
+  :where(.gm-totals > dt) {
+    color: var(--gm-ink-muted);
+  }
+  :where(.gm-totals > dd) {
+    margin: 0;
+    padding-inline-start: var(--gm-space-lg, 16px);
+    color: var(--gm-ink);
+    font-variant-numeric: tabular-nums;
+    text-align: end;
+  }
+  :where(.gm-totals > .gm-totals-total) {
+    padding-top: var(--gm-space-sm, 8px);
+    border-top: 1px solid color-mix(in srgb, var(--gm-ink) 20%, transparent);
+    color: var(--gm-ink);
+    font-size: var(--gm-text-md, 1rem);
+    font-weight: 600;
+  }
+  :where(.gm-totals > dd > small) {
+    display: block;
+    color: var(--gm-ink-muted);
+    font-size: var(--gm-text-xs, 0.75rem);
+    font-weight: 400;
+  }
+}

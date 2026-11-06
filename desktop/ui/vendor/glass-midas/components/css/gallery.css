@@ -1,0 +1,199 @@
+@layer gm-base, gm-components, gm-overrides;
+
+@layer gm-components {
+  /*
+ * Gallery: content, not glass. One picture at a time on a snapping track, round arrows over its
+ * edges (hidden on touch screens, where a swipe does it), thumbnails under it, the current one
+ * ringed. The large view is a plain dark dialog, so nothing competes with the picture.
+ */
+  :where(gm-gallery) {
+    display: grid;
+    gap: var(--gm-space-md, 12px);
+    min-width: 0;
+  }
+  :where(.gm-gallery-stage) {
+    position: relative;
+  }
+  :where(.gm-gallery-track) {
+    display: flex;
+    overflow-x: auto;
+    border-radius: var(--gm-gallery-radius, var(--gm-radius-lg, 28px));
+    background: var(--gm-gallery-fill, var(--gm-chip-fill, rgb(255 255 255 / 0.1)));
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+    overscroll-behavior-x: contain;
+  }
+  :where(.gm-gallery-track)::-webkit-scrollbar {
+    display: none;
+  }
+  :where(.gm-gallery-track:focus-visible) {
+    outline: 0;
+    box-shadow: var(--gm-focus);
+  }
+  :where(.gm-gallery-track > *) {
+    flex: 0 0 100%;
+    width: 100%;
+    min-width: 0;
+    margin: 0;
+    scroll-snap-align: start;
+    scroll-snap-stop: always;
+  }
+  :where(.gm-gallery-track > img, .gm-gallery-track img) {
+    display: block;
+    width: 100%;
+    height: auto;
+    aspect-ratio: var(--gm-gallery-ratio, auto);
+    object-fit: cover;
+  }
+  :where(gm-gallery[zoom] .gm-gallery-track > *) {
+    cursor: zoom-in;
+  }
+
+  :where(.gm-gallery-arrow) {
+    position: absolute;
+    top: 50%;
+    display: grid;
+    place-items: center;
+    width: 2.5rem;
+    height: 2.5rem;
+    padding: 0;
+    border: 0;
+    border-radius: var(--gm-radius-pill, 999px);
+    background: color-mix(in srgb, var(--gm-tint-solid, rgb(20 20 28)) 70%, transparent);
+    color: var(--gm-ink);
+    cursor: pointer;
+    translate: 0 -50%;
+    transition:
+      opacity 0.2s,
+      background 0.2s;
+  }
+  :where(.gm-gallery-previous) {
+    left: var(--gm-space-md, 12px);
+  }
+  :where(.gm-gallery-next) {
+    right: var(--gm-space-md, 12px);
+  }
+  :where(.gm-gallery-arrow svg) {
+    width: 1.1rem;
+    height: 1.1rem;
+  }
+  :where(.gm-gallery-arrow:disabled) {
+    opacity: 0;
+    pointer-events: none;
+  }
+  :where(.gm-gallery-arrow:focus-visible) {
+    outline: 0;
+    box-shadow: var(--gm-focus);
+  }
+  @media (hover: none) {
+    :where(.gm-gallery-arrow) {
+      display: none;
+    }
+  }
+
+  :where(.gm-gallery-thumbs) {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(4.5rem, 22%), 1fr));
+    gap: var(--gm-space-sm, 8px);
+  }
+  :where(gm-gallery[data-single] :is(.gm-gallery-thumbs, .gm-gallery-arrow)) {
+    display: none;
+  }
+  :where(.gm-gallery-thumbs > button) {
+    padding: 0;
+    overflow: hidden;
+    border: 0;
+    border-radius: var(--gm-radius-sm, 10px);
+    background: var(--gm-gallery-fill, var(--gm-chip-fill, rgb(255 255 255 / 0.1)));
+    cursor: pointer;
+    opacity: 0.6;
+    transition: opacity 0.2s;
+  }
+  :where(.gm-gallery-thumbs > button:hover, .gm-gallery-thumbs > button[aria-current]) {
+    opacity: 1;
+  }
+  :where(.gm-gallery-thumbs > button[aria-current]) {
+    box-shadow: 0 0 0 2px var(--gm-ink);
+  }
+  :where(.gm-gallery-thumbs > button:focus-visible) {
+    outline: 0;
+    box-shadow: var(--gm-focus);
+  }
+  :where(.gm-gallery-thumbs img) {
+    display: block;
+    width: 100%;
+    aspect-ratio: 1;
+    object-fit: cover;
+  }
+
+  :where(.gm-gallery-zoom) {
+    width: 100vw;
+    max-width: none;
+    height: 100dvh;
+    max-height: none;
+    margin: 0;
+    padding: var(--gm-space-xl, 24px);
+    overflow: hidden;
+    border: 0;
+    background: rgb(8 8 12 / 0.94);
+    color: #fff;
+  }
+  :where(.gm-gallery-zoom[open]) {
+    display: grid;
+    place-items: center;
+  }
+  :where(.gm-gallery-zoom)::backdrop {
+    background: transparent;
+  }
+  :where(.gm-gallery-zoom > img) {
+    width: auto;
+    height: auto;
+    max-width: min(100%, 72rem);
+    max-height: calc(100dvh - 2 * var(--gm-space-xl, 24px));
+    border-radius: var(--gm-radius-md, 18px);
+    cursor: zoom-in;
+    transition: scale 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+  :where(.gm-gallery-zoom > img[data-magnified]) {
+    scale: 2;
+    cursor: zoom-out;
+  }
+  :where(.gm-gallery-close) {
+    position: absolute;
+    top: calc(var(--gm-space-lg, 16px) + env(safe-area-inset-top));
+    right: var(--gm-space-lg, 16px);
+    display: grid;
+    place-items: center;
+    width: 2.75rem;
+    height: 2.75rem;
+    padding: 0;
+    border: 0;
+    border-radius: var(--gm-radius-pill, 999px);
+    background: rgb(255 255 255 / 0.14);
+    color: inherit;
+    cursor: pointer;
+  }
+  :where(.gm-gallery-zoom .gm-gallery-arrow) {
+    display: grid;
+    width: 2.75rem;
+    height: 2.75rem;
+    background: rgb(255 255 255 / 0.14);
+    color: #fff;
+  }
+  :where(.gm-gallery-zoom .gm-gallery-arrow:focus-visible) {
+    box-shadow: 0 0 0 2px #fff;
+  }
+  :where(.gm-gallery-close svg) {
+    width: 1.2rem;
+    height: 1.2rem;
+  }
+  :where(.gm-gallery-close:focus-visible) {
+    outline: 0;
+    box-shadow: 0 0 0 2px #fff;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    :where(.gm-gallery-zoom > img) {
+      transition: none;
+    }
+  }
+}

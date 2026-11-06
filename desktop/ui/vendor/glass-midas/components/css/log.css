@@ -1,0 +1,50 @@
+@layer gm-base, gm-components, gm-overrides;
+
+@layer gm-components {
+  /*
+ * Log: an activity feed, one line per event, newest at the bottom. Monospace, so times and
+ * counts line up; each line can carry a tone and a time.
+ * <ol class="gm-log" aria-live="polite"><li data-tone="success"><time>12:04:31</time>Saved</li></ol>
+ * Keep the newest line in view as lines arrive unless the reader has scrolled up to read; how
+ * many lines to keep is up to the page.
+ */
+  :where(.gm-log) {
+    display: grid;
+    align-content: start;
+    gap: 2px;
+    max-height: var(--gm-log-height, 16rem);
+    margin: 0;
+    padding: 0;
+    overflow: auto;
+    color: var(--gm-ink);
+    font: 0.82rem/1.55 var(--gm-font-mono, ui-monospace, 'Cascadia Code', Consolas, monospace);
+    list-style: none;
+    overscroll-behavior: contain;
+  }
+  :where(.gm-log > li) {
+    display: flex;
+    gap: var(--gm-space-md, 12px);
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+  :where(.gm-log > li > time) {
+    flex: none;
+    color: var(--gm-ink-muted);
+    font-variant-numeric: tabular-nums;
+  }
+  :where(.gm-log > li[data-tone='info']) {
+    color: var(--gm-status-info, rgb(120 170 255));
+  }
+  :where(.gm-log > li[data-tone='success']) {
+    color: var(--gm-status-success, rgb(90 210 150));
+  }
+  :where(.gm-log > li[data-tone='warning']) {
+    color: var(--gm-status-warning, rgb(255 196 90));
+  }
+  :where(.gm-log > li[data-tone='danger']) {
+    color: var(--gm-status-danger, rgb(255 110 110));
+  }
+  :where(.gm-log > li[data-tone='muted']) {
+    color: var(--gm-ink-muted);
+  }
+}

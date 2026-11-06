@@ -1,0 +1,165 @@
+@layer gm-base, gm-components, gm-overrides;
+
+@layer gm-components {
+  /*
+ * Choices: native radios (or checkboxes) dressed three ways, so a group keeps the keyboard, forms
+ * and screen readers for free. A swatch is a dot of a color; a choice is a chip with a word on
+ * it; an option is a row with a title, a note and a price. The one that's on gets the rim.
+ */
+  :where(.gm-swatches, .gm-choices) {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--gm-space-sm, 8px);
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+
+  /* Swatch: <input type="radio" class="gm-swatch" style="--gm-swatch: #5fae9c" aria-label="…">. */
+  :where(.gm-swatch) {
+    flex: none;
+    width: var(--gm-swatch-size, 2rem);
+    height: var(--gm-swatch-size, 2rem);
+    margin: 0;
+    border-radius: var(--gm-radius-pill, 999px);
+    background: var(--gm-swatch, var(--gm-chip-fill));
+    background-size: cover;
+    box-shadow:
+      inset 0 0 0 1px rgb(255 255 255 / 0.2),
+      0 0 0 1px rgb(0 0 0 / 0.25);
+    outline: 1.5px solid transparent;
+    outline-offset: 3px;
+    cursor: pointer;
+    appearance: none;
+    transition: outline-color 0.15s;
+  }
+  :where(.gm-swatch[data-size='sm']) {
+    --gm-swatch-size: 1.4rem;
+  }
+  :where(.gm-swatch[data-size='lg']) {
+    --gm-swatch-size: 2.6rem;
+  }
+  :where(.gm-swatch:hover) {
+    outline-color: color-mix(in srgb, var(--gm-ink) 20%, transparent);
+  }
+  :where(.gm-swatch:checked) {
+    outline-color: var(--gm-ink);
+  }
+  :where(.gm-swatch:focus-visible) {
+    outline-color: var(--gm-ink);
+    box-shadow: var(--gm-focus);
+  }
+  /* Sold out: still choosable (to see it, or to be told when it's back), struck through. */
+  :where(.gm-swatch[data-unavailable], .gm-swatch:disabled) {
+    background:
+      linear-gradient(
+        to top right,
+        transparent calc(50% - 1px),
+        var(--gm-ink) calc(50% - 1px) calc(50% + 1px),
+        transparent calc(50% + 1px)
+      ),
+      var(--gm-swatch, var(--gm-chip-fill));
+  }
+  :where(.gm-swatch:disabled) {
+    opacity: 0.5;
+    cursor: default;
+  }
+
+  /* Choice: <label class="gm-choice"><input type="radio" name="size" value="m">M</label>. */
+  :where(.gm-choice) {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4em;
+    min-width: 2.75rem;
+    min-height: 2.25rem;
+    padding: 0.35rem 0.9rem;
+    border-radius: var(--gm-radius-pill, 999px);
+    background: var(--gm-chip-fill, rgb(255 255 255 / 0.1));
+    color: var(--gm-ink);
+    font-size: var(--gm-text-sm, 0.875rem);
+    font-weight: 500;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.15s;
+  }
+  :where(.gm-choice > input) {
+    position: absolute;
+    inset: 0;
+    margin: 0;
+    opacity: 0;
+    cursor: inherit;
+  }
+  :where(.gm-choice:hover) {
+    background: var(--gm-chip-fill-hover, rgb(255 255 255 / 0.16));
+  }
+  :where(.gm-choice:has(> input:checked)) {
+    background: var(--gm-chip-fill-on, rgb(255 255 255 / 0.22));
+    box-shadow: var(--gm-rim);
+  }
+  :where(.gm-choice:has(> input:focus-visible)) {
+    box-shadow: var(--gm-focus);
+  }
+  :where(.gm-choice:has(> input[data-unavailable])) {
+    color: var(--gm-ink-muted);
+    text-decoration: line-through;
+  }
+  :where(.gm-choice:has(> input:disabled)) {
+    opacity: 0.5;
+    cursor: default;
+  }
+
+  /*
+ * Option: a row to pick, for delivery speeds, payment methods, saved addresses.
+ * <label class="gm-option"><input type="radio" class="gm-check" …><span>Standard<small>3–5
+ * days</small></span><span>Free</span></label>. Everything after the title is quieter.
+ */
+  :where(.gm-options) {
+    display: grid;
+    gap: var(--gm-space-sm, 8px);
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+  :where(.gm-option) {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: var(--gm-space-md, 12px);
+    padding: var(--gm-space-md, 12px) var(--gm-space-lg, 16px);
+    border-radius: var(--gm-radius-md, 16px);
+    background: var(--gm-chip-fill, rgb(255 255 255 / 0.1));
+    color: var(--gm-ink);
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  :where(.gm-option:hover) {
+    background: var(--gm-chip-fill-hover, rgb(255 255 255 / 0.16));
+  }
+  :where(.gm-option:has(> input:checked)) {
+    background: var(--gm-chip-fill-on, rgb(255 255 255 / 0.22));
+    box-shadow: var(--gm-rim);
+  }
+  :where(.gm-option:has(> input:focus-visible)) {
+    box-shadow: var(--gm-focus);
+  }
+  :where(.gm-option > span) {
+    display: grid;
+    gap: 0.15rem;
+    font-weight: 500;
+  }
+  :where(.gm-option small) {
+    color: var(--gm-ink-muted);
+    font-size: var(--gm-text-sm, 0.875rem);
+    font-weight: 400;
+  }
+  :where(.gm-option > span:last-child:not(:nth-child(2))) {
+    font-variant-numeric: tabular-nums;
+    text-align: end;
+  }
+  :where(.gm-option:has(> input:disabled)) {
+    opacity: 0.5;
+    cursor: default;
+  }
+}

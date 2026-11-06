@@ -1,0 +1,193 @@
+# QA: what people do with Bakin
+
+The scenarios the pre-publish test must cover. **A** = automated in
+`packaging/ui-smoke.mjs` (runs inside `release.ps1`, a release cannot go out
+if one fails); **M** = manual check before a release that touches that area;
+**→** = planned to become automated.
+
+Every bug a user finds gets a scenario here **and** an automated check before
+it is called fixed (0.6.1's reload after the tray became R1).
+
+## Common flows
+
+| # | Flow | Status |
+|---|---|---|
+| C1 | Open Bakin: library shows, no script errors | A |
+| C2 | Switch Biblioteca / Descargas / Convertir and back | A |
+| C3 | Open and close each settings dialog (presets, tools, extension) | A |
+| C4 | Paste a link in the link box: right actions for YouTube and Wallhaven | A |
+| C5 | Scroll a big library (300+ files) up and down; the card wraps the grid | A |
+| C6 | Click a song: it plays, its row is marked, «siguiente» works | A |
+| C7 | A song ends and the next one starts by itself | A |
+| C8 | Música > Artistas > an artist > «Reproducir» | A |
+| C9 | Close the window while music plays: music goes on in the tray | A |
+| C10 | Reopen from the tray after a while: same page, same queue, still playing (no reload) | A |
+| C11 | Download a song / playlist with the default preset | M (needs YouTube) |
+| C12 | Queue several downloads, pause and resume the queue | M → A (fake engine) |
+| C13 | Select photos: favourite, tag, delete (Recycle Bin), undo | → A |
+| C14 | Convert a few images / songs to another format | → A |
+| C15 | Create a playlist from a selection, play it, remove a song | → A |
+| C16 | Smart playlist: rules, live preview, save, edit | → A |
+| C17 | Shuffle / repeat / sleep timer / crossfade change behaviour as shown | → A |
+| C18 | Search the library while music plays | → A |
+| C19 | Update from the app with a pending download queue | M |
+| C20 | Restart Bakin: player queue, position, volume and view come back | → A |
+| C21 | Scroll photos or covers down and back up: nothing flashes or re-animates (0.6.1 report) | A |
+| C22 | Viewer: next / previous keeps one box inside the window, no jump; controls fade out; details closed by default (0.6.2 report) | A |
+| C23 | Mark the playing song as favourite (♥ in the player or F); it shows in Música > Favoritas | → A |
+| C24 | ⏮ ⏭: a click jumps the chosen seconds in the same song, a right click changes song (0.7.0 report) | A (right click in the UI test) |
+| C25 | Fotos and Música are separate: Fotos never lists songs or music folders, Música never shows photo collections or photo filters; each space keeps its own filters (0.7.1 report) | A |
+| C26 | Open «Eliminadas» with hundreds of deleted files: the list shows within a second | → A (0.03 s measured, was 5 s) |
+| C27 | Every setting lives in Configuración, once (no copies in sidebars); Consumo shows Bakin's real total (0.7.1 report) | A |
+| C28 | Cola: the playing song first, then what follows; a click jumps there | → A |
+| C29 | Locate: a click on the player's cover/title shows the song in the list on screen (loading pages if needed) or in Cola, highlighted (0.8 s for the 900th song) | → A |
+| C30 | Selecting with the list scrolled: the selection bar is solid, the column header sticks under it, all its buttons fit (0.7.1 report) | → A |
+| C31 | Each thing said once: Música starts at «Todo» (no «MÚSICA» heading under the Música tab); the list's count shows only when the sidebar isn't showing it (search or filter on, entry without a number, sidebar collapsed or closed) | A |
+| C32 | ☰ or Ctrl B collapses the sidebar to a column of icons (names on hover) and back; remembered across restarts | A |
+| C33 | The top search only searches the library (Ctrl K / Ctrl F; typing from Descargas or Convertir goes back to it); «Descargar» (Ctrl D) opens one panel with every way to download (Fondos de Wallhaven, Pegar enlace, Música o video, Mis «Me gusta», Seguir un canal; sections on the left, the last one remembered), the link sections putting their action first; pasting a link into the search opens the link box | A |
+| C34 | Vertical monitor (1080×1920, also at 125 % = 864 px wide) and a narrow window: nothing spills sideways, the search stays usable; at ≤ 900 px the tabs go to a second row and the sidebar is a drawer (☰, closes on pick, outside click or Escape) | A |
+| C35 | Right click on ⤨: Totalmente al azar / Inteligente (more favourites and long-unheard songs, never the same artist twice in a row) / Por álbum (whole albums in order); a pick turns shuffle on, the button shows ✦ or ◉, the kind survives a restart | A |
+| C36 | Modo mínimo (⧉ in the player or N); its arrow button makes it transparent to the mouse (clicks go through, buttons dimmed; tray menu «Modo mínimo: usar el mouse» or opening the full window brings the mouse back; first time, a notification says how): a 460×72 window bottom right with the song playing (cover, title, progress, ⏮ ⏯ ⏭ like the big bar, wheel = volume, 📌 cycles always on top / normal / always on bottom, remembered); the big window hides and is destroyed after 20 s like in the tray; ⤢, the cover or Escape bring it back | A |
+| C37 | The background is a static procedural pattern (soft lights in the interface's colours and grain, no dots (0.9.1 report)), drawn once and again only on a resize or, with Configuración › General › «Con el color de la portada», when the song changes; never per frame; the old one fades out | A |
+| C38 | Switching lists (Fotos ↔ Música, a collection) before the previous list finished loading always shows the new list; a failed download says which song and why, with «Ver» to the Descargas log (0.9.2 report) | A |
+| C39 | Cold start: only the dark base shows until the page is wired (no raw dialogs, menus or unstyled buttons for a few frames), then the whole window appears at once; a 4 s fallback reveals it even if something failed (0.9.3 report) | A |
+| C40 | Fondos de Wallhaven: «Descargar» › «Fondos de Wallhaven» searches (tags, categories, order, monitor = resolution + ratio, «sketchy» opt-in, never NSFW), thumbnails in the wallpaper's own shape, «Ya lo tenés» for downloaded ones, pick and «Bajar N» queues a job; files land in Fotos › Wallhaven with their tags; pasted Wallhaven links download from Wallhaven, never through yt-dlp; on 429 the queue waits an hour | A |
+| C41 | Modo mínimo, second pass: three sizes (bar, card, song only) from its size button; a volume slider (🔊 in the bar, always in the card); «transparente al mouse» switches to song only and back; it reopens where and how it was (Configuración › General › «Recordar dónde estaba», on by default; a monitor that is gone means the default place); also opens from the tray | A |
+| C42 | ¿Audio o video?: analysing a link («Elegir formato») shows «Detectado: Música / Video» with why, picks a music or video preset by itself (unless the user already picked one); changing it remembers that preset for the site, and direct downloads from the link box use it (tested offline with a saved yt-dlp -J) | A |
+| C43 | Engine on demand: window closed to the tray with nothing queued → within ~90 s the engine process is gone while the music goes on; reopening Bakin wakes it (library, same song playing); plays counted while it slept show up in «Más escuchadas»; covers in the media overlay and the small window still show (from the cover cache) | A (tray check) + pytest (sleep/wake, pending plays) |
+| C44 | «Poner de fondo»: right click on a photo, or «Poner de fondo…» in the viewer → a menu with each monitor (main first, size, «vertical») and «Todos»; the photo becomes that monitor's background (fill). Only images are accepted | A (dry run: `BAKIN_DRY_WALLPAPER=1`, two fake monitors; never the real desktop) + M (on the user's PC, with their OK) |
+| C45 | Rotating backgrounds: Configuración › Fondos de pantalla has a row per monitor (source: Wallhaven, Favoritas or a collection; every 5 min … 1 day; random or in order; only its orientation). Turning it on shows one at once; then it changes by itself with the window closed and the engine asleep; «Siguiente» (row or tray) changes it now; nothing repeats until the source runs out; «Pausar la rotación» (settings or tray) stops the timer. Each monitor gets a copy framed to its exact shape and size, as PNG (never enlarged) | A (dry run, C44/C45) + cargo (`pick_next`, `crop_rect`, `frame`) |
+| C46 | «Fondos» filters in Fotos (not in Música): shape (horizontal / vertical / square), minimum resolution (1080p, 1440p, 4K) and dominant colour (Wallhaven's 29); every photo shows its real size; the photo a monitor shows says «Fondo N» (top right; hidden while selecting). Colours are worked out in the background; Wallhaven's come from its API | A + pytest (`test_query_orientation_resolution_and_color`, Wallhaven colours) |
+| C47 | Wallhaven account: Configuración › Descargas › Wallhaven (user + API key, a password field, never filled back; checked with Wallhaven before saving; kept in the Windows Credential Manager; a test copy uses its own entry). With a key and user, «Descargar › Fondos de Wallhaven» shows «Mis colecciones» (private ones 🔒). «Seguir…» (every 6 h / day / week) follows the search or collection shown: the first ones now, then what is new, in its own folder, with the window closed | A (C47, no network) + pytest (key only to the API, redacted, account, follows) |
+| C48 | Rotation wishes: «De día claros, de noche oscuros» (7–19 h light photos, else dark, by their colour) and «Que siga la portada» (the photos closest to the playing cover's colour); with nothing matching it takes from all, never stuck | A (C48, by the clock) + cargo (`pick_prefers_colour`) |
+| C49 | (user, 0.13 review) The Wallhaven grid lagged: tiles load the small thumbnail (300 px; the large one only on dense screens), decoded off the main thread, and tiles out of view are not painted; the big preview asks for the full file only if you stay on it | A (C49, a saved page of 60 results, no network) |
+| C50 | (user, 0.13 review) Smooth scrolling: a mouse-wheel notch glides over a few frames in every list (library, Wallhaven, settings…); touchpads, Ctrl+wheel and «reduce motion» keep the browser's own | A (C50) |
+| C51 | (user, 0.13 review) ~4000 liked songs in the queue, paused until tomorrow by the daily limit, kept Wallhaven out («La cola ya tiene 2000 trabajos») and waiting. Now Wallhaven and conversions have their own lane: their own count, ahead of the music, and a pause from YouTube (daily limit, pushback) holds only music and video; the queue says so | A (C51) + pytest (`test_wallpapers_get_past_a_music_library_held_by_the_daily_limit`) |
+| C52 | (user, 0.13 review) The first time «Descargar» showed the wallpapers it was very laggy, even after waiting; closing and opening it again was smooth. Measured: ~20 fps scrolling the first time (thumbnails coming in) vs 144 later, almost no script time: the panel's refraction glass (an SVG `backdrop-filter`) being repainted. The panel uses glass-midas' light glass (`variant="lite"`, blur): 144 fps the first time too. Smooth scrolling keeps gliding when something else moves the list (it used to stop dead) | A (C49 checks the light glass; C50) |
+| C53 | (user, 0.13 review) Each small Wallhaven job showed its own «1 fondo nuevo» toast and they stacked. Now one toast per lane adds up while jobs keep finishing (under a minute apart): «Listo: 3 fondos nuevos · 1 ya estaba» | A (C53, finished events emitted to the page) |
+| C54 | (user, 0.13 review) Having to «resume the queue» was odd: Descargas › Colas has a row per lane (Música y video, Fondos de Wallhaven, Conversiones) with its count and state («Bajando ahora», «En espera», «Espera hasta mañana 00:05 · límite diario…») and its own Pausar / Reanudar / «Seguir ahora»; the list below shows the chosen lane; empty lanes are hidden; «Pausar todo» / «Reanudar todo» on top. Each lane's pause is kept and lifted on its own; download hours hold downloads but not conversions; the 0.13 queue.json (one pause «for music only») loads as a music-lane pause | A (C54) + pytest (lanes, persistence, old format) |
+| C55 | (user, 0.13 review) The lock screen: Windows refused it on the user's PC (only Store apps). After it refuses once, «Pantalla de bloqueo» is no longer offered | M (user saw it) |
+| C56 | (user, 0.13 review) Configuración lagged. Measured with a copy of the user's data and music playing: refraction on the big dialog dropped 5 % of frames to ≥ 28 ms; light glass: steady 7 ms. Every big dialog (settings, viewer, presets, tools, news…) uses `variant="lite"`; small static ones (confirmations) keep refraction | A (C56) |
+| C57 | (user, 0.13 review) The colour filter had no way back: the same colour again clears it, and the chip shows an × that clears it without opening the palette | A (C57) |
+| C58 | (user, 0.13 review) The selection bar and «Seleccionar» didn't fit the design: «Seleccionar» is a round icon button like refresh; while selecting the bar takes the filters' place (their pill shape), with the main actions in sight and the rest under ⋯ | A (C58) |
+| C59 | (user, 0.13 review) A song's ♥ from the music list itself (it took opening the song): an outline on hover, filled when a favourite; clicking it doesn't play the song | A (C59) |
+| C60 | (user, 0.13 review) Mini card: the title sat on the cover. The cover now takes the space the rest leaves | A (C60) |
+| C61 | (user, 0.13 review) Mini «solo el tema»: the layer and «transparente al mouse» were out of reach; ⋯ unfolds every window option | A (C61) |
+| C62 | (user, 0.13 review) «Ajustar encuadre…» in the background menu: the photo with a frame of the chosen monitor's shape, dragged (or arrows) to what should show; kept per photo and monitor shape (wallpapers.json `focus`), used by «Poner de fondo» and the rotation | A (C62) + cargo (`crop_rect_at`) |
+| C63 | (user, 0.13 review) Shortcuts that work anywhere (a game in front too), set in Configuración › General › «Atajos de teclado»: «Modo gaming» (Ctrl+Shift+G: the small window, always on top, the mouse through; again: the mouse back), modo mínimo, play/pause, next, previous, next background, show Bakin. Recording: click and press (Esc cancels, Backspace clears); refused if another action or program has it. A test copy (BAKIN_HOME) never takes the keys from Windows | A (C63, actions run through `hotkeys_run`) + cargo (defaults parse) + M (the real keys) |
+| C64 | (user, 0.13 review) «Descargar» wasn't intuitive: two ways in instead of five — «Fondos» (Wallhaven) and «Música y video» (one field for any link; Enter picks the format, the list also offers «Descargar ya» and «Seguir…»; «Me gusta» is a card under it). The top «Descargar» button is its own frosted glass (gm-button) | A (C33) |
+| C65 | (user, test build 0.13.1-prueba.1) A fast wheel flick went up and back down (and the reverse) in Música: the glide «carried on» from moves the browser made while the list loaded. It now only moves forward from where the list is, scroll anchoring is off in the lists, and grabbing the scrollbar or the keyboard stops it | A (C65: 25 quick notches over the 300-photo grid, never backwards) |
+| C66 | (user, test build) While a song downloaded, its cover (yt-dlp writes «Tema.webp» next to «Tema.webm.part» and embeds it at the end) showed in Fotos. In music and video folders an image named like one of their songs or videos (finished or downloading) is its cover, not a photo; the user's own folders are untouched. The UI test now has its own download folder (it used Windows' default, the user's Downloads, listing names only) | A (C66) + pytest |
+| C67 | (user, test build) In the mini window, ⋯ (song only) and 🔊 (bar) open vertically in room the window makes (down, or up near the screen's edge) instead of over the song; «Cerrar» is last, the farthest from ⋯, either way; the window gets its size back when they close | A (C61) |
+| C68 | (user, test build) The mini card took far too much room (248 × 384) and stacked everything. Like Apple Music's MiniPlayer and Spotify's square miniplayer, the card is now the cover itself, a 224 px square: at rest only the cover and a hairline of progress; on hover a scrim brings the window options (top, «Cerrar» set apart), prev / play / next (centre, on dark rounds for light covers) and the song, its time and the seek bar (bottom); the wheel sets the volume | A (C60: square, cover fills, controls only on hover; C36) |
+| C69 | (user, test build 0.13.1-prueba.2) Scrolling the songs «lagged». Measured with real wheel input over CDP (as Playwright does) on a copy of the user's data: frames steady (7 ms at 144 Hz), but a fast flick stopped dead where the loaded part of the list ended (pages of ~50 songs) and the extra notches were lost. Now notches past the end are kept and the glide carries on when the next page arrives (loaded earlier, 2000 px ahead), and row covers decode off the main thread | A (C69: 600 songs, 40 quick real notches; 95 % of frames ≤ 25 ms, none > 50 ms; it must cover ≥ 80 % of what was asked) |
+| C70 | (user, test build 0.13.1-prueba.3) Scrolling still lagged, «not like before»: the page's own glide set the scroll position from JavaScript every frame, on the main thread, competing with drawing rows, the glass and the player; the browser's scrolling runs on the compositor thread and stays smooth when the page is busy. The glide is gone: the browser scrolls, with Chromium's smooth scrolling turned on for the WebView (`--enable-smooth-scrolling`, plus Tauri's default flags). (C50 now checks the page doesn't take the wheel.) | A (C50, C65, C69) + M (the feel, only with the user's own mouse) |
+| C71 | (user, test build 0.13.1-prueba.4) Chromium's wheel smoothing does nothing in WebView2, and the user wants a strong smooth scroll like Zen's. The page takes each wheel notch and asks the browser for a smooth scroll (`scrollTo({behavior: 'smooth'})`, animated on the compositor thread, so it doesn't lag like the page-driven glide did): a notch goes 1.3× and glides, notches within 450 ms add up so a fast flick goes further. Touchpads, Ctrl+wheel and «reduce motion» keep the browser's own | A (C50: one notch glides, five add up; C65; C69) + M (the feel) |
+| C72 | (user, test build 0.13.1-prueba.5) The browser's smooth scroll felt delayed (it eases in). Smooth scrolling is now optional, Configuración › General › «Desplazamiento suave», off by default (the system's scrolling, no delay). On: a notch moves at once and eases out over ~180 ms, quick notches add up; the page measures the end once per notch and only writes the position each frame | A (C50: off doesn't take the wheel; on: > 45 % of the notch at 40 ms, done by 340 ms, five add up) + M (the feel) |
+| C73 | (user, test build) The music list's top: a loose «Tamaño» select and «Baja calidad» chip in a row of their own, a heavy dark column head, «Duración» on top of «Formato». Música sorts by its column heads (↑↓), «Baja calidad» sits with Reproducir / Aleatorio, the filters row is gone there, the head is a light line that scrolls with the list (stuck on top it would need to be opaque: glass can't frost inside glass), duration right-aligned with room | A (C73) |
+| C74 | (user, 0.13.1 polish) The top bar: Música and Imágenes (renamed from Fotos) by default, «+» shows Descargas / Convertir (several ticks without closing; remembered); a hidden view opened another way («Descargar» → Descargas) shows its tab while open; the search centred in the window with «Descargar» as the same frosted pill next to it; the window buttons without a pill behind | A (C74) |
+| C75 | (user, 0.13.1 polish) Right click anywhere showed Chromium's menu (Refresh, Share, Save image…) and Ctrl+G opened its find bar: both gone (Ctrl+F/P/R, F3/F5 too); text fields keep copy/paste | A (C75) |
+| C76 | (user, 0.13.1 polish) The folded sidebar: the ☰ over the column's middle; in Imágenes the tags card was an empty sliver (impossible to use): now a tag button that unfolds the sidebar on them (green while a tag filter is on); unfolding drew arcs around the cards for a moment, like a wrapper (glass-midas stretches the old refraction map until the new one is drawn): surfaces whose shape changes a lot frost plainly until then. Same guard for maximize and any big resize | A (C76) |
+| C77 | (user, 0.13.1 polish) The mini window's volume (the row and the vertical pop) used the browser's plain range: now glass-midas' slider, fine like the main player's, filled from the bottom when standing | M (screenshot with the test copy) |
+| C78 | (user, prueba.7) Spacing and narrow windows: the bar's pieces were 41 / 40 / 38 / 36 px tall; under 1200 px «Descargar» lost its label too early; under 900 px the «B» mark took room; at the minimum width (520) the search shrank under «Descargar» and settings went off; the song count vanished from the title when the sidebar was a drawer; an empty 36–52 px column before every song. Now one 40 px height, the label goes at 1000, the search keeps an icon's width, the count shows, the heart column is just the heart | A (C78, 1600–520 px) |
+| C79 | (user, after 0.13.1) Configuración in categories: General (background, browser), Apariencia (cover tint, smooth scrolling, which tabs show on top — the same as «+»), Fondos de pantalla, Música (⏮⏭, fade, mini window), Atajos (global shortcuts plus the window's keys as a list), Descargas, Cuentas (Wallhaven key), Consumo; each entry opens only its own section | A (C79) |
+| C80 | A toast fired while a modal dialog is open (Configuración, «Preset guardado» in the preset dialog) shows over it: glass-midas 0.8.1 puts the toast region in the top layer (Bakin's own stand-in removed) | A (C80) |
+| C81 | (a friend's report, 0.13.2) «Descargué muchas canciones y no aparecían; reinicié y aparecieron todas»: a playlist is one job and the library was read again only when it ended. Each song re-reads it now (engine: `media_file` invalidates the index; page: at most every 4 s), in place — the list keeps its scroll and never goes blank (it also jumped to the top after every download) | pytest (`test_each_song_shows_while_a_long_list_downloads`) + A (C81) |
+| C82 | (same friend) Typing an artist in the library search to find new music showed an empty list: with music and no match, the notice says it searches the library and offers «Buscar «…» en YouTube Music» (opens the browser; Bakin's own music search comes in 0.15) | pytest + A (C82) |
+| C83 | (user, 2026-11-07) Their cookies.txt sat in plain text in Downloads: Configuración › Cuentas › YouTube imports it into Bakin's vault (DPAPI, this Windows user), the presets that used it switch to «Guardadas en Bakin», yt-dlp gets a plain copy only while it runs (wiped after; renewed cookies kept), «Borrar el archivo original» overwrites and deletes it (not to the Recycle Bin), «Quitar de Bakin» turns those presets off. Never a value in the page, logs or errors | pytest (`test_vault.py`) + A (C83) |
+| C84 | (PLAN 0.14.1) Música › ⋯ › «Limpiar títulos y artistas…»: before → after per song (YouTube noise, «Artista - Tema» split, Topic/VEVO, a label or channel as the artist → «revisar», unticked), «Aplicar» writes the ticked ones (Opus, Vorbis, FLAC, MP3, M4A; WAV can't), the song playing is left for later, «Deshacer» puts the tags back (backup in library/tags-backup.jsonl). On the user's 5176 songs: 2457 proposals, ~85–90 % right by eye in two samples of 40–50 | pytest (`test_tagclean.py`, `test_library_clean.py`) + A (C84) |
+| C85 | (PLAN 0.14.3) «Buscar duplicados…»: same title and main artist ±2 s (noise and feat. ignored; remix/live/edit are different songs), the best copy marked (lossless > Opus > AAC > MP3, then bitrate); «Dejar uno de cada grupo» sends the rest to the Recycle Bin (Deshacer), their plays, favourite and playlist places go to the one kept | pytest (`test_dupes.py`, `test_library_clean.py`) + A (C85, never resolved: no Recycle Bin in tests) |
+| C86 | (PLAN 0.14.5) Música › «Estadísticas»: week / month / year / all from the play log (each play with its time, from 0.14 on): plays, minutes, distinct songs, top songs and artists (click: play / open), plays by hour, artists new to you | pytest (`test_library_clean.py::test_stats…`) + A (C86) |
+| C87 | (user, 2026-11-06) «Más escuchadas» shows how many times each song was played («Escuchado» column) | A (C87) |
+| C88 | (PLAN 0.14.4 + user) A song's right click › «Radio desde este tema» (the song, its artist, artists played near it, favourites); the daily mix leans on new and favourite songs with few plays, weighs this hour's songs up and skipped ones down (the player records «next» before 30 s); shuffle «Por artista» (an artist at a time) | pytest (`test_mixes.py`) + cargo test (`artist_shuffle…`) + A (C88) |
+| C89 | (PLAN 0.14.2) MusicBrainz (Configuración › Música, off by default): in «Limpiar títulos…», «Buscar en MusicBrainz» looks the chosen songs up one a second (only title, artist and length sent), proposes artist / title / album / year and the official cover, the user ticks; a 503/429 stops with a note | pytest (`test_musicbrainz.py`, no network) + M |
+| C90 | (PLAN 0.15.1, the user's friend) «Descargar» › «Buscar música»: YouTube Music's catalogue like Wallhaven (no account): songs as rows to tick (what you have marked), albums / artists / playlists as tiles that open (an artist's songs and albums, an album's tracks, «Bajar todo»), «Bajar» queues the ticked ones; a search only on Enter, results cached, at most 100 catalogue requests an hour (Configuración), a 429 or bot check stops it for an hour | pytest (`test_ytmusic.py`, fake client) + A (C90, saved catalogue) |
+| C91 | (PLAN 0.15.2, the user) A Spotify link (track, album, playlist) in «Descargar» › «Buscar estos temas en YouTube Music»: names and lengths from Spotify's public page (no account; a playlist's first 100, «Importar CSV…» for more), each song found on YouTube Music with a score (title, artists, length, version): sure ones ticked, «revisar» and other versions (live, remix…) with a choice of the other results, not found said so; the downloads are YouTube's. On a real 18-song album: 16 sure, the 2 remixes YouTube Music doesn't have, not found | pytest (`test_spotify.py`) + A (C91, saved pages) |
+| C92 | (PLAN 0.15.3, the user's friend: «que sea en tercer plano») Starting a download no longer jumps to Descargas: a note with «Ver», and a ring next to «Descargar» with the progress and how many are left (a click opens Descargas, hidden when nothing downloads); Descargas folds the step-by-step activity under «Detalles» | A (C92) |
+| C93 | (PLAN 0.15.5, the user: «lo que consuma mucho, con toggle») Configuración › Rendimiento: the catalogue's hourly limit (0 = none, at most 1000) and its covers on/off, each with its cost; the engine takes only those keys | pytest (`test_ytmusic.py::test_settings_only_take_known_keys`) + A (C79) |
+| C94 | (PLAN 0.16) Configuración › Música: «Volumen parejo» (Apagado / Por tema / Por álbum, +0…6 dB; each song measured once with ffmpeg's EBU R128 at low priority, toward −18 LUFS, never clipping), a 10-band EQ with presets (no clipping: pre-gain), the output device (Windows' default if the chosen one is gone), lyrics (a song's .lrc next to it or in Bakin; LRCLIB only if allowed: title, artist, album, length) in a panel in time with the song (a line clicked seeks); «Repetir un tramo» A–B in the timer | pytest (`test_loudness.py`, `test_lyrics.py`, `test_sound.py`) + cargo test (eq, gain, ab) + A (C94) |
+| C95 | (PLAN 0.18.1, 0.18.4) Configuración › General › «Copia de seguridad»: «Exportar…» makes a .zip of what the user built (playlists, plays, favourites and tags per collection, presets with cookie paths blanked, follows, lyrics, settings; never the vault, cookies, tools, logs, previews); «Importar…» previews it and merges (favourites and tags joined, plays summed once per backup, newer playlists win, nothing deleted; a copy of today's data first; zip-slip and foreign zips refused). «Datos de Bakin» › «Mover…» copies the data folder, checks it, points Bakin there and restarts | pytest (`test_backup.py`, `test_paths_redirect.py`) + A (C95) |
+| C96 | (PLAN 0.18.2) Older data files are brought to today's shape when the engine starts (`_v` per file, one backup `*.before-<v>.json` once; an unreadable file is left alone); the writers keep the version | pytest (`test_migrate.py`) |
+| C97 | (PLAN 0.20.2) Each follow shows what its last check brought: new, already there, failed and why (the last 30 checks kept, the last 10 in the tooltip) | pytest (`test_background.py::test_follow_history`) + smoke |
+| C98 | (PLAN 0.20.1) «Carpeta espejo…» in a playlist: the folder gets its songs and a relative `playlist.m3u8`, follows edits 30 s later and at start; a folder with things in it is only used after asking and its files are never touched; removing goes to the Recycle Bin after a first yes; stopping leaves the files | pytest (`test_mirror.py`, `test_music_views.py::test_playlist_mirror_folder`) + smoke |
+| C99 | (PLAN 0.20.3) «Tranquilo» and «Intenso» mixes appear once 20+ songs are measured (Configuración › Sonido › volumen parejo) and split them by how they sound | pytest (`test_loudness.py::test_energy_axis`, `test_energy_mixes`) |
+| C100 | (PLAN 0.21.1) Configuración › En tu casa: on → a Subsonic app on the phone connects with the address, user «bakin» and the code; library, albums, playlists, covers, lyrics, streaming with seeking, stars and plays come back to Bakin; «Cambiar el código» locks every phone out; off → the port closes | cargo test (`lan::`), smoke (loopback only) + M (a real phone, Symfonium or Tempo) |
+| C101 | (PLAN 0.21.2–0.21.3) The phone page at `http://<PC>:4533/app/`: the code, songs, albums, playlists, favourites, play with the lock-screen controls, keep songs on the phone, «Mandar a Bakin» opens the download dialog on the PC (nothing queued without confirming) | cargo test (`lan::tests::endpoints`), smoke + M |
+| R31 | A public wifi (no private address): the server only listens on this PC; a request from a public address is refused (403); a test copy never leaves 127.0.0.1 | cargo test (`private_ip_only`, `public_peer_rejected`), smoke |
+| C102 | (PLAN 0.22.2) A fresh Bakin (empty data folder) opens a three-step welcome: downloads folder, «my music» folders, what each part is; «Saltar» or finishing never shows it again; a used Bakin never sees it | pytest (`test_migrate.py::test_first_run_*`) + smoke + M (a clean Windows user) |
+| C103 | (PLAN 0.22.4) axe-core finds no serious/critical issue in Fotos, Música, Descargar and every Configuración section; tiles and rows show a focus ring with the keyboard; with Windows' animations off nothing slides | smoke (axe) + M (keyboard only, Narrador) |
+| C104 | (PLAN 0.22.3) Configuración › General › Idioma: English → the window, its dialogs, the mini player, the tray (next start) and the engine's fixed messages in English; Automático follows Windows; back to Español restores everything | pytest (`test_i18n.py`: every key translated, placeholders match) + smoke + M (the tray) |
+| R30 | The moved data folder is on a disk that isn't there: Bakin starts with the usual folder and says where the moved one was | pytest (`test_paths_redirect.py`) + M |
+
+## Rare but possible (top 25)
+
+| # | Situation | Status |
+|---|---|---|
+| R1 | Song on repeat-one, window in the tray for minutes, then reopened | A (partial): the UI test plays a 4-min song on repeat for 140 s in the tray and reopens; it passes on 0.6.2 but did **not** catch 0.6.1 (that needed the user's 3500-file page). Closed for good by the native player (ARCHITECTURE-BACKGROUND step 1) |
+| R2 | The playing file is deleted / moved from outside Bakin | → A |
+| R3 | The music drive (R:) is disconnected while playing or at start | M |
+| R4 | Two clicks on two songs within a second (race between loads) | → A |
+| R5 | Media keys pressed with the window hidden | M |
+| R6 | Windows sleeps / hibernates while playing or downloading, then wakes | M |
+| R7 | The library changes on disk while browsing (new downloads land) | → A |
+| R8 | An upgrade replaces the song that is playing right now | → A |
+| R9 | A playlist / mix with songs that no longer exist | A (engine tests) |
+| R10 | 0-byte, corrupt or unsupported audio file in the queue | → A |
+| R11 | Very long queue (5000 songs): open the queue dialog, shuffle | → A |
+| R12 | The window resized to its minimum and maximised, player bar visible | → A |
+| R13 | Bakin started with Windows (hidden), then opened later | M |
+| R14 | Second launch while one is running (single instance shows the window) | → A |
+| R15 | A bakin:// link arrives while a dialog is open | → A |
+| R16 | Closing the window while a dialog is open and music plays | → A |
+| R17 | Engine crash / killed: the UI says so, nothing is lost | → A |
+| R18 | Download queue resumes at its hour while the user is playing music | M |
+| R19 | YouTube bot check in the middle of the night queue | A (engine tests) |
+| R20 | Cookies expire while the queue runs | A (engine tests) |
+| R21 | Disk full while downloading or converting | → A (engine tests) |
+| R22 | Names with emoji, Japanese, very long paths (>260 chars) | → A |
+| R23 | Clock / time zone change while a timed pause is waiting | A (engine tests) |
+| R24 | Delete a playlist that is playing right now | → A |
+| R25 | Update installed while music plays from the tray | M |
+| R26 | No sound output (Bluetooth headphones off) when pressing play, or the output disappears mid-song | M → A (a fake device switch) |
+| R27 | The engine sleeps, the PC sleeps too, and a timed pause (download hours, daily limit, YouTube pushback) or a follow comes due meanwhile: on waking, the shell's scheduler wakes the engine within 30 s and the queue goes on | pytest (`wake_at`, `resume_due`) + cargo test (`scheduler::due`); M for the real PC sleep |
+| R28 | A monitor is disconnected while its menu is open, or reconnected with a new id: monitors are looked up again on every request; a gone one answers «Ese monitor ya no está conectado» | cargo test (`describe` skips empty rectangles); M |
+
+## Budgets (checked on every release → A)
+
+The numbers live in `packaging/budgets.json`; the UI test (`ui-smoke.mjs`,
+run by `release.ps1`) measures each one, prints the table at the end and
+fails the release when one is over (or could not be measured). Measured on
+2026-11-02 with the debug build of the test (release: measure at the next
+install; the debug shell weighs more).
+
+| What | Budget | How it is measured | Measured (debug) |
+|---|---|---|---|
+| Tray with music, engine asleep (C43), all Bakin processes | ≤ 75 MB | long song on repeat, window closed ~2 min | 8 MB |
+| Tray, idle (music paused, queue paused until later) | ≤ 30 MB | window closed, ~1.5 min | 9 MB |
+| CPU playing from the tray | < 1 % | Bakin's processes' CPU time over 10 s, % of the machine | 0.27 % |
+| Window open, 300 photos | ≤ 150 MB (**warning only** until 0.16) | 10 s after the library check | 302 MB |
+| Page load to library visible, 300 files | < 2 s | reload → first tile (`performance.now()`) | 137 ms |
+| Same, 3800 files | < 2 s | 3500 tiny images added | 166 ms |
+| Installer | Defender clean, signed for the updater | `release.ps1` + `MpCmdRun` | ✔ |
+
+The start-up numbers are a page reload in a warm WebView2, not a cold
+start of the app (that adds WebView2's own start, ~1 s).
+
+**Where the window's memory goes** (PLAN 0.17.1, 2026-11-07, debug test copy, Música with 31
+songs, private working set by process; runs vary ±5 MB):
+
+| Variant | Total | Renderer | GPU | WebView2 browser | Engine | Shell |
+|---|---|---|---|---|---|---|
+| As it is | 195–203 MB | 60–65 | 59–60 | 29–30 | 28 | 7.5 |
+| No glass at all | 175 | 44 | 55 | 30 | 28 | 7.5 |
+| Refraction → plain blur everywhere | 173 | 41 | 56 | 30 | 28 | 7.5 |
+| The two toolbar pills blur-only (kept) | 194 | 57.5 | 59 | 30 | 28 | 7.5 |
+| Without the list / without the background | ~177 | ~42 | ~59 | 29 | 28 | 7.3 |
+
+Previews as files (asset:) instead of base64 changed nothing measurable (kept: less JSON). With
+WebView2 the floor is ~150 MB even without glass (GPU + browser + a bare renderer), so the
+«window open ≤ 150 MB» budget stays a warning until 1.0's native interface (GPUI).
+
+The memory is counted like the Task Manager does (private working set) and
+over every process Bakin starts, WebView2 included: the number shown to the
+user must be the honest total.

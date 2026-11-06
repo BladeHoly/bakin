@@ -1,0 +1,112 @@
+@layer gm-base, gm-components, gm-overrides;
+
+@layer gm-components {
+  /*
+ * Field: a label, a control, a hint or an error, stacked. Inputs sit inside glass, so like chips
+ * they're a light fill, not glass; the focus ring and the rim mark the one being typed in.
+ */
+  :where(.gm-field) {
+    display: grid;
+    gap: var(--gm-space-xs, 4px);
+    min-width: 0;
+  }
+  :where(.gm-field > label, .gm-field-label) {
+    color: var(--gm-ink);
+    font-size: var(--gm-text-sm, 0.875rem);
+    font-weight: 500;
+  }
+  :where(.gm-field-hint, .gm-field-error) {
+    margin: 0;
+    color: var(--gm-ink-muted);
+    font-size: var(--gm-text-xs, 0.75rem);
+    line-height: 1.4;
+  }
+  :where(.gm-field-error) {
+    color: var(--gm-status-danger, rgb(255 110 110));
+  }
+  :where(.gm-field-error:empty) {
+    display: none;
+  }
+
+  :where(.gm-input) {
+    box-sizing: border-box;
+    width: 100%;
+    min-height: 2.75rem;
+    margin: 0;
+    padding: 0.6em 0.9em;
+    border: 0;
+    border-radius: var(--gm-radius-sm, 10px);
+    background: var(--gm-chip-fill);
+    color: var(--gm-ink);
+    font: inherit;
+    transition:
+      background 0.2s,
+      box-shadow 0.2s;
+  }
+  :where(textarea.gm-input) {
+    min-height: 6rem;
+    resize: vertical;
+  }
+  :where(.gm-input)::placeholder {
+    color: var(--gm-ink-muted);
+    opacity: 0.8;
+  }
+  :where(.gm-input:hover) {
+    background: var(--gm-chip-fill-hover);
+  }
+  :where(.gm-input:focus) {
+    outline: 0;
+    background: var(--gm-chip-fill-hover);
+    box-shadow: var(--gm-focus);
+  }
+  :where(.gm-input[aria-invalid='true'], .gm-input:user-invalid) {
+    box-shadow: inset 0 0 0 1px var(--gm-status-danger, rgb(255 110 110));
+  }
+  /* Being fixed: the focus ring around the error ring, so both read. */
+  :where(.gm-input[aria-invalid='true']:focus, .gm-input:user-invalid:focus) {
+    box-shadow:
+      var(--gm-focus),
+      inset 0 0 0 1px var(--gm-status-danger, rgb(255 110 110));
+  }
+  :where(.gm-input:disabled) {
+    opacity: 0.5;
+    cursor: default;
+  }
+  /* Autofill paints its own yellow; keep the field's look and ink. */
+  :where(.gm-input:autofill) {
+    -webkit-text-fill-color: var(--gm-ink);
+    caret-color: var(--gm-ink);
+    transition: background-color 600000s 0s;
+  }
+
+  /* A control with an icon or a button inside, at either end. */
+  :where(.gm-input-group) {
+    position: relative;
+    display: flex;
+    align-items: center;
+  }
+  :where(.gm-input-group > .gm-input) {
+    flex: 1;
+  }
+  :where(.gm-input-group > :not(.gm-input)) {
+    position: absolute;
+    display: inline-flex;
+    color: var(--gm-ink-muted);
+  }
+  :where(.gm-input-group > :not(.gm-input):first-child) {
+    left: 0.75em;
+  }
+  :where(.gm-input-group > :not(.gm-input):last-child) {
+    right: 0.4em;
+  }
+  :where(.gm-input-group > :not(.gm-input):first-child ~ .gm-input) {
+    padding-left: 2.5em;
+  }
+  :where(.gm-input-group > .gm-input:has(~ :not(.gm-input))) {
+    padding-right: 3em;
+  }
+  :where(.gm-input-group svg) {
+    width: 1.15em;
+    height: 1.15em;
+  }
+}

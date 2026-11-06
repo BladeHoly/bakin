@@ -1,0 +1,135 @@
+@layer gm-base, gm-components, gm-overrides;
+
+@layer gm-components {
+  /*
+ * Badge: a short status, its color only where it means something. A dot and a tinted fill;
+ * the word carries the meaning, so it reads without the color too.
+ */
+  :where(.gm-badge) {
+    --gm-badge-tone: var(--gm-ink-muted);
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45em;
+    padding: 0.2em 0.65em;
+    border-radius: var(--gm-radius-pill, 999px);
+    background: color-mix(in srgb, var(--gm-badge-tone) 16%, transparent);
+    color: var(--gm-ink);
+    font-size: var(--gm-text-xs, 0.75rem);
+    font-weight: 600;
+    line-height: 1.5;
+    white-space: nowrap;
+  }
+  :where(.gm-badge)::before {
+    content: '';
+    width: 0.45em;
+    height: 0.45em;
+    border-radius: var(--gm-radius-pill, 999px);
+    background: var(--gm-badge-tone);
+  }
+  :where(.gm-badge[data-tone='info']) {
+    --gm-badge-tone: var(--gm-status-info, rgb(120 170 255));
+  }
+  :where(.gm-badge[data-tone='success']) {
+    --gm-badge-tone: var(--gm-status-success, rgb(90 210 150));
+  }
+  :where(.gm-badge[data-tone='warning']) {
+    --gm-badge-tone: var(--gm-status-warning, rgb(255 196 90));
+  }
+  :where(.gm-badge[data-tone='danger']) {
+    --gm-badge-tone: var(--gm-status-danger, rgb(255 110 110));
+  }
+
+  /* Avatar: a picture, or initials on a tint, in a circle. */
+  :where(.gm-avatar) {
+    display: inline-grid;
+    place-items: center;
+    flex: none;
+    width: var(--gm-avatar-size, 2rem);
+    height: var(--gm-avatar-size, 2rem);
+    overflow: hidden;
+    border-radius: var(--gm-radius-pill, 999px);
+    background: var(--gm-avatar-fill, var(--gm-chip-fill-on, rgb(255 255 255 / 0.22)));
+    color: var(--gm-ink);
+    font-size: calc(var(--gm-avatar-size, 2rem) * 0.4);
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    user-select: none;
+  }
+  :where(.gm-avatar[data-size='sm']) {
+    --gm-avatar-size: 1.5rem;
+  }
+  :where(.gm-avatar[data-size='lg']) {
+    --gm-avatar-size: 3rem;
+  }
+  :where(.gm-avatar > img) {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  /* A few avatars, overlapped. */
+  :where(.gm-avatar-group) {
+    display: inline-flex;
+  }
+  :where(.gm-avatar-group > .gm-avatar + .gm-avatar) {
+    margin-left: calc(var(--gm-avatar-size, 2rem) * -0.3);
+    box-shadow: 0 0 0 2px var(--gm-avatar-ring, var(--gm-tint-solid, rgb(28 28 36)));
+  }
+
+  /* Skeleton: where content will be, while it loads. */
+  :where(.gm-skeleton) {
+    display: block;
+    min-height: 1em;
+    border-radius: var(--gm-radius-sm, 10px);
+    background: linear-gradient(
+        100deg,
+        transparent 30%,
+        var(--gm-chip-fill, rgb(255 255 255 / 0.1)) 50%,
+        transparent 70%
+      )
+      var(--gm-chip-fill, rgb(255 255 255 / 0.1));
+    background-size: 200% 100%;
+    animation: gm-shimmer 1.4s ease-in-out infinite;
+  }
+  :where(.gm-skeleton-text) {
+    height: 0.8em;
+    border-radius: 4px;
+  }
+  :where(.gm-skeleton-round) {
+    border-radius: var(--gm-radius-pill, 999px);
+  }
+  @keyframes gm-shimmer {
+    from {
+      background-position: 150% 0;
+    }
+    to {
+      background-position: -50% 0;
+    }
+  }
+
+  /* Pagination: chips for pages, the current one on. */
+  :where(.gm-pagination) {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--gm-space-xs, 4px);
+  }
+  :where(.gm-pagination .gm-chip) {
+    min-width: 2.5em;
+    padding-inline: 0.75em;
+    font-variant-numeric: tabular-nums;
+  }
+  :where(.gm-pagination-gap) {
+    min-width: 1.5em;
+    color: var(--gm-ink-muted);
+    text-align: center;
+  }
+}
+
+@layer gm-overrides {
+  @media (prefers-reduced-motion: reduce) {
+    :where(.gm-skeleton) {
+      animation: none;
+    }
+  }
+}

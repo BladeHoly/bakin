@@ -1,0 +1,48 @@
+@layer gm-base, gm-components, gm-overrides;
+
+@layer gm-components {
+  /* Tabs */
+  :where(gm-tabs) {
+    display: block;
+    margin-block: 1.25rem;
+  }
+  :where(gm-tab) {
+    display: block;
+  }
+  :where(gm-tab[hidden]) {
+    display: none;
+  }
+  /* Before the script runs, show only the first tab rather than all of them. */
+  :where(gm-tabs:not(:defined) > gm-tab:not(:first-of-type)) {
+    display: none;
+  }
+  :where(.gm-tablist) {
+    position: relative;
+    display: inline-flex;
+    gap: 0.125rem;
+    padding: 0.25rem;
+    margin-bottom: 0.75rem;
+    border-radius: var(--gm-radius-pill, 999px);
+    /* More tabs than room: the row scrolls sideways instead of widening the page. */
+    max-width: 100%;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  :where(.gm-tab-button) {
+    flex: none;
+    position: relative;
+    z-index: 1;
+    padding: 0.4rem 0.95rem;
+    border: 0;
+    border-radius: var(--gm-radius-pill, 999px);
+    background: none;
+    color: var(--gm-ink-muted);
+    font: inherit;
+    font-size: 0.875rem;
+    cursor: pointer;
+    transition: color 0.2s;
+  }
+  :where(.gm-tab-button[aria-selected='true']) {
+    color: var(--gm-ink);
+  }
+}

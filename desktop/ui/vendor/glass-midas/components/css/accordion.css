@@ -1,0 +1,71 @@
+@layer gm-base, gm-components, gm-overrides;
+
+@layer gm-components {
+  /*
+ * Accordion: native <details> in a .gm-accordion, hairlines between them and a chevron that
+ * turns. Give them one `name` and only one stays open at a time; the browser does the keyboard
+ * and find-in-page. Where it can animate to auto height, the content slides open.
+ */
+  :where(.gm-accordion) {
+    interpolate-size: allow-keywords;
+  }
+  :where(.gm-accordion > details) {
+    border-bottom: 1px solid color-mix(in srgb, var(--gm-ink) 20%, transparent);
+  }
+  :where(.gm-accordion > details:last-child) {
+    border-bottom: 0;
+  }
+  :where(.gm-accordion > details > summary) {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--gm-space-md, 12px);
+    padding: var(--gm-space-lg, 16px) 0;
+    border-radius: 4px;
+    color: var(--gm-ink);
+    font-weight: 600;
+    cursor: pointer;
+    list-style: none;
+  }
+  :where(.gm-accordion > details > summary)::-webkit-details-marker {
+    display: none;
+  }
+  :where(.gm-accordion > details > summary)::after {
+    content: '';
+    flex: none;
+    width: 1rem;
+    height: 1rem;
+    background: currentColor;
+    opacity: 0.7;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M3.5 6L8 10.5 12.5 6' fill='none' stroke='%23000' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")
+      center / contain no-repeat;
+    transition: rotate 0.25s;
+  }
+  :where(.gm-accordion > details[open] > summary)::after {
+    rotate: 180deg;
+  }
+  :where(.gm-accordion > details > summary:focus-visible) {
+    outline: 0;
+    box-shadow: var(--gm-focus);
+  }
+  :where(.gm-accordion > details > :not(summary)) {
+    margin: 0 0 var(--gm-space-lg, 16px);
+    color: var(--gm-ink-muted);
+  }
+  :where(.gm-accordion > details)::details-content {
+    height: 0;
+    overflow: clip;
+    transition:
+      height 0.3s cubic-bezier(0.2, 0.8, 0.2, 1),
+      content-visibility 0.3s allow-discrete;
+  }
+  :where(.gm-accordion > details[open])::details-content {
+    height: auto;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    :where(.gm-accordion > details)::details-content,
+    :where(.gm-accordion > details > summary)::after {
+      transition: none;
+    }
+  }
+}

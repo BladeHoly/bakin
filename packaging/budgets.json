@@ -1,0 +1,9 @@
+{
+  "_": "Bakin's budgets (docs/QA.md › Budgets), read by ui-smoke.mjs. MB = private working set of every Bakin process, as the Task Manager counts it. warn_only: printed, not failed (the window's budget is hard from 0.16 on).",
+  "window_open_mb": { "max": 150, "warn_only": true },
+  "tray_music_mb": { "max": 75 },
+  "tray_idle_mb": { "max": 30 },
+  "tray_music_cpu_pct": { "max": 1 },
+  "startup_ms": { "max": 2000 },
+  "startup_3500_ms": { "max": 2000 }
+}

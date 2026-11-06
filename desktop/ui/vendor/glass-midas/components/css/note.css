@@ -1,0 +1,45 @@
+@layer gm-base, gm-components, gm-overrides;
+
+@layer gm-components {
+  /*
+ * Note: an inline alert that isn't glass, for where gm-callout can't go: inside a gm-dialog, a
+ * gm-surface or a panel. A tint of its status colour and a hairline rim of the same, so it reads
+ * on any fill; the words carry the meaning, the colour only confirms it.
+ * <p class="gm-note" data-tone="warning">…</p>, or a <div> with a <strong class="gm-note-heading">.
+ * data-lines keeps the line breaks of a message as it came (a server's, a log's).
+ */
+  :where(.gm-note) {
+    --gm-note-tone: var(--gm-ink-muted);
+    display: grid;
+    gap: var(--gm-space-2xs, 2px);
+    margin: 0;
+    padding: var(--gm-space-md, 12px) var(--gm-space-lg, 16px);
+    border-radius: var(--gm-radius-sm, 10px);
+    background: color-mix(in srgb, var(--gm-note-tone) 14%, transparent);
+    box-shadow: inset 0 0 0 0.5px color-mix(in srgb, var(--gm-note-tone) 60%, transparent);
+    color: var(--gm-ink);
+    font-size: var(--gm-text-sm, 0.875rem);
+    line-height: 1.5;
+  }
+  :where(.gm-note[data-tone='info']) {
+    --gm-note-tone: var(--gm-status-info, rgb(120 170 255));
+  }
+  :where(.gm-note[data-tone='success']) {
+    --gm-note-tone: var(--gm-status-success, rgb(90 210 150));
+  }
+  :where(.gm-note[data-tone='warning']) {
+    --gm-note-tone: var(--gm-status-warning, rgb(255 196 90));
+  }
+  :where(.gm-note[data-tone='danger']) {
+    --gm-note-tone: var(--gm-status-danger, rgb(255 110 110));
+  }
+  :where(.gm-note-heading) {
+    font-weight: 600;
+  }
+  :where(.gm-note > p) {
+    margin: 0;
+  }
+  :where(.gm-note[data-lines]) {
+    white-space: pre-line;
+  }
+}

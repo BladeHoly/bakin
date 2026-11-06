@@ -1,0 +1,33 @@
+@layer gm-base, gm-components, gm-overrides;
+
+@layer gm-components {
+  /* Button: a glass pill around a native button or link, for actions floating on their own. */
+  :where(gm-button) {
+    display: inline-flex;
+    border-radius: var(--gm-radius-pill, 999px);
+  }
+  :where(gm-button > :is(button, a)) {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.55em;
+    padding: 0.7em 1.3em;
+    border: 0;
+    border-radius: inherit;
+    background: none;
+    color: inherit;
+    font: inherit;
+    text-decoration: none;
+    cursor: pointer;
+  }
+  :where(gm-button > :is(button, a):hover) {
+    background: var(--gm-chip-fill);
+  }
+
+  /* Icon only: a circle. */
+  :where(gm-button[shape='round'] > :is(button, a)) {
+    justify-content: center;
+    width: 2.9em;
+    height: 2.9em;
+    padding: 0;
+  }
+}

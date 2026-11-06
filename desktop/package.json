@@ -1,0 +1,14 @@
+{
+  "name": "bakin-desktop",
+  "private": true,
+  "version": "0.13.2",
+  "scripts": {
+    "tauri": "tauri",
+    "dev": "tauri dev",
+    "build:debug": "tauri build --debug --no-bundle"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "2.12.4",
+    "axe-core": "^4.10.3"
+  }
+}

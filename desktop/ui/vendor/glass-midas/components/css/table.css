@@ -1,0 +1,251 @@
+@layer gm-base, gm-components, gm-overrides;
+
+@layer gm-components {
+  /*
+ * Table: content, not glass. Hairlines between rows, a quiet header, numbers that line up, and
+ * a fill on the rows that are selected. It scrolls sideways when it's wider than its box.
+ */
+  :where(gm-table) {
+    --gm-table-row: 48px;
+    /* Positioned, so visually hidden text in a cell stays inside the scroll and can't widen the page. */
+    position: relative;
+    display: block;
+    max-width: 100%;
+    overflow-x: auto;
+    color: var(--gm-ink);
+  }
+  :where(gm-table[density='compact']) {
+    --gm-table-row: 40px;
+  }
+  :where(gm-table[density='relaxed']) {
+    --gm-table-row: 56px;
+  }
+  :where(gm-table table) {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-variant-numeric: tabular-nums;
+  }
+  :where(gm-table :is(th, td)) {
+    height: var(--gm-table-row);
+    padding: 0 var(--gm-space-md, 12px);
+    text-align: start;
+    vertical-align: middle;
+    white-space: nowrap;
+  }
+  :where(gm-table th) {
+    height: 2.5rem;
+    color: var(--gm-ink-muted);
+    font-size: var(--gm-text-sm, 0.875rem);
+    font-weight: 500;
+  }
+  :where(gm-table td) {
+    border-top: 1px solid var(--gm-table-line, var(--gm-chip-fill, rgb(255 255 255 / 0.1)));
+  }
+  :where(gm-table tbody tr:hover > td) {
+    background: var(--gm-table-hover, color-mix(in srgb, var(--gm-chip-fill) 50%, transparent));
+  }
+  :where(gm-table tr[aria-selected='true'] > td) {
+    background: var(--gm-table-selected, var(--gm-chip-fill));
+  }
+  :where(gm-table :is(th, td):is(.gm-num, [data-type='number'])) {
+    text-align: end;
+  }
+  /* A checkbox column: as narrow as its box. */
+  :where(gm-table :is(th, td):has(> .gm-check:only-child)) {
+    width: 1px;
+    padding-inline-end: 0;
+  }
+
+  /* Sortable headers: the whole label is the button; an arrow shows the order. */
+  :where(.gm-table-sort) {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35em;
+    margin: 0 -0.4em;
+    padding: 0.3em 0.4em;
+    border: 0;
+    border-radius: 6px;
+    background: none;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+  }
+  :where(.gm-table-sort:hover) {
+    color: var(--gm-ink);
+  }
+  :where(.gm-table-sort)::after {
+    content: '';
+    width: 0.7em;
+    height: 0.7em;
+    background: currentColor;
+    opacity: 0.35;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M3 4.5 6 1.5l3 3M3 7.5l3 3 3-3' fill='none' stroke='%23000' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")
+      center / contain no-repeat;
+  }
+  :where([aria-sort] > .gm-table-sort) {
+    color: var(--gm-ink);
+  }
+  :where([aria-sort] > .gm-table-sort)::after {
+    opacity: 1;
+    mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M3 7.5 6 4.5l3 3' fill='none' stroke='%23000' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  }
+  :where([aria-sort='descending'] > .gm-table-sort)::after {
+    rotate: 180deg;
+  }
+  :where(:is(.gm-num, [data-type='number']) > .gm-table-sort) {
+    flex-direction: row-reverse;
+  }
+
+  /* Filterable headers: a small funnel beside the label, filled with a count when it's on. */
+  :where(.gm-table-filter) {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.2em;
+    min-width: 24px;
+    min-height: 24px;
+    margin-inline-start: 0.25em;
+    padding: 0.25em 0.35em;
+    border: 0;
+    border-radius: 6px;
+    background: none;
+    color: inherit;
+    font: inherit;
+    font-size: var(--gm-text-xs, 0.75rem);
+    vertical-align: middle;
+    cursor: pointer;
+  }
+  :where(.gm-table-filter svg) {
+    width: 0.95em;
+    height: 0.95em;
+    opacity: 0.55;
+  }
+  :where(.gm-table-filter:hover) {
+    color: var(--gm-ink);
+    background: var(--gm-chip-fill, rgb(255 255 255 / 0.1));
+  }
+  :where(.gm-table-filter[data-active]) {
+    background: var(--gm-chip-fill-on, rgb(255 255 255 / 0.22));
+    box-shadow: var(--gm-rim);
+    color: var(--gm-ink);
+    font-weight: 600;
+  }
+  :where(.gm-table-filter[data-active] svg) {
+    opacity: 1;
+  }
+  :where(.gm-table-filter span:empty) {
+    display: none;
+  }
+  :where(.gm-table-sort:focus-visible, .gm-table-filter:focus-visible) {
+    outline: 0;
+    box-shadow: var(--gm-focus);
+  }
+  /* The list of a column's values: content on a plain fill, under its button. */
+  :where(.gm-table-filter-menu) {
+    position: fixed;
+    inset: auto;
+    width: 15rem;
+    max-height: min(22rem, 60vh);
+    margin: 0;
+    padding: var(--gm-space-sm, 8px);
+    overflow-y: auto;
+    border: 0;
+    border-radius: var(--gm-radius-md, 18px);
+    background: var(--gm-tint-solid, rgb(24 22 34));
+    box-shadow: var(--gm-rim), var(--gm-lift);
+    color: var(--gm-ink);
+    font-size: var(--gm-text-sm, 0.875rem);
+  }
+  :where(.gm-table-filter-list) {
+    display: grid;
+  }
+  :where(.gm-table-filter-menu .gm-check-label) {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    min-height: 2.25rem;
+    padding: 0 var(--gm-space-sm, 8px);
+    border-radius: var(--gm-radius-sm, 10px);
+  }
+  :where(.gm-table-filter-menu .gm-check-label:hover) {
+    background: var(--gm-chip-fill, rgb(255 255 255 / 0.1));
+  }
+  :where(.gm-table-filter-menu small) {
+    color: var(--gm-ink-muted);
+    font-variant-numeric: tabular-nums;
+  }
+  :where(.gm-table-filter-menu > .gm-chip) {
+    width: 100%;
+    margin-top: var(--gm-space-xs, 4px);
+  }
+
+  /* Pinned first column(s), for wide tables that scroll sideways. */
+  :where(gm-table[pin] :is(th, td):first-child) {
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    background: var(--gm-table-pin, var(--gm-tint-solid, rgb(28 28 36 / 0.88)));
+  }
+
+  /* On a phone, with `stack`: each row a card, each cell labeled with its column. */
+  @media (max-width: 40rem) {
+    :where(gm-table[stack]) {
+      overflow: visible;
+    }
+    :where(gm-table[stack] :is(table, tbody, tr, td)) {
+      display: block;
+    }
+    :where(gm-table[stack] thead tr) {
+      display: flex;
+      align-items: center;
+      gap: var(--gm-space-sm, 8px);
+    }
+    :where(gm-table[stack] thead th:not(:has(> .gm-check))) {
+      display: none;
+    }
+    :where(gm-table[stack] tbody tr) {
+      position: relative;
+      padding: var(--gm-space-sm, 8px) 0;
+      border-top: 1px solid var(--gm-table-line, var(--gm-chip-fill, rgb(255 255 255 / 0.1)));
+    }
+    :where(gm-table[stack] td) {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: var(--gm-space-md, 12px);
+      height: auto;
+      min-height: 2rem;
+      border: 0;
+      white-space: normal;
+      text-align: end;
+    }
+    :where(gm-table[stack] td[data-label])::before {
+      content: attr(data-label);
+      color: var(--gm-ink-muted);
+      font-size: var(--gm-text-sm, 0.875rem);
+      text-align: start;
+    }
+    /* The card itself is what's selected or hovered, checkbox included. */
+    :where(gm-table[stack] tbody tr > td) {
+      background: none;
+    }
+    :where(gm-table[stack] tbody tr[aria-selected='true']) {
+      background: var(--gm-table-selected, var(--gm-chip-fill));
+    }
+    /* The checkbox sits at the card's start, beside its first line, with room made for it. */
+    :where(gm-table[stack] tbody tr:has(> td > .gm-check:only-child)) {
+      padding-inline-start: 2rem;
+    }
+    :where(gm-table[stack] td:has(> .gm-check:only-child)) {
+      position: absolute;
+      top: calc(var(--gm-space-sm, 8px) + 0.375rem);
+      left: 0;
+      width: auto;
+      min-height: 0;
+      padding: 0;
+    }
+    :where(gm-table[stack] td:has(> .gm-check:only-child))::before {
+      content: none;
+    }
+  }
+}

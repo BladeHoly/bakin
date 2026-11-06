@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "bakin"
+version = "0.13.2"
+description = "Your photo and music library on your PC: wallpapers, music and video, and a light player"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+dependencies = [
+    "requests>=2.32",
+    "pillow>=11.0",
+    "mutagen>=1.47",        # audio tags for the music library (title, artist, bitrate)
+    "ytmusicapi>=1.12",     # YouTube Music's catalogue, without an account (PLAN 0.15.1)
+]
+
+[project.optional-dependencies]
+test = ["pytest>=8"]
+
+[tool.setuptools.packages.find]
+include = ["bakin*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

@@ -1,0 +1,112 @@
+@layer gm-base, gm-components, gm-overrides;
+
+@layer gm-components {
+  /*
+ * Tip: a card of glass with an optional icon, a heading, the message, actions and a close button.
+ * Anchored, it floats next to its target with an arrow, which has its own frost: it's a sibling of
+ * the card, since glass inside glass can't see the page.
+ */
+  :where(gm-tip) {
+    display: block;
+    margin-block: 1.25rem;
+  }
+  :where(gm-tip[hidden]) {
+    display: none;
+  }
+  :where(gm-tip[anchor]) {
+    position: fixed;
+    z-index: 60;
+    width: max-content;
+    max-width: min(22rem, calc(100vw - 16px));
+    margin: 0;
+  }
+  :where(.gm-tip-card) {
+    position: relative;
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    column-gap: 0.75rem;
+    align-items: start;
+    padding: 0.9rem 0.9rem 0.9rem 1.1rem;
+    border-radius: 22px;
+  }
+  /* Everything that isn't the icon or the close button sits in the middle column. */
+  :where(.gm-tip-card > *) {
+    grid-column: 2;
+    margin: 0;
+  }
+  :where(.gm-tip-card > [slot='icon']) {
+    grid-column: 1;
+    grid-row: 1 / span 9;
+    width: 1.6rem;
+    height: 1.6rem;
+    color: var(--gm-tip-accent, var(--gm-callout-tip));
+  }
+  :where(.gm-tip-heading) {
+    font-weight: 600;
+  }
+  :where(.gm-tip-card > :not(.gm-tip-heading, .gm-tip-close, [slot='icon'])) {
+    color: var(--gm-ink-muted);
+  }
+  :where(.gm-tip-heading + *) {
+    margin-top: 0.2rem;
+  }
+  :where(.gm-tip-actions) {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin-top: 0.75rem;
+  }
+  :where(.gm-tip-close) {
+    grid-column: 3;
+    grid-row: 1;
+    display: grid;
+    place-items: center;
+    width: 1.75rem;
+    height: 1.75rem;
+    margin: -0.2rem -0.2rem 0 0;
+    padding: 0;
+    border: 0;
+    border-radius: var(--gm-radius-pill, 999px);
+    background: none;
+    color: var(--gm-ink-muted);
+    cursor: pointer;
+  }
+  :where(.gm-tip-close:hover) {
+    background: var(--gm-chip-fill);
+    color: var(--gm-ink);
+  }
+  :where(.gm-tip-close svg) {
+    width: 0.95rem;
+    height: 0.95rem;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+  }
+  :where(.gm-tip-arrow) {
+    position: absolute;
+    top: -8px;
+    left: calc(var(--gm-tip-arrow, 50%) - 8px);
+    width: 16px;
+    height: 16px;
+    border-radius: 3px;
+    background: var(--gm-tint-light, rgb(255 255 255 / 0.18));
+    box-shadow: var(--gm-rim);
+    -webkit-backdrop-filter: blur(var(--gm-blur-lg, 28px)) saturate(var(--gm-saturation-md, 160%));
+    backdrop-filter: blur(var(--gm-blur-lg, 28px)) saturate(var(--gm-saturation-md, 160%));
+    rotate: 45deg;
+  }
+  :where(gm-tip[material='frost'] > .gm-tip-arrow) {
+    background: var(--gm-frost-tint);
+  }
+  :where(gm-tip[data-side='top'] > .gm-tip-arrow) {
+    top: auto;
+    bottom: -8px;
+  }
+  /* With no backdrop effect, the arrow matches the card's opaque tint. */
+  :where(gm-tip:has(> .gm-tip-card[data-glass-tier='solid']) > .gm-tip-arrow) {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    background: var(--gm-tint-solid, rgb(28 28 36 / 0.88));
+  }
+}

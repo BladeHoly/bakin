@@ -1,0 +1,9 @@
+@layer gm-base, gm-components, gm-overrides;
+
+@layer gm-components {
+  :where(gm-surface) {
+    display: block;
+    border-radius: var(--gm-radius-lg, 28px);
+    padding: 1.5rem;
+  }
+}

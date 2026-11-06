@@ -1,0 +1,84 @@
+{
+  "created": "2026-11-06T12:00:00.000Z",
+  "count": 3,
+  "offset": 0,
+  "recordings": [
+    {
+      "id": "b1a9c0e9-d987-4042-ae91-78d6a3267d69",
+      "score": 100,
+      "title": "Under Pressure",
+      "length": 248000,
+      "video": null,
+      "artist-credit": [
+        {"name": "Queen", "joinphrase": " & ", "artist": {"id": "0383dadf-2a4e-4d10-a46a-e9e041da8eb3", "name": "Queen", "sort-name": "Queen"}},
+        {"name": "David Bowie", "joinphrase": "", "artist": {"id": "5441c29d-3602-4898-b1a1-b77fa23b8e50", "name": "David Bowie", "sort-name": "Bowie, David"}}
+      ],
+      "first-release-date": "1981-10-26",
+      "releases": [
+        {
+          "id": "11111111-1111-4111-8111-111111111111",
+          "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+          "count": 1,
+          "title": "Greatest Hits II",
+          "status": "Official",
+          "release-group": {"id": "aaaaaaaa-0000-4000-8000-000000000001", "type-id": "dd2a21e1-0c00-3729-a7a0-de60b84eb5d1", "primary-type": "Album", "secondary-types": ["Compilation"]},
+          "date": "1991-10-28",
+          "country": "GB"
+        },
+        {
+          "id": "22222222-2222-4222-8222-222222222222",
+          "count": 1,
+          "title": "Under Pressure",
+          "status": "Official",
+          "release-group": {"id": "aaaaaaaa-0000-4000-8000-000000000002", "primary-type": "Single"},
+          "date": "1981-10-26",
+          "country": "GB"
+        },
+        {
+          "id": "33333333-3333-4333-8333-333333333333",
+          "count": 1,
+          "title": "Hot Space",
+          "status": "Official",
+          "release-group": {"id": "aaaaaaaa-0000-4000-8000-000000000003", "primary-type": "Album"},
+          "date": "1982-05-21",
+          "country": "GB"
+        },
+        {
+          "id": "44444444-4444-4444-8444-444444444444",
+          "count": 1,
+          "title": "Hot Space (bootleg)",
+          "status": "Bootleg",
+          "release-group": {"id": "aaaaaaaa-0000-4000-8000-000000000004", "primary-type": "Album"},
+          "date": "1980",
+          "country": "XW"
+        },
+        {
+          "id": "55555555-5555-4555-8555-555555555555",
+          "count": 1,
+          "title": "Hot Space",
+          "status": "Official",
+          "release-group": {"id": "aaaaaaaa-0000-4000-8000-000000000003", "primary-type": "Album"},
+          "date": "2011-03-14",
+          "country": "XE"
+        }
+      ]
+    },
+    {
+      "id": "c2c2c2c2-0000-4000-8000-00000000000c",
+      "score": 95,
+      "title": "Under Pressure (live)",
+      "length": 236000,
+      "artist-credit": [{"name": "Queen", "joinphrase": "", "artist": {"id": "0383dadf-2a4e-4d10-a46a-e9e041da8eb3", "name": "Queen"}}],
+      "releases": [{"id": "66666666-6666-4666-8666-666666666666", "title": "Live Magic", "status": "Official",
+                    "release-group": {"primary-type": "Album", "secondary-types": ["Live"]}, "date": "1986-12-01"}]
+    },
+    {
+      "id": "d3d3d3d3-0000-4000-8000-00000000000d",
+      "score": 62,
+      "title": "Under Pressure",
+      "length": 248500,
+      "artist-credit": [{"name": "Some Cover Band", "joinphrase": ""}],
+      "releases": []
+    }
+  ]
+}

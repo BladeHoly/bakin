@@ -1,0 +1,71 @@
+@layer gm-base, gm-components, gm-overrides;
+
+@layer gm-components {
+  /*
+ * Checkbox and radio: native inputs with a class, for inside glass. A light fill when off; the
+ * ink with a mark when on (a tick, a dash for "some", a dot for a radio).
+ */
+  :where(.gm-check) {
+    position: relative;
+    flex: none;
+    display: inline-grid;
+    place-content: center;
+    width: 1.25rem;
+    height: 1.25rem;
+    margin: 0;
+    border-radius: 6px;
+    background: var(--gm-chip-fill-hover, rgb(255 255 255 / 0.16));
+    box-shadow: inset 0 0 0 1px var(--gm-chip-fill-on, rgb(255 255 255 / 0.22));
+    vertical-align: middle;
+    cursor: pointer;
+    appearance: none;
+    transition:
+      background 0.15s,
+      box-shadow 0.15s;
+  }
+  :where(.gm-check[type='radio']) {
+    border-radius: var(--gm-radius-pill, 999px);
+  }
+  :where(.gm-check)::before {
+    content: '';
+    width: 0.8rem;
+    height: 0.8rem;
+    background: var(--gm-check-mark, var(--gm-ink-inverse));
+    scale: 0;
+    transition: scale 0.15s cubic-bezier(0.3, 1.4, 0.5, 1);
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M3 8.5l3.2 3L13 4.5' fill='none' stroke='%23000' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")
+      center / contain no-repeat;
+  }
+  :where(.gm-check:indeterminate)::before {
+    mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M4 8h8' stroke='%23000' stroke-width='2.4' stroke-linecap='round'/%3E%3C/svg%3E");
+  }
+  :where(.gm-check[type='radio'])::before {
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: var(--gm-radius-pill, 999px);
+    mask: none;
+  }
+  :where(.gm-check:is(:checked, :indeterminate)) {
+    background: var(--gm-check-on, var(--gm-ink));
+    box-shadow: none;
+  }
+  :where(.gm-check:is(:checked, :indeterminate))::before {
+    scale: 1;
+  }
+  :where(.gm-check[aria-invalid='true']) {
+    box-shadow: inset 0 0 0 1px var(--gm-status-danger, rgb(255 110 110));
+  }
+  :where(.gm-check:disabled) {
+    opacity: 0.5;
+    cursor: default;
+  }
+
+  /* A box and its label, side by side; the label is the bigger target. */
+  :where(.gm-check-label) {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--gm-space-sm, 8px);
+    min-height: 2.25rem;
+    cursor: pointer;
+  }
+}

@@ -1,0 +1,38 @@
+# Secondary safeguard only: bakin never writes secrets inside the project.
+# Sessions live in the OS credential manager; see SECURITY.md.
+
+# Session / credential material
+*.cookies
+cookies*.txt
+*cookies*.json
+*session*.json
+*.session
+sessionid*
+.bakin-secrets/
+browser-profile/
+gdl-cache.sqlite3
+
+# Downloads and run state
+downloads/
+.bakin-state.json
+.bakin-index.json
+
+# Local config overrides
+config.toml
+.env
+.env.*
+
+# Desktop shell (Tauri): dependencies, build output, generated schemas
+desktop/node_modules/
+desktop/src-tauri/target/
+desktop/src-tauri/gen/
+desktop/src-tauri/engine-dist/
+
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.pytest_cache/

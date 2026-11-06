@@ -1,0 +1,43 @@
+@layer gm-base, gm-components, gm-overrides;
+
+@layer gm-components {
+  /*
+ * Empty state: nothing here yet, said kindly, with the one thing to do about it.
+ * <div class="gm-empty"><svg class="gm-empty-art">…</svg><h2>No orders yet</h2><p>…</p>
+ * <a class="gm-chip" href="…">Start shopping</a></div>. Centered, at a reading width.
+ */
+  :where(.gm-empty) {
+    display: grid;
+    justify-items: center;
+    gap: var(--gm-space-sm, 8px);
+    max-width: 28rem;
+    margin: 0 auto;
+    padding: var(--gm-space-3xl, 48px) var(--gm-space-lg, 16px);
+    color: var(--gm-ink);
+    text-align: center;
+  }
+  :where(.gm-empty-art) {
+    width: var(--gm-empty-art, 4rem);
+    height: var(--gm-empty-art, 4rem);
+    margin-bottom: var(--gm-space-sm, 8px);
+    color: var(--gm-ink-muted);
+  }
+  :where(.gm-empty > :is(h2, h3, strong)) {
+    margin: 0;
+    font-size: var(--gm-text-lg, 1.125rem);
+    font-weight: 600;
+  }
+  :where(.gm-empty > p) {
+    margin: 0;
+    color: var(--gm-ink-muted);
+  }
+  :where(.gm-empty > :is(a, button, div):last-child) {
+    margin-top: var(--gm-space-md, 12px);
+  }
+  :where(.gm-empty-actions) {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: var(--gm-space-sm, 8px);
+  }
+}

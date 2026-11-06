@@ -1,0 +1,204 @@
+/*
+ * glass-midas components: the base every component sheet needs. Custom properties only (the core
+ * tokens, --gm-<group>-<name>, and the component ones below), inside :where(), in cascade layers:
+ * base, then components, then overrides (focus, reduced motion), whatever order the sheets load
+ * in. Any CSS of yours outside a layer wins over all of it.
+ */
+@layer gm-base, gm-components, gm-overrides;
+
+@layer gm-base {
+  :where(:root) {
+    --gm-ink: rgb(255 255 255 / 0.94);
+    --gm-ink-muted: rgb(255 255 255 / 0.66);
+    /* What reads on a fill of the ink: marks on a checked box, text on a primary chip. */
+    --gm-ink-inverse: rgb(14 14 20);
+    --gm-rim: inset 0 0 0 0.5px var(--gm-highlight-edge, rgb(255 255 255 / 0.55));
+    --gm-lift: 0 8px 28px rgb(0 0 0 / 0.18);
+    --gm-focus: 0 0 0 2px rgb(255 255 255 / 0.85);
+    --gm-callout-note: var(--gm-status-info, rgb(120 170 255));
+    --gm-callout-tip: var(--gm-status-success, rgb(90 210 150));
+    --gm-callout-caution: var(--gm-status-warning, rgb(255 196 90));
+    --gm-callout-danger: var(--gm-status-danger, rgb(255 110 110));
+    --gm-frost-tint: var(--gm-tint-dark, rgb(20 20 28 / 0.32));
+    --gm-chip-fill: rgb(255 255 255 / 0.1);
+    --gm-chip-fill-hover: rgb(255 255 255 / 0.16);
+    --gm-chip-fill-on: rgb(255 255 255 / 0.22);
+  }
+
+  /* Every surface: a light tint, the hairline rim and a soft lift. */
+  :where(
+    gm-surface,
+    gm-button,
+    gm-callout,
+    gm-code,
+    .gm-tablist,
+    gm-segmented,
+    gm-popover,
+    gm-menu,
+    .gm-dialog-panel,
+    gm-toast,
+    gm-nav,
+    .gm-search-field,
+    .gm-search-results,
+    .gm-tip-card
+  ) {
+    background: var(--gm-tint-light, rgb(255 255 255 / 0.18));
+    box-shadow: var(--gm-rim), var(--gm-lift);
+    color: var(--gm-ink);
+  }
+
+  /* Frost material: a smoke tint under heavy frosting, so what's on the glass always reads. */
+  :where(
+    [material='frost']:not(gm-tabs, gm-search, gm-tip, gm-dialog),
+    gm-dialog[material='frost'] > .gm-dialog-panel,
+    gm-tabs[material='frost'] > .gm-tablist,
+    gm-tip[material='frost'] > .gm-tip-card,
+    gm-search[material='frost'] :is(.gm-search-field, .gm-search-results)
+  ) {
+    background: var(--gm-frost-tint);
+  }
+
+  /* No backdrop effect: an opaque tint keeps text legible. */
+  :where([data-glass-tier='solid']) {
+    background: var(--gm-tint-solid, rgb(28 28 36 / 0.88));
+  }
+
+  /*
+ * Chip: a control inside a glass surface. Not glass itself (glass inside glass can't see the
+ * page), just a light fill. The rim is kept for the one that's on: pressed, selected, current.
+ */
+  :where(.gm-chip) {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5em;
+    min-height: 2.5em;
+    padding: 0.45em 1.1em;
+    border: 0;
+    border-radius: var(--gm-radius-pill, 999px);
+    background: var(--gm-chip-fill);
+    color: var(--gm-ink);
+    font: inherit;
+    text-decoration: none;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+  :where(.gm-chip-plain) {
+    background: none;
+  }
+  :where(.gm-chip:hover) {
+    background: var(--gm-chip-fill-hover);
+  }
+  :where(.gm-chip[aria-pressed='true'], .gm-chip[aria-selected='true'], .gm-chip[aria-current]) {
+    background: var(--gm-chip-fill-on);
+    box-shadow: var(--gm-rim);
+  }
+  /* Primary: the one action a surface is for. The ink as its fill, so it leads without glass. */
+  :where(.gm-chip-primary) {
+    background: var(--gm-chip-primary, var(--gm-ink));
+    color: var(--gm-ink-inverse);
+    font-weight: 600;
+  }
+  :where(.gm-chip-primary:hover) {
+    background: var(
+      --gm-chip-primary-hover,
+      color-mix(in srgb, var(--gm-chip-primary, var(--gm-ink)) 86%, transparent)
+    );
+  }
+  :where(.gm-chip:disabled, .gm-chip[aria-disabled='true']) {
+    opacity: 0.5;
+    cursor: default;
+  }
+  /* Busy: a spinner where the label was, at the same size, while the action runs. */
+  :where(.gm-chip[aria-busy='true']) {
+    position: relative;
+    color: transparent;
+    pointer-events: none;
+  }
+  :where(.gm-chip[aria-busy='true'])::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    width: 1.1em;
+    height: 1.1em;
+    margin: auto;
+    border: 2px solid var(--gm-ink);
+    border-right-color: transparent;
+    border-radius: var(--gm-radius-pill, 999px);
+    animation: gm-spin 0.7s linear infinite;
+  }
+  :where(.gm-chip-primary[aria-busy='true'])::after {
+    border-color: var(--gm-ink-inverse);
+    border-right-color: transparent;
+  }
+  @keyframes gm-spin {
+    to {
+      rotate: 1turn;
+    }
+  }
+  /* Icon only: a circle. */
+  :where(.gm-chip-round) {
+    width: 2.5em;
+    padding: 0;
+  }
+  :where(.gm-chip svg, gm-button svg) {
+    width: 1.25em;
+    height: 1.25em;
+    flex: none;
+  }
+
+  /* Droplet: the moving marker under the selected tab or current link. */
+  :where(.gm-droplet) {
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 0;
+    border-radius: var(--gm-radius-pill, 999px);
+    background: var(--gm-highlight-glow, rgb(255 255 255 / 0.12));
+    box-shadow: var(--gm-rim);
+    pointer-events: none;
+    transform-origin: center;
+  }
+}
+
+@layer gm-overrides {
+  :where(
+    gm-nav a,
+    .gm-tab-button,
+    .gm-segment,
+    .gm-copy,
+    .gm-chip,
+    gm-button > :is(button, a),
+    .gm-tip-close,
+    .gm-toggle,
+    .gm-check,
+    .gm-select-trigger
+  ):focus-visible {
+    outline: 0;
+    box-shadow: var(--gm-focus);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    :where(
+      .gm-copy,
+      .gm-tab-button,
+      .gm-segment,
+      gm-nav a,
+      gm-scrollbar,
+      .gm-dialog-panel,
+      gm-toast,
+      .gm-toggle,
+      .gm-input,
+      .gm-check
+    ) {
+      transition: none;
+    }
+    :where(.gm-toggle, .gm-check)::before,
+    :where(gm-slider input[type='range'])::-webkit-slider-thumb {
+      transition: none;
+    }
+    :where(gm-slider input[type='range'])::-moz-range-thumb {
+      transition: none;
+    }
+  }
+}

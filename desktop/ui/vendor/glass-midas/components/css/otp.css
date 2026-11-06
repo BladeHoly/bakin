@@ -1,0 +1,92 @@
+@layer gm-base, gm-components, gm-overrides;
+
+@layer gm-components {
+  /*
+ * One-time code: one input stretched invisibly over a row of boxes that show its characters.
+ * The box being typed in gets the focus ring.
+ */
+  :where(gm-otp) {
+    position: relative;
+    display: inline-block;
+    max-width: 100%;
+  }
+  :where(.gm-otp-input) {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    outline: 0;
+    background: none;
+    color: transparent;
+    caret-color: transparent;
+    font: inherit;
+    letter-spacing: 2em;
+    /* The selection highlight would show through; the boxes are the visible text. */
+    -webkit-text-fill-color: transparent;
+  }
+  :where(.gm-otp-input)::selection {
+    background: transparent;
+  }
+  :where(.gm-otp-cells) {
+    display: flex;
+    gap: var(--gm-space-sm, 8px);
+  }
+  :where(.gm-otp-cells > span) {
+    display: grid;
+    place-items: center;
+    width: 2.75rem;
+    height: 3.25rem;
+    border-radius: var(--gm-radius-sm, 10px);
+    background: var(--gm-chip-fill);
+    color: var(--gm-ink);
+    font-size: var(--gm-text-xl, 1.375rem);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    transition: box-shadow 0.15s;
+  }
+  :where(gm-otp:has(.gm-otp-input[aria-invalid='true']) .gm-otp-cells > span) {
+    box-shadow: inset 0 0 0 1px var(--gm-status-danger, rgb(255 110 110));
+  }
+  :where(.gm-otp-cells > span.gm-otp-active) {
+    box-shadow: var(--gm-focus);
+  }
+  :where(gm-otp:has(.gm-otp-input[aria-invalid='true']) .gm-otp-cells > span.gm-otp-active) {
+    box-shadow:
+      var(--gm-focus),
+      inset 0 0 0 1px var(--gm-status-danger, rgb(255 110 110));
+  }
+  /* The caret, drawn in the empty box being typed in. */
+  :where(.gm-otp-cells > span.gm-otp-active:empty)::after {
+    content: '';
+    width: 2px;
+    height: 1.4rem;
+    background: var(--gm-ink);
+    animation: gm-otp-caret 1s steps(1) infinite;
+  }
+  :where(gm-otp:has(.gm-otp-input:disabled)) {
+    opacity: 0.5;
+  }
+  @media (max-width: 380px) {
+    :where(.gm-otp-cells > span) {
+      width: 2.4rem;
+      height: 3rem;
+    }
+  }
+  @keyframes gm-otp-caret {
+    50% {
+      opacity: 0;
+    }
+  }
+}
+
+@layer gm-overrides {
+  @media (prefers-reduced-motion: reduce) {
+    :where(.gm-otp-cells > span.gm-otp-active:empty)::after {
+      animation: none;
+    }
+  }
+}

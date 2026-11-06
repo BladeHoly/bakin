@@ -1,0 +1,53 @@
+@layer gm-base, gm-components, gm-overrides;
+
+@layer gm-components {
+  /*
+ * Small pieces of running text: a key to press, a bit of code, a button that reads as a link,
+ * and a label for a control that isn't in a .gm-field (a segmented control, a quantity).
+ * <kbd class="gm-kbd">F12</kbd> · <code class="gm-code-inline">access_key</code> ·
+ * <button class="gm-link">your account</button> · <span class="gm-label">Quality <span>(max)</span></span>
+ */
+  :where(.gm-kbd, .gm-code-inline) {
+    padding: 0.1em 0.4em;
+    border-radius: 6px;
+    background: var(--gm-chip-fill, rgb(255 255 255 / 0.1));
+    color: var(--gm-ink);
+    font: 0.82em/1.4 var(--gm-font-mono, ui-monospace, 'Cascadia Code', Consolas, monospace);
+    overflow-wrap: anywhere;
+  }
+  :where(.gm-kbd) {
+    box-shadow: inset 0 -1px 0 color-mix(in srgb, var(--gm-ink) 22%, transparent);
+    white-space: nowrap;
+  }
+  :where(.gm-link) {
+    display: inline;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 2px;
+    background: none;
+    color: inherit;
+    font: inherit;
+    text-decoration: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 3px;
+    cursor: pointer;
+  }
+  :where(.gm-link:hover) {
+    text-decoration-thickness: 2px;
+  }
+  :where(.gm-link:focus-visible) {
+    outline: 0;
+    box-shadow: var(--gm-focus, 0 0 0 2px rgb(255 255 255 / 0.85));
+  }
+  :where(.gm-label) {
+    display: block;
+    color: var(--gm-ink);
+    font-size: var(--gm-text-sm, 0.875rem);
+    font-weight: 600;
+  }
+  :where(.gm-label > span) {
+    color: var(--gm-ink-muted);
+    font-weight: 400;
+  }
+}

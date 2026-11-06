@@ -1,0 +1,33 @@
+@layer gm-base, gm-components, gm-overrides;
+
+@layer gm-components {
+  /* Callout */
+  :where(gm-callout) {
+    --gm-accent: var(--gm-callout-note);
+    display: block;
+    border-radius: var(--gm-radius-md, 18px);
+    padding: 1rem 1.25rem;
+    margin-block: 1.25rem;
+    box-shadow:
+      var(--gm-rim),
+      inset 3px 0 0 var(--gm-accent),
+      var(--gm-lift);
+  }
+  :where(gm-callout[type='tip']) {
+    --gm-accent: var(--gm-callout-tip);
+  }
+  :where(gm-callout[type='caution']) {
+    --gm-accent: var(--gm-callout-caution);
+  }
+  :where(gm-callout[type='danger']) {
+    --gm-accent: var(--gm-callout-danger);
+  }
+  :where(.gm-callout-heading) {
+    margin: 0 0 0.35rem;
+    font-weight: 600;
+    color: var(--gm-accent);
+  }
+  :where(gm-callout > :last-child) {
+    margin-bottom: 0;
+  }
+}

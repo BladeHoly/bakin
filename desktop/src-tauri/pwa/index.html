@@ -1,0 +1,334 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0d0f14">
+  <title>Bakin</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icon.png" type="image/png">
+  <link rel="apple-touch-icon" href="icon.png">
+  <link rel="stylesheet" href="gm.css">
+  <style>
+    /* Bakin on the phone (PLAN 0.21.2): the home server's library, served by lan.rs */
+    :root { color-scheme: dark; --pad: 16px; }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100dvh; background: radial-gradient(120% 80% at 20% 0%, #232838 0%, #0d0f14 60%) fixed; color: var(--gm-ink);
+      font: 15px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif; padding-bottom: calc(96px + env(safe-area-inset-bottom)); }
+    header { position: sticky; top: 0; z-index: 2; padding: calc(10px + env(safe-area-inset-top)) var(--pad) 10px; display: grid; gap: 10px;
+      background: rgb(13 15 20 / 0.72); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px); }
+    h1 { margin: 0; font-size: 1.15rem; font-weight: 650; }
+    .tabs { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; }
+    .tabs button[aria-pressed="true"] { background: rgb(255 255 255 / 0.18); }
+    input[type=search], input[type=text], input[type=password], input[type=url] { width: 100%; padding: 10px 12px; border-radius: 12px; border: 0;
+      background: rgb(255 255 255 / 0.08); color: inherit; font: inherit; box-shadow: inset 0 0 0 0.5px rgb(255 255 255 / 0.14); }
+    main { padding: 6px var(--pad); }
+    ul.list { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+    .row { display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 6px 4px; border-radius: 12px; cursor: pointer; }
+    .row:active, .row.playing { background: rgb(255 255 255 / 0.08); }
+    .row img, .row .ph { width: 44px; height: 44px; border-radius: 8px; object-fit: cover; background: rgb(255 255 255 / 0.08); }
+    .row strong, .row small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .row small { color: var(--gm-ink-muted); }
+    .row .act { background: none; border: 0; color: inherit; font-size: 1.2rem; padding: 8px; opacity: 0.8; }
+    .empty { color: var(--gm-ink-muted); padding: 24px 4px; }
+    #player { position: fixed; left: 8px; right: 8px; bottom: calc(8px + env(safe-area-inset-bottom)); z-index: 3; display: grid;
+      grid-template-columns: 48px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 8px 10px; border-radius: 18px;
+      background: rgb(30 34 46 / 0.78); backdrop-filter: blur(22px); -webkit-backdrop-filter: blur(22px); box-shadow: inset 0 0 0 0.5px rgb(255 255 255 / 0.16); }
+    #player[hidden] { display: none; }
+    #player img { width: 48px; height: 48px; border-radius: 10px; object-fit: cover; background: rgb(255 255 255 / 0.08); }
+    #player strong, #player small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    #player small { color: var(--gm-ink-muted); }
+    #player .ctl { display: flex; gap: 2px; }
+    #player .ctl button { background: none; border: 0; color: inherit; font-size: 1.35rem; width: 40px; height: 40px; border-radius: 50%; }
+    #bar { grid-column: 1 / -1; height: 3px; border-radius: 3px; background: rgb(255 255 255 / 0.12); overflow: hidden; }
+    #bar > i { display: block; height: 100%; width: 0; background: var(--gm-ink); }
+    .login { max-width: 420px; margin: 12vh auto 0; padding: 0 var(--pad); display: grid; gap: 12px; }
+    .login p { color: var(--gm-ink-muted); margin: 0; }
+    .err { color: #ff8a80; min-height: 1.2em; }
+    .send { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; margin: 8px 0 14px; }
+  </style>
+</head>
+<body>
+  <section class="login" id="login" hidden>
+    <h1>Bakin</h1>
+    <p>Pon el código que muestra Bakin en la PC (Configuración › En tu casa).</p>
+    <input id="code" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="ABCD-EFGH" aria-label="Código de Bakin">
+    <button class="gm-chip" id="enter">Entrar</button>
+    <p class="err" id="login-err"></p>
+  </section>
+
+  <div id="app" hidden>
+    <header>
+      <h1>Bakin</h1>
+      <input id="q" type="search" placeholder="Buscar en tu biblioteca" aria-label="Buscar">
+      <nav class="tabs" aria-label="Vistas">
+        <button class="gm-chip gm-chip-plain" data-tab="songs" aria-pressed="true">Canciones</button>
+        <button class="gm-chip gm-chip-plain" data-tab="albums" aria-pressed="false">Álbumes</button>
+        <button class="gm-chip gm-chip-plain" data-tab="playlists" aria-pressed="false">Playlists</button>
+        <button class="gm-chip gm-chip-plain" data-tab="starred" aria-pressed="false">Favoritas</button>
+        <button class="gm-chip gm-chip-plain" data-tab="offline" aria-pressed="false">En el teléfono</button>
+        <button class="gm-chip gm-chip-plain" data-tab="send" aria-pressed="false">Mandar a Bakin</button>
+      </nav>
+    </header>
+    <main id="main"></main>
+  </div>
+
+  <div id="player" hidden>
+    <img id="p-art" alt="">
+    <div><strong id="p-title"></strong><small id="p-artist"></small></div>
+    <div class="ctl">
+      <button id="p-prev" aria-label="Anterior">⏮</button>
+      <button id="p-play" aria-label="Pausa">⏸</button>
+      <button id="p-next" aria-label="Siguiente">⏭</button>
+    </div>
+    <div id="bar"><i></i></div>
+  </div>
+  <audio id="audio" preload="auto"></audio>
+
+  <script>
+  'use strict';
+  // ------------------------------------------------------------------ md5 (Subsonic's token auth)
+  // The code itself never travels: each request carries md5(code + salt) and the salt.
+  function md5(str) {
+    const k = [], s = [7, 12, 17, 22, 5, 9, 14, 20, 4, 11, 16, 23, 6, 10, 15, 21];
+    for (let i = 0; i < 64; i++) k[i] = Math.floor(Math.abs(Math.sin(i + 1)) * 2 ** 32) >>> 0;
+    const bytes = new TextEncoder().encode(str);
+    const n = ((bytes.length + 8) >> 6) + 1, w = new Uint32Array(n * 16);
+    for (let i = 0; i < bytes.length; i++) w[i >> 2] |= bytes[i] << ((i % 4) * 8);
+    w[bytes.length >> 2] |= 0x80 << ((bytes.length % 4) * 8);
+    w[n * 16 - 2] = (bytes.length * 8) >>> 0;
+    w[n * 16 - 1] = Math.floor(bytes.length / 0x20000000);
+    let a0 = 0x67452301, b0 = 0xefcdab89, c0 = 0x98badcfe, d0 = 0x10325476;
+    for (let o = 0; o < w.length; o += 16) {
+      let a = a0, b = b0, c = c0, d = d0;
+      for (let i = 0; i < 64; i++) {
+        let f, g;
+        if (i < 16) { f = (b & c) | (~b & d); g = i; }
+        else if (i < 32) { f = (d & b) | (~d & c); g = (5 * i + 1) % 16; }
+        else if (i < 48) { f = b ^ c ^ d; g = (3 * i + 5) % 16; }
+        else { f = c ^ (b | ~d); g = (7 * i) % 16; }
+        const t = d; d = c; c = b;
+        const x = (a + f + k[i] + w[o + g]) >>> 0, r = s[(i >> 4) * 4 + (i % 4)];
+        b = (b + ((x << r) | (x >>> (32 - r)))) >>> 0; a = t;
+      }
+      a0 = (a0 + a) >>> 0; b0 = (b0 + b) >>> 0; c0 = (c0 + c) >>> 0; d0 = (d0 + d) >>> 0;
+    }
+    return [a0, b0, c0, d0].map((v) => [0, 8, 16, 24].map((sh) => ((v >>> sh) & 255).toString(16).padStart(2, '0')).join('')).join('');
+  }
+
+  // ------------------------------------------------------------------ the server
+  const $ = (id) => document.getElementById(id);
+  const store = { get: (k) => { try { return localStorage.getItem(k); } catch { return null; } },
+                  set: (k, v) => { try { localStorage.setItem(k, v); } catch { /* private mode */ } } };
+  let auth = null;   // {t, s}: md5(code + salt) and the salt, never the code
+
+  function authFor(code) {
+    const s = Array.from(crypto.getRandomValues(new Uint8Array(8)), (b) => b.toString(16).padStart(2, '0')).join('');
+    return { t: md5(code + s), s };
+  }
+  function url(method, params = {}) {
+    const q = new URLSearchParams({ u: 'bakin', t: auth.t, s: auth.s, v: '1.16.1', c: 'bakin-pwa', f: 'json', ...params });
+    return `/rest/${method}?${q}`;
+  }
+  async function api(method, params) {
+    const r = await fetch(url(method, params));
+    const body = (await r.json())['subsonic-response'];
+    if (body.status !== 'ok') throw Object.assign(new Error(body.error?.message || 'Error'), { code: body.error?.code });
+    return body;
+  }
+  const cover = (id, size = 96) => (id ? url('getCoverArt', { id, size }) : '');
+
+  // ------------------------------------------------------------------ login
+  async function enter(code) {
+    auth = authFor(code.trim().toUpperCase());
+    try { await api('ping'); } catch (e) { auth = null; throw e; }
+    store.set('bakin-auth', JSON.stringify(auth));
+  }
+  $('enter').addEventListener('click', async () => {
+    $('login-err').textContent = '';
+    try { await enter($('code').value); start(); } catch (e) { $('login-err').textContent = e.code === 40 ? 'Ese código no es. Fíjate en la PC.' : `No se pudo conectar: ${e.message}`; }
+  });
+  $('code').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('enter').click(); });
+
+  // ------------------------------------------------------------------ views
+  let songs = [], tab = 'songs';
+  const main = $('main');
+
+  function songRow(s, list, i) {
+    const li = document.createElement('li');
+    li.className = 'row';
+    li.dataset.id = s.id;
+    const img = document.createElement('img');
+    img.loading = 'lazy'; img.alt = ''; img.src = cover(s.coverArt);
+    const txt = document.createElement('div');
+    const t = document.createElement('strong'); t.textContent = s.title;
+    const a = document.createElement('small'); a.textContent = [s.artist, s.album].filter(Boolean).join(' · ');
+    txt.append(t, a);
+    const star = document.createElement('button');
+    star.className = 'act'; star.textContent = s.starred ? '♥' : '♡';
+    star.setAttribute('aria-label', s.starred ? 'Quitar de favoritas' : 'Favorita');
+    star.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const on = !s.starred;
+      await api(on ? 'star' : 'unstar', { id: s.id }).catch(() => null);
+      s.starred = on ? new Date().toISOString() : undefined;
+      star.textContent = on ? '♥' : '♡';
+    });
+    li.append(img, txt, star);
+    li.addEventListener('click', () => playList(list, i));
+    return li;
+  }
+  function rowFor(title, sub, art, onClick) {
+    const li = document.createElement('li');
+    li.className = 'row';
+    const img = document.createElement('img'); img.loading = 'lazy'; img.alt = ''; img.src = art;
+    const txt = document.createElement('div');
+    const t = document.createElement('strong'); t.textContent = title;
+    const a = document.createElement('small'); a.textContent = sub;
+    txt.append(t, a);
+    li.append(img, txt, document.createElement('span'));
+    li.addEventListener('click', onClick);
+    return li;
+  }
+  function showSongs(list, empty = 'No hay temas.') {
+    const ul = document.createElement('ul'); ul.className = 'list';
+    list.slice(0, 1500).forEach((s, i) => ul.append(songRow(s, list, i)));
+    main.replaceChildren(list.length ? ul : Object.assign(document.createElement('p'), { className: 'empty', textContent: empty }));
+  }
+  const match = (s, q) => !q || `${s.title} ${s.artist} ${s.album}`.toLowerCase().includes(q);
+
+  async function render() {
+    const q = $('q').value.trim().toLowerCase();
+    $('q').hidden = tab === 'send';
+    if (tab === 'songs') return showSongs(songs.filter((s) => match(s, q)));
+    if (tab === 'starred') return showSongs(((await api('getStarred2')).starred2.song || []).filter((s) => match(s, q)), 'Todavía no hay favoritas.');
+    if (tab === 'albums') {
+      const albums = ((await api('getAlbumList2', { type: 'alphabeticalByName', size: 500 })).albumList2.album || [])
+        .filter((a) => !q || `${a.name} ${a.artist}`.toLowerCase().includes(q));
+      const ul = document.createElement('ul'); ul.className = 'list';
+      for (const a of albums) ul.append(rowFor(a.name, `${a.artist || ''} · ${a.songCount} temas`, cover(a.coverArt), async () => showSongs((await api('getAlbum', { id: a.id })).album.song || [])));
+      return main.replaceChildren(ul);
+    }
+    if (tab === 'playlists') {
+      const lists = (await api('getPlaylists')).playlists.playlist || [];
+      const ul = document.createElement('ul'); ul.className = 'list';
+      for (const p of lists) ul.append(rowFor(p.name, `${p.songCount} temas`, cover(p.coverArt), async () => showSongs((await api('getPlaylist', { id: p.id })).playlist.entry || [])));
+      return main.replaceChildren(lists.length ? ul : Object.assign(document.createElement('p'), { className: 'empty', textContent: 'No hay playlists.' }));
+    }
+    if (tab === 'offline') return showOffline(q);
+    if (tab === 'send') return showSend();
+  }
+
+  // «Mandar a Bakin» (PLAN 0.21.3): a link goes to the PC's download hub
+  function showSend() {
+    const wrap = document.createElement('div');
+    wrap.innerHTML = '<p class="empty" style="padding:8px 0">Pega un enlace (YouTube, SoundCloud, Bandcamp, Wallhaven…): aparece en Bakin, en la PC, listo para bajar.</p>';
+    const form = document.createElement('div'); form.className = 'send';
+    const input = Object.assign(document.createElement('input'), { type: 'url', placeholder: 'https://…', value: new URLSearchParams(location.search).get('url') || new URLSearchParams(location.search).get('text') || '' });
+    const go = Object.assign(document.createElement('button'), { className: 'gm-chip', textContent: 'Mandar' });
+    const out = Object.assign(document.createElement('p'), { className: 'empty' });
+    go.addEventListener('click', async () => {
+      const link = (input.value.match(/https?:\/\/\S+/) || [''])[0];
+      if (!link) { out.textContent = 'Eso no parece un enlace.'; return; }
+      try { await api('bakinLink', { url: link }); out.textContent = 'Listo: ya está en Bakin.'; input.value = ''; }
+      catch (e) { out.textContent = `No se pudo: ${e.message}`; }
+    });
+    form.append(input, go);
+    wrap.append(form, out);
+    main.replaceChildren(wrap);
+  }
+
+  // «En el teléfono»: songs kept on the phone (IndexedDB: the Cache API needs https, the home server is http)
+  const db = new Promise((ok, ko) => {
+    const r = indexedDB.open('bakin', 1);
+    r.onupgradeneeded = () => { r.result.createObjectStore('songs', { keyPath: 'id' }); };
+    r.onsuccess = () => ok(r.result); r.onerror = () => ko(r.error);
+  });
+  const tx = async (mode, fn) => { const d = await db; return new Promise((ok, ko) => { const t = d.transaction('songs', mode); const q = fn(t.objectStore('songs')); t.oncomplete = () => ok(q?.result); t.onerror = () => ko(t.error); }); };
+  async function keep(s) {
+    const blob = await (await fetch(url('download', { id: s.id }))).blob();
+    await tx('readwrite', (st) => st.put({ id: s.id, song: s, blob }));
+  }
+  async function showOffline(q) {
+    const all = (await tx('readonly', (st) => st.getAll())) || [];
+    const list = all.map((x) => ({ ...x.song, _blob: x.blob })).filter((s) => match(s, q));
+    showSongs(list, 'Nada guardado todavía. En una lista, mantén apretado un tema… o usa «Guardar todo» en Favoritas.');
+    if (tab === 'offline' && !q) {
+      const b = Object.assign(document.createElement('button'), { className: 'gm-chip gm-chip-plain', textContent: 'Guardar las favoritas en el teléfono' });
+      b.addEventListener('click', async () => {
+        const fav = (await api('getStarred2')).starred2.song || [];
+        let n = 0;
+        for (const s of fav) { b.textContent = `Guardando ${++n} de ${fav.length}…`; await keep(s).catch(() => null); }
+        render();
+      });
+      main.prepend(b);
+    }
+  }
+
+  // ------------------------------------------------------------------ playing
+  const audio = $('audio');
+  let queue = [], pos = -1, counted = false;
+  async function playList(list, i) { queue = list; pos = i; await playAt(); }
+  async function playAt() {
+    const s = queue[pos];
+    if (!s) return;
+    counted = false;
+    const kept = s._blob || (await tx('readonly', (st) => st.get(s.id)).catch(() => null))?.blob;
+    audio.src = kept ? URL.createObjectURL(kept) : url('stream', { id: s.id });
+    audio.play().catch(() => {});
+    $('player').hidden = false;
+    $('p-title').textContent = s.title; $('p-artist').textContent = s.artist || '';
+    $('p-art').src = cover(s.coverArt, 160);
+    document.querySelectorAll('.row.playing').forEach((r) => r.classList.remove('playing'));
+    document.querySelector(`.row[data-id="${CSS.escape(s.id)}"]`)?.classList.add('playing');
+    if ('mediaSession' in navigator) {
+      navigator.mediaSession.metadata = new MediaMetadata({ title: s.title, artist: s.artist || '', album: s.album || '',
+        artwork: s.coverArt ? [{ src: cover(s.coverArt, 512), sizes: '512x512', type: 'image/jpeg' }] : [] });
+    }
+  }
+  const step = (d) => { if (queue[pos + d]) { pos += d; playAt(); } };
+  $('p-prev').addEventListener('click', () => (audio.currentTime > 4 ? (audio.currentTime = 0) : step(-1)));
+  $('p-next').addEventListener('click', () => step(1));
+  $('p-play').addEventListener('click', () => (audio.paused ? audio.play() : audio.pause()));
+  audio.addEventListener('play', () => { $('p-play').textContent = '⏸'; $('p-play').setAttribute('aria-label', 'Pausa'); });
+  audio.addEventListener('pause', () => { $('p-play').textContent = '▶'; $('p-play').setAttribute('aria-label', 'Reproducir'); });
+  audio.addEventListener('ended', () => step(1));
+  audio.addEventListener('timeupdate', () => {
+    $('bar').firstElementChild.style.width = audio.duration ? `${(audio.currentTime / audio.duration) * 100}%` : '0';
+    // a play counts past half the song (or four minutes), like Bakin's own player
+    if (!counted && audio.duration && (audio.currentTime > audio.duration / 2 || audio.currentTime > 240)) {
+      counted = true;
+      api('scrobble', { id: queue[pos].id, submission: 'true' }).catch(() => null);
+    }
+  });
+  if ('mediaSession' in navigator) {
+    navigator.mediaSession.setActionHandler('previoustrack', () => step(-1));
+    navigator.mediaSession.setActionHandler('nexttrack', () => step(1));
+  }
+
+  // ------------------------------------------------------------------ start
+  for (const b of document.querySelectorAll('[data-tab]')) {
+    b.addEventListener('click', () => {
+      tab = b.dataset.tab;
+      document.querySelectorAll('[data-tab]').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+      render().catch((e) => { main.textContent = `No se pudo cargar: ${e.message}`; });
+    });
+  }
+  let typing;
+  $('q').addEventListener('input', () => { clearTimeout(typing); typing = setTimeout(() => render().catch(() => null), 200); });
+
+  async function start() {
+    $('login').hidden = true; $('app').hidden = false;
+    songs = (await api('search3', { query: '', songCount: 100000, albumCount: 0, artistCount: 0 })).searchResult3.song || [];
+    const shared = new URLSearchParams(location.search);
+    if (shared.get('url') || shared.get('text')) document.querySelector('[data-tab=send]').click();
+    else render();
+  }
+  (async () => {
+    try { auth = JSON.parse(store.get('bakin-auth') || 'null'); } catch { auth = null; }
+    if (auth) { try { await api('ping'); return start(); } catch { auth = null; } }
+    $('login').hidden = false;
+  })();
+  </script>
+</body>
+</html>

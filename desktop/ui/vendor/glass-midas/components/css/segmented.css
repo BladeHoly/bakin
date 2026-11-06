@@ -1,0 +1,38 @@
+@layer gm-base, gm-components, gm-overrides;
+
+@layer gm-components {
+  /* Segmented: one choice among a few, a droplet under the chosen one. */
+  :where(gm-segmented) {
+    position: relative;
+    display: inline-flex;
+    gap: 0.125rem;
+    padding: 0.25rem;
+    border-radius: var(--gm-radius-pill, 999px);
+    vertical-align: middle;
+  }
+  :where(.gm-segment) {
+    position: relative;
+    z-index: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.45em;
+    padding: 0.45rem 1rem;
+    border: 0;
+    border-radius: var(--gm-radius-pill, 999px);
+    background: none;
+    color: var(--gm-ink-muted);
+    font: inherit;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: color 0.2s;
+  }
+  :where(.gm-segment[aria-checked='true']) {
+    color: var(--gm-ink);
+  }
+  :where(.gm-segment svg) {
+    width: 1.15em;
+    height: 1.15em;
+    flex: none;
+  }
+}

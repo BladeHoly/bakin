@@ -1,0 +1,1488 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Bakin</title>
+  <script type="importmap">{"imports":{"@glass-midas/core":"./vendor/glass-midas/core/index.js"}}</script>
+  <link rel="stylesheet" href="vendor/glass-midas/components/styles.css">
+  <link rel="stylesheet" href="app.css">
+  <script type="module" src="app.js"></script>
+</head>
+<body>
+  <!-- Resize handles at the window edge (native resize; pending in glass-midas: gm-window-edges) -->
+  <div class="edges" aria-hidden="true">
+    <i data-dir="North"></i><i data-dir="South"></i><i data-dir="West"></i><i data-dir="East"></i>
+    <i data-dir="NorthWest"></i><i data-dir="NorthEast"></i><i data-dir="SouthWest"></i><i data-dir="SouthEast"></i>
+  </div>
+
+  <div class="app">
+    <!-- ======================================================= top row -->
+    <div class="brand" data-tauri-drag-region>
+      <button type="button" class="gm-chip gm-chip-plain gm-chip-round side-toggle" id="btn-side" title="Barra lateral (Ctrl B)" aria-label="Barra lateral" aria-expanded="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+      </button>
+      <span class="brand-mark" aria-hidden="true" data-tauri-drag-region>
+        <!-- Bakin mark: a "B" monogram in a rounded square (no third-party logos). -->
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="6"/><path d="M9.5 7.5v9M9.5 7.5h3.25a2.25 2.25 0 0 1 0 4.5H9.5M9.5 12h3.75a2.25 2.25 0 0 1 0 4.5H9.5"/></svg>
+      </span>
+      <span class="brand-text" data-tauri-drag-region>
+        <strong data-tauri-drag-region>Bakin</strong>
+        <button type="button" id="btn-version" class="version" title="Novedades de esta versión">v…</button>
+      </span>
+    </div>
+
+    <header class="toolbar" data-tauri-drag-region>
+      <!-- left: the tabs you chose (Música and Imágenes by default; «+» shows Descargas, Convertir) -->
+      <div class="tb-side tb-left" data-tauri-drag-region>
+        <gm-segmented id="view" class="view-switch" material="frost" value="music" label="Vista">
+          <button value="music">Música</button>
+          <button value="photos">Imágenes</button>
+          <button value="downloads">Descargas<span class="busy-dot" id="busy-dot" hidden aria-label="(descargando)"></span></button>
+          <button value="convert">Convertir</button>
+        </gm-segmented>
+        <button type="button" class="gm-chip gm-chip-plain gm-chip-round tb-more" id="view-more" title="Mostrar u ocultar secciones" aria-label="Mostrar u ocultar secciones">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+        </button>
+        <gm-menu id="view-menu" anchor="view-more">
+          <span class="gm-menu-label">Pestañas arriba</span>
+          <button value="downloads">Descargas</button>
+          <button value="convert">Convertir</button>
+        </gm-menu>
+      </div>
+      <!-- centre: the search, and «Descargar» in the same pill style -->
+      <div class="tb-center">
+        <!-- tier="blur": the refraction of these two long pills cost ~20 MB of the renderer (0.17.1) -->
+        <gm-surface material="frost" radius="999" tier="blur" class="top-search">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
+          <input id="lib-q" type="search" placeholder="Buscar por nombre o tag" aria-label="Buscar en la biblioteca" spellcheck="false" autocomplete="off">
+          <kbd aria-hidden="true">Ctrl K</kbd>
+        </gm-surface>
+        <!-- downloads in the background (0.15.3): a ring with how much is left; a click shows them -->
+        <button type="button" class="gm-chip gm-chip-plain gm-chip-round tb-progress" id="tb-progress" hidden title="Descargas" aria-label="Ver las descargas">
+          <svg viewBox="0 0 36 36" aria-hidden="true"><circle class="ring-bg" cx="18" cy="18" r="15"/><circle class="ring" id="tb-ring" cx="18" cy="18" r="15" pathLength="100"/></svg>
+          <span id="tb-progress-n"></span>
+        </button>
+        <gm-surface material="frost" radius="999" tier="blur" class="top-dl">
+          <button type="button" class="dl-btn" id="btn-download" title="Descargar (Ctrl D)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg><span>Descargar</span>
+          </button>
+        </gm-surface>
+      </div>
+      <div class="tb-side tb-right" data-tauri-drag-region>
+      <button type="button" class="gm-chip gm-chip-plain gm-chip-round settings-btn" id="btn-settings" title="Configuración" aria-label="Configuración">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+      </button>
+      <gm-surface material="frost" radius="999" class="pill update-pill" id="update-pill" hidden>
+        <button type="button" id="btn-update" class="gm-chip gm-chip-primary">Actualizar</button>
+      </gm-surface>
+      <div class="win-controls">
+        <button id="win-min" class="gm-chip gm-chip-plain gm-chip-round" aria-label="Minimizar" title="Minimizar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 12h12"/></svg>
+        </button>
+        <button id="win-max" class="gm-chip gm-chip-plain gm-chip-round" aria-label="Maximizar" title="Maximizar">
+          <svg class="i-max" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="6" y="6" width="12" height="12" rx="3"/></svg>
+          <svg class="i-restore" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="5" y="9" width="10" height="10" rx="2.5"/><path d="M9 9V7.5A2.5 2.5 0 0 1 11.5 5h5A2.5 2.5 0 0 1 19 7.5v5a2.5 2.5 0 0 1-2.5 2.5H15"/></svg>
+        </button>
+        <button id="win-close" class="gm-chip gm-chip-plain gm-chip-round win-close" aria-label="Cerrar" title="Cerrar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m7 7 10 10M17 7 7 17"/></svg>
+        </button>
+      </div>
+      </div>
+    </header>
+
+    <!-- ============================================== library: sidebar -->
+    <aside class="sidebar" id="side-library" aria-label="Biblioteca">
+      <gm-surface material="frost" radius="24" class="card photos-only">
+        <nav class="scopes" id="scopes" aria-label="Ver">
+          <button type="button" class="scope" data-scope="all" aria-current="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="3" y="3" width="7.5" height="7.5" rx="2"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="2"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="2"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="2"/></svg>
+            <span>Todo</span><small id="count-all">0</small>
+          </button>
+          <button type="button" class="scope" data-scope="favorites">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/></svg>
+            <span>Favoritas</span><small id="count-fav">0</small>
+          </button>
+          <button type="button" class="scope" data-scope="deleted">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>
+            <span>Eliminadas</span><small id="count-deleted">0</small>
+          </button>
+        </nav>
+      </gm-surface>
+
+      <gm-surface material="frost" radius="24" class="card music-only" id="music-card">
+        <nav class="scopes" id="music-views" aria-label="Música">
+          <button type="button" class="scope" data-mview="queue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h13M3 12h13M3 18h8M17 15v6l5-3z"/></svg><span>Cola</span><small id="mc-queue"></small></button>
+          <button type="button" class="scope" data-mview="songs"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg><span>Todo</span><small id="mc-songs"></small></button>
+          <button type="button" class="scope" data-mview="favorites"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/></svg><span>Favoritas</span><small id="mc-favorites"></small></button>
+          <button type="button" class="scope" data-mview="artists"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg><span>Artistas</span><small id="mc-artists"></small></button>
+          <button type="button" class="scope" data-mview="albums"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="2.5"/></svg><span>Álbumes</span><small id="mc-albums"></small></button>
+          <button type="button" class="scope" data-mview="top"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 20h18M7 16V9M12 16V4M17 16v-5"/></svg><span>Más escuchadas</span><small id="mc-played"></small></button>
+          <button type="button" class="scope" data-mview="recent"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span>Escuchadas hace poco</span><small></small></button>
+          <button type="button" class="scope" data-mview="added"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg><span>Agregadas hace poco</span><small></small></button>
+          <button type="button" class="scope" data-mview="never"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M5.7 5.7l12.6 12.6"/></svg><span>Nunca escuchadas</span><small id="mc-never"></small></button>
+          <button type="button" class="scope" data-mview="stats"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19V5M4 19h16M8 15l3-4 3 2 5-6"/></svg><span>Estadísticas</span><small></small></button>
+          <button type="button" class="scope" data-mview="deleted"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg><span>Eliminadas</span><small id="mc-deleted"></small></button>
+        </nav>
+        <div class="card-head music-sub" id="mixes-head" hidden><h3>Mixes</h3></div>
+        <ul class="collections" id="music-mixes"></ul>
+        <div class="card-head music-sub">
+          <h3>Playlists</h3>
+          <button type="button" class="gm-chip gm-chip-plain gm-chip-round" id="btn-new-playlist" aria-label="Nueva playlist" title="Nueva playlist (normal o inteligente)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+          </button>
+        </div>
+        <ul class="collections" id="music-playlists"></ul>
+        <p class="hint" id="playlists-empty">Selecciona temas y usa «Agregar a playlist…», o crea una inteligente con el +.</p>
+      </gm-surface>
+
+      <gm-surface material="frost" radius="24" class="card">
+        <div class="card-head">
+          <h3 id="collections-title">Colecciones</h3>
+          <button type="button" class="gm-chip gm-chip-plain gm-chip-round" id="btn-add-folder" aria-label="Agregar una carpeta tuya" title="Agregar una carpeta tuya (fotos, videos, audio…)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+          </button>
+        </div>
+        <ul class="collections" id="collections" aria-label="Colecciones"></ul>
+        <p class="hint" id="collections-empty">Baja fondos de Wallhaven o agrega una carpeta tuya con el botón +.</p>
+      </gm-surface>
+
+      <gm-surface material="frost" radius="24" class="card photos-only" id="tags-card">
+        <!-- folded sidebar: the tags as one button that opens the sidebar on them -->
+        <button type="button" class="scope tags-fold" id="tags-fold" title="Tags" aria-label="Tags">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8z"/><circle cx="7.5" cy="7.5" r="1.5"/></svg>
+        </button>
+        <div class="card-head"><h3>Tags</h3><button type="button" class="gm-link" id="btn-tags-clear" hidden>Quitar filtro</button></div>
+        <div class="chips tag-cloud" id="tag-cloud" role="group" aria-label="Filtrar por tags"></div>
+        <p class="hint" id="tags-empty">Selecciona fotos y usa «Etiquetar» para agregar tags.</p>
+      </gm-surface>
+    </aside>
+
+    <!-- ============================================== library: content -->
+    <main class="content" id="view-library">
+      <gm-surface material="frost" radius="28" variant="lite" class="card wide lib-card">
+        <div class="card-head">
+          <div class="lib-heading">
+            <button class="gm-chip gm-chip-plain lib-back" id="lib-back" hidden></button>
+            <h2 id="lib-title">Todo</h2>
+            <span class="hint" id="lib-count"></span>
+          </div>
+          <div class="chips">
+            <span class="chips music-actions" id="music-actions" hidden>
+              <button class="gm-chip gm-chip-primary" id="mus-play">▶ Reproducir</button>
+              <button class="gm-chip gm-chip-plain" id="mus-shuffle">Aleatorio</button>
+              <!-- a filter of the songs, with the actions: the filters' row stays empty in Música (0.13 review) -->
+              <button class="gm-chip gm-chip-plain" id="lib-lowq" aria-pressed="false" hidden title="Solo MP3 o menos de 160 kbps: lo que conviene volver a bajar en mejor calidad">Baja calidad</button>
+              <button class="gm-chip gm-chip-plain" id="pl-edit" hidden>Editar</button>
+              <button class="gm-chip gm-chip-plain" id="pl-mirror" hidden title="Una carpeta (el auto, el celular, otro reproductor) que Bakin mantiene igual a esta playlist">Carpeta espejo…</button>
+              <button class="gm-chip gm-chip-plain" id="pl-export" hidden title="Guardar como .m3u8 (lo abren otros reproductores y el celular)">Exportar</button>
+              <button class="gm-chip gm-chip-plain danger" id="pl-delete" hidden>Borrar</button>
+              <button class="gm-chip gm-chip-plain" id="queue-clear" hidden title="Deja solo el tema que suena">Vaciar lo que sigue</button>
+              <button class="gm-chip gm-chip-plain gm-chip-round" id="mus-more" aria-label="Más" title="Ordenar la biblioteca">
+                <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg></button>
+              <gm-menu id="mus-menu" anchor="mus-more">
+                <span class="gm-menu-label">Ordenar la biblioteca</span>
+                <button value="clean">Limpiar títulos y artistas…</button>
+                <button value="dupes">Buscar duplicados…</button>
+              </gm-menu>
+            </span>
+            <button class="gm-chip gm-chip-plain gm-chip-round" id="btn-select" aria-label="Seleccionar" title="Seleccionar varios (también Ctrl+clic)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="3.5" width="17" height="17" rx="4.5"/><path d="m8 12 3 3 5-6"/></svg>
+            </button>
+            <button class="gm-chip gm-chip-plain gm-chip-round" id="btn-lib-refresh" aria-label="Volver a leer la biblioteca" title="Volver a leer la biblioteca (si cambiaste archivos fuera de Bakin)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8 8 0 1 0-2.3 5.7M20 5v6h-6"/></svg>
+            </button>
+          </div>
+        </div>
+        <div class="lib-filters" id="lib-filters">
+          <gm-segmented id="kind" material="frost" value="" label="Tipo">
+            <button value="">Todo</button>
+            <button value="image">Fotos</button>
+            <button value="video">Videos</button>
+            <button value="other">Otros</button>
+          </gm-segmented>
+          <div class="lib-wp" id="lib-wp">
+            <gm-select class="lib-wp-sel">
+              <select id="lib-orient" aria-label="Forma">
+                <option value="">Cualquier forma</option>
+                <option value="landscape">Horizontales</option>
+                <option value="portrait">Verticales</option>
+                <option value="square">Cuadradas</option>
+              </select>
+            </gm-select>
+            <gm-select class="lib-wp-sel">
+              <select id="lib-minpx" aria-label="Resolución mínima">
+                <option value="0">Cualquier tamaño</option>
+                <option value="1080">1080p o más</option>
+                <option value="1440">1440p o más</option>
+                <option value="2160">4K o más</option>
+              </select>
+            </gm-select>
+            <button class="gm-chip gm-chip-plain lib-color-btn" id="lib-color-btn" popovertarget="lib-color-pop" aria-label="Color"><span class="swatch" id="lib-color-swatch"></span><span id="lib-color-label">Color</span><span class="lib-color-clear" id="lib-color-clear" role="button" aria-label="Quitar el filtro de color" title="Quitar el filtro de color" hidden>×</span></button>
+            <gm-popover id="lib-color-pop" class="lib-color-pop">
+              <div class="color-grid" id="lib-color-grid" role="group" aria-label="Color dominante"></div>
+            </gm-popover>
+          </div>
+          <gm-select class="lib-sort">
+            <select id="lib-sort" aria-label="Ordenar">
+              <option value="new">Más recientes</option>
+              <option value="old">Más antiguas</option>
+              <option value="name">Nombre</option>
+              <option value="size">Tamaño</option>
+              <optgroup label="Música">
+                <option value="artist">Artista</option>
+                <option value="album">Álbum</option>
+                <option value="title">Título</option>
+                <option value="duration">Duración</option>
+                <option value="bitrate">Mejor bitrate</option>
+                <option value="bitrate_asc">Peor bitrate</option>
+              </optgroup>
+            </select>
+          </gm-select>
+        </div>
+
+        <!-- while selecting, this takes the filters' place (0.13 review: a bar stacked under them didn't
+             fit); the main actions in sight, the rest under ⋯ -->
+        <div class="gm-actionbar selbar" id="selbar" hidden>
+          <strong class="gm-actionbar-count" id="sel-count">0 seleccionadas</strong>
+          <div class="gm-actionbar-actions">
+            <button class="gm-chip gm-chip-plain" id="sel-play" hidden>▶ Reproducir</button>
+            <button class="gm-chip gm-chip-plain" id="sel-queue" hidden>Agregar a la cola</button>
+            <button class="gm-chip gm-chip-plain" id="sel-addpl" hidden>Agregar a playlist…</button>
+            <button class="gm-chip gm-chip-plain" id="sel-fav">♥ Favorita</button>
+            <button class="gm-chip gm-chip-plain" id="sel-tag">Etiquetar…</button>
+            <button class="gm-chip gm-chip-plain gm-chip-round" id="sel-more" aria-label="Más acciones" title="Más acciones">
+              <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg></button>
+            <gm-menu id="sel-menu" anchor="sel-more">
+              <button id="sel-all">Seleccionar todo</button>
+              <button id="sel-unfav">Quitar ♥</button>
+              <button id="sel-rmpl" hidden>Quitar de la playlist</button>
+              <button id="sel-convert">Convertir…</button>
+              <button id="sel-upgrade" hidden title="Bajar de nuevo desde YouTube en mejor calidad (no convierte)">Mejorar calidad…</button>
+            </gm-menu>
+            <button class="gm-chip gm-chip-plain danger" id="sel-delete">Eliminar</button>
+            <button class="gm-chip gm-chip-primary" id="sel-done">Listo</button>
+          </div>
+        </div>
+
+        <div class="gm-media-grid lib-grid" style="--gm-media-min:132px" role="group" aria-label="Archivos" id="lib-grid"></div>
+        <div class="lib-groups" id="lib-groups" role="list" hidden></div>
+        <!-- Música › Estadísticas (PLAN 0.14.5): from the play log -->
+        <div class="lib-stats" id="lib-stats" hidden>
+          <div class="chips group" id="st-span" role="group" aria-label="Período">
+            <button class="gm-chip gm-chip-plain" value="week" aria-pressed="false">Semana</button>
+            <button class="gm-chip gm-chip-plain" value="month" aria-pressed="true">Mes</button>
+            <button class="gm-chip gm-chip-plain" value="year" aria-pressed="false">Año</button>
+            <button class="gm-chip gm-chip-plain" value="all" aria-pressed="false">Todo</button>
+          </div>
+          <div class="gm-stat-grid st-grid">
+            <div class="gm-stat"><span class="gm-stat-label">Reproducciones</span><strong class="gm-stat-value" id="st-plays">0</strong></div>
+            <div class="gm-stat"><span class="gm-stat-label">Minutos</span><strong class="gm-stat-value" id="st-minutes">0</strong></div>
+            <div class="gm-stat"><span class="gm-stat-label">Temas distintos</span><strong class="gm-stat-value" id="st-songs">0</strong></div>
+          </div>
+          <div class="st-cols">
+            <section><h3>Lo más escuchado</h3><ol class="st-list" id="st-top-songs"></ol></section>
+            <section><h3>Artistas</h3><ol class="st-list" id="st-top-artists"></ol></section>
+          </div>
+          <section><h3>A qué hora escuchas</h3><div class="st-hours" id="st-hours" aria-hidden="true"></div></section>
+          <p class="hint" id="st-new"></p>
+          <p class="hint" id="st-since"></p>
+        </div>
+        <div class="gm-empty" id="lib-empty" hidden>
+          <svg class="gm-empty-art photos-only" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="9" cy="10" r="2"/><path d="m21 16-5-5-9 9"/></svg>
+          <svg class="gm-empty-art music-only" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+          <h2 id="lib-empty-title">Nada por aquí</h2>
+          <p id="lib-empty-text">Baja fondos de Wallhaven («Descargar» arriba) o agrega una carpeta tuya.</p>
+          <!-- nothing in the library for those words: maybe they wanted new music -->
+          <button type="button" class="gm-chip" id="lib-empty-web" hidden></button>
+        </div>
+        <div class="drawer-actions"><button class="gm-chip gm-chip-plain" id="btn-lib-more" hidden>Cargar más</button></div>
+
+        <!-- Eliminadas -->
+        <div class="trash" id="trash" hidden>
+          <p class="hint">Están en la Papelera de Windows.</p>
+          <ul class="trash-list" id="trash-list"></ul>
+        </div>
+      </gm-surface>
+    </main>
+
+    <!-- ============================================== convert: sidebar -->
+    <aside class="sidebar" id="side-convert" aria-label="Formato de salida" hidden>
+      <gm-surface material="frost" radius="24" class="card">
+        <h3>Convertir a</h3>
+        <div class="chips group" id="cv-kind" role="group" aria-label="Tipo">
+          <button class="gm-chip gm-chip-plain" value="image" aria-pressed="true">Imagen</button>
+          <button class="gm-chip gm-chip-plain" value="audio" aria-pressed="false">Audio</button>
+          <button class="gm-chip gm-chip-plain" value="video" aria-pressed="false">Video</button>
+        </div>
+        <div class="chips group wrap" id="cv-format" role="group" aria-label="Formato"></div>
+        <p class="hint" id="cv-format-hint"></p>
+      </gm-surface>
+
+      <gm-surface material="frost" radius="24" class="card" id="cv-opts-image">
+        <h3>Imagen</h3>
+        <div class="row" id="cv-quality-row">
+          <span class="gm-label">Calidad <span>1–100</span></span>
+          <gm-quantity><input id="cv-quality" type="number" min="1" max="100" step="5" value="90" aria-label="Calidad de imagen"></gm-quantity>
+        </div>
+        <div class="row">
+          <label class="gm-label" for="cv-size">Tamaño <span>lado más largo</span></label>
+          <gm-select><select id="cv-size"><option value="0">Original</option><option value="4096">4096 px</option><option value="2048">2048 px</option><option value="1080">1080 px</option><option value="720">720 px</option></select></gm-select>
+        </div>
+      </gm-surface>
+
+      <gm-surface material="frost" radius="24" class="card" id="cv-opts-audio" hidden>
+        <h3>Audio</h3>
+        <div class="chips group" id="cv-aq" role="group" aria-label="Calidad de audio">
+          <button class="gm-chip gm-chip-plain" value="0" aria-pressed="true">Máxima</button>
+          <button class="gm-chip gm-chip-plain" value="320" aria-pressed="false">320</button>
+          <button class="gm-chip gm-chip-plain" value="192" aria-pressed="false">192</button>
+          <button class="gm-chip gm-chip-plain" value="128" aria-pressed="false">128</button>
+        </div>
+        <p class="hint" id="cv-aq-hint">kbps. FLAC y WAV no pierden calidad.</p>
+      </gm-surface>
+
+      <gm-surface material="frost" radius="24" class="card" id="cv-opts-video" hidden>
+        <h3>Video</h3>
+        <div class="chips group" id="cv-vq" role="group" aria-label="Calidad de video">
+          <button class="gm-chip gm-chip-plain" value="high" aria-pressed="true">Alta</button>
+          <button class="gm-chip gm-chip-plain" value="medium" aria-pressed="false">Media</button>
+          <button class="gm-chip gm-chip-plain" value="small" aria-pressed="false">Liviana</button>
+        </div>
+        <div class="row">
+          <label class="gm-label" for="cv-height">Resolución máx.</label>
+          <gm-select><select id="cv-height"><option value="0">Original</option><option value="2160">4K</option><option value="1080">1080p</option><option value="720">720p</option><option value="480">480p</option></select></gm-select>
+        </div>
+        <p class="hint" id="cv-video-hint"></p>
+      </gm-surface>
+
+      <gm-surface material="frost" radius="24" class="card">
+        <h3>Dónde guardar</h3>
+        <div class="chips group" id="cv-where" role="group" aria-label="Dónde guardar">
+          <button class="gm-chip gm-chip-plain" value="same" aria-pressed="true">Junto al original</button>
+          <button class="gm-chip gm-chip-plain" value="folder" aria-pressed="false">Otra carpeta</button>
+        </div>
+        <div class="gm-input-group" id="cv-outdir-row" hidden>
+          <input id="cv-outdir" class="gm-input" type="text" spellcheck="false" aria-label="Carpeta de salida" readonly>
+          <button type="button" id="cv-outdir-pick" class="gm-chip gm-chip-plain gm-chip-round" aria-label="Elegir carpeta" title="Elegir carpeta">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+          </button>
+        </div>
+        <label class="gm-toggle-row">
+          <span class="gm-toggle-row-text"><strong>Conservar metadatos</strong><small>EXIF, perfil de color, etiquetas y carátula.</small></span>
+          <input id="cv-meta" type="checkbox" class="gm-toggle" role="switch" checked>
+        </label>
+        <p class="hint">Siempre se crea un archivo nuevo: el original no se toca y nada se sobrescribe.</p>
+      </gm-surface>
+    </aside>
+
+    <!-- ============================================== convert: content -->
+    <main class="content" id="view-convert" hidden>
+      <gm-surface material="frost" radius="28" variant="lite" class="card wide cv-card" id="cv-drop">
+        <div class="card-head">
+          <div class="lib-heading"><h2>Convertir</h2><span class="hint" id="cv-count"></span></div>
+          <div class="chips">
+            <button class="gm-chip gm-chip-plain" id="cv-clear" hidden>Quitar todo</button>
+            <button class="gm-chip" id="cv-add">Agregar archivos…</button>
+          </div>
+        </div>
+        <ul class="cv-list" id="cv-list"></ul>
+        <div class="gm-empty" id="cv-empty">
+          <svg class="gm-empty-art" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h11l-3-3M20 17H9l3 3"/></svg>
+          <h2>Arrastra archivos aquí</h2>
+          <p>O usa «Agregar archivos…», o selecciona en la Biblioteca y toca «Convertir…». Imágenes, audio y video.</p>
+        </div>
+        <div class="cv-actions">
+          <p class="hint" id="cv-summary"></p>
+          <button class="gm-chip gm-chip-primary" id="cv-go" disabled>Convertir</button>
+        </div>
+      </gm-surface>
+    </main>
+
+    <!-- ============================================ downloads: sidebar -->
+    <aside class="sidebar" id="side-downloads" aria-label="Descargas" hidden>
+      <gm-surface material="frost" radius="24" class="card">
+        <h3>Descargas</h3>
+        <dl class="dl-summary" id="dl-summary"></dl>
+        <p class="hint">Para bajar algo, «Descargar» arriba: fondos de Wallhaven o cualquier enlace que soporte yt-dlp (YouTube, SoundCloud, Twitch…).</p>
+        <div class="chips compact"><button type="button" class="gm-chip gm-chip-plain" id="btn-dl-settings">Configurar descargas…</button></div>
+      </gm-surface>
+    </aside>
+
+    <!-- ============================================ downloads: content -->
+    <main class="content" id="view-downloads" hidden>
+      <gm-surface material="frost" radius="28" variant="lite" class="card wide">
+        <div class="card-head">
+          <h2 id="job-title">Listo para empezar</h2>
+          <span class="gm-badge" id="job-badge" hidden></span>
+        </div>
+        <span class="gm-meter" id="meter" role="meter" aria-label="Progreso" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" style="--value: 0"></span>
+        <div class="card-head">
+          <p class="status" id="status">Pega un enlace en la búsqueda de arriba (Ctrl K) o «Descargar»: Wallhaven, YouTube, SoundCloud…</p>
+          <div class="chips">
+            <button class="gm-chip gm-chip-plain" id="btn-cancel" hidden>Cancelar</button>
+            <button class="gm-chip gm-chip-plain" id="btn-open" disabled>Abrir carpeta</button>
+          </div>
+        </div>
+        <p class="gm-note" id="stop-note" data-tone="danger" data-lines hidden></p>
+      </gm-surface>
+
+      <gm-surface material="frost" radius="28" variant="lite" class="card wide" id="queue-card" hidden>
+        <div class="card-head">
+          <div class="lib-heading"><h2>Colas</h2><span class="hint" id="queue-count"></span></div>
+          <div class="chips">
+            <button class="gm-chip gm-chip-plain" id="btn-queue-pause">Pausar todo</button>
+            <button class="gm-chip gm-chip-plain" id="btn-queue-resume" hidden>Reanudar todo</button>
+          </div>
+        </div>
+        <div class="lanes" id="lanes" role="tablist" aria-label="Colas"></div>
+        <ol class="queue" id="queue" aria-label="Trabajos en cola"></ol>
+      </gm-surface>
+
+      <gm-surface material="frost" radius="28" variant="lite" class="card wide">
+        <div class="card-head">
+          <div class="lib-heading"><h2>Seguidos</h2><span class="hint" id="follows-count"></span></div>
+          <div class="chips"><button class="gm-chip gm-chip-plain" id="btn-follows-all" hidden>Revisar todos ahora</button></div>
+        </div>
+        <ul class="follows" id="follows"></ul>
+        <p class="hint" id="follows-empty">Para seguir un canal o una playlist, pega el enlace en la búsqueda y elige «Seguir…». Bakin revisa cada tanto y baja solo lo nuevo, aunque la ventana esté cerrada.</p>
+      </gm-surface>
+
+      <gm-surface material="frost" radius="28" variant="lite" class="card wide">
+        <!-- what yt-dlp says, for when something fails: folded (0.15.3) -->
+        <details class="activity" id="activity"><summary><h2>Detalles</h2><span class="hint">lo que hace Bakin, paso a paso</span></summary>
+        <ol class="gm-log" id="log" aria-live="polite"></ol>
+        <p class="hint" id="log-path"></p>
+      </details>
+      </gm-surface>
+    </main>
+
+    <!-- ===================================================== player -->
+    <gm-surface material="frost" radius="22" variant="lite" class="player" id="player" hidden>
+      <div class="pl-now">
+        <button type="button" class="pl-locate" id="pl-locate" title="Mostrar en la lista" aria-label="Mostrar el tema en la lista">
+          <span class="pl-cover" id="pl-cover" aria-hidden="true"></span>
+          <span class="pl-meta"><strong id="pl-title"></strong><small id="pl-artist"></small></span>
+        </button>
+      </div>
+      <div class="pl-center">
+        <div class="pl-buttons">
+          <button class="gm-chip gm-chip-plain gm-chip-round" id="pl-shuffle" aria-pressed="false" data-mode="random" title="Aleatorio (S) · clic derecho: elegir el tipo" aria-label="Aleatorio; clic derecho: elegir el tipo">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h4v4M4 20 20 4M20 16v4h-4M15 15l5 5M4 4l5 5"/></svg><span class="pl-mode" aria-hidden="true"></span></button>
+          <gm-menu id="shuffle-menu" class="shuffle-menu" anchor="pl-shuffle" placement="top">
+            <button value="random">Totalmente al azar<small>Cualquier orden</small></button>
+            <button value="smart">Inteligente<small>Más favoritas y lo que hace rato no suena; nunca el mismo artista seguido</small></button>
+            <button value="album">Por álbum<small>Álbumes enteros en orden; los álbumes, al azar</small></button>
+            <button value="artist">Por artista<small>Un artista a la vez, sus temas mezclados; los artistas, al azar</small></button>
+          </gm-menu>
+          <button class="gm-chip gm-chip-plain gm-chip-round" id="pl-prev" title="Clic: atrasar 10 s · Clic derecho: tema anterior" aria-label="Atrasar; clic derecho: tema anterior">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 20 9 12l10-8zM5 19V5"/></svg></button>
+          <button class="gm-chip gm-chip-round pl-play" id="pl-play" title="Reproducir o pausar (Espacio)" aria-label="Reproducir">
+            <svg class="i-play" viewBox="0 0 24 24" fill="currentColor"><path d="M7 4.5v15l13-7.5z"/></svg>
+            <svg class="i-pause" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4.5" width="4" height="15" rx="1"/><rect x="14" y="4.5" width="4" height="15" rx="1"/></svg></button>
+          <button class="gm-chip gm-chip-plain gm-chip-round" id="pl-next" title="Clic: adelantar 10 s · Clic derecho: tema siguiente" aria-label="Adelantar; clic derecho: tema siguiente">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 4 10 8-10 8zM19 5v14"/></svg></button>
+          <button class="gm-chip gm-chip-plain gm-chip-round" id="pl-repeat" data-mode="off" title="Repetir: no (R)" aria-label="Repetir">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 2l4 4-4 4"/><path d="M3 11V9a3 3 0 0 1 3-3h15M7 22l-4-4 4-4"/><path d="M21 13v2a3 3 0 0 1-3 3H3"/></svg><span class="pl-one">1</span></button>
+        </div>
+        <div class="pl-seek">
+          <span id="pl-pos">0:00</span>
+          <gm-slider class="pl-bar"><input id="pl-seek" type="range" min="0" max="1000" step="1" value="0" aria-label="Posición"><span class="pl-hover" id="pl-hover" hidden></span></gm-slider>
+          <span id="pl-len">0:00</span>
+        </div>
+      </div>
+      <div class="pl-side">
+        <span class="pl-badge" id="pl-sleep-badge" hidden></span>
+        <button class="gm-chip gm-chip-plain gm-chip-round" id="pl-fav" aria-pressed="false" title="Favorita (F)" aria-label="Marcar como favorita">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/></svg></button>
+        <button class="gm-chip gm-chip-plain gm-chip-round" id="pl-lyrics" title="Letra" aria-label="Ver la letra" aria-pressed="false">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h10M4 10h10M4 14h6M17 4v10.5"/><circle cx="15" cy="16.5" r="2.5"/></svg></button>
+        <button class="gm-chip gm-chip-plain gm-chip-round" id="pl-queue" title="Cola (Q)" aria-label="Ver la cola">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h13M3 12h13M3 18h8M17 15v6l5-3z"/></svg></button>
+        <button class="gm-chip gm-chip-plain gm-chip-round" id="pl-more" title="Temporizador" aria-label="Temporizador">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2 2M9 2h6"/></svg></button>
+        <button class="gm-chip gm-chip-plain gm-chip-round" id="pl-mini" title="Modo mínimo: solo esta barra, en una ventana chica (N)" aria-label="Modo mínimo">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="3"/><rect x="11" y="12" width="7" height="5" rx="1.5"/></svg></button>
+        <button class="gm-chip gm-chip-plain gm-chip-round" id="pl-mute" title="Silenciar (M)" aria-label="Silenciar">
+          <svg class="i-vol" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4zM15.5 8.5a5 5 0 0 1 0 7M19 5a10 10 0 0 1 0 14"/></svg>
+          <svg class="i-muted" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4zM22 9l-6 6M16 9l6 6"/></svg></button>
+        <gm-slider class="pl-vol"><input id="pl-volume" type="range" min="0" max="100" step="1" value="80" aria-label="Volumen"></gm-slider>
+      </div>
+    </gm-surface>
+  </div>
+
+  <!-- the song's lyrics, in time with it (PLAN 0.16.3) -->
+  <gm-surface material="frost" radius="24" class="lyrics-panel" id="lyrics-panel" hidden>
+    <div class="card-head"><h3 id="ly-title">Letra</h3>
+      <button type="button" class="gm-chip gm-chip-plain gm-chip-round" id="ly-close" aria-label="Cerrar la letra">✕</button></div>
+    <div class="ly-lines" id="ly-lines"></div>
+    <div class="ly-empty" id="ly-empty" hidden><p class="hint" id="ly-empty-text"></p>
+      <button type="button" class="gm-chip" id="ly-fetch" hidden>Buscar en LRCLIB</button></div>
+  </gm-surface>
+
+  <!-- ======================================================= dialogs -->
+  <!-- variant="lite": blur, not refraction. The refraction filter is repainted while new
+       thumbnails come in and the grid dropped to ~20 fps the first time (0.13 review, C52) -->
+  <gm-dialog id="download-hub" heading="Descargar">
+    <div class="hub">
+      <nav class="scopes hub-nav" id="hub-nav" aria-label="Qué bajar">
+        <button type="button" class="scope" data-sec="catalog"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m20 20-4.8-4.8M8.5 13V8l4-1v4.5"/><circle cx="7.6" cy="13" r="1"/><circle cx="11.6" cy="11.5" r="1"/></svg><span>Buscar música</span></button>
+        <button type="button" class="scope" data-sec="wallhaven"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="14" rx="3"/><path d="m3 15 5-5 5 5 3-3 5 5M8 21h8"/></svg><span>Fondos</span></button>
+        <button type="button" class="scope" data-sec="link" data-mode="media"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg><span>Música y video</span></button>
+      </nav>
+      <div class="hub-body">
+        <!-- YouTube Music's catalogue, like Wallhaven (PLAN 0.15.1): search, open, tick, download -->
+        <section data-sec="catalog" hidden>
+        <div class="dialog-form cat">
+          <div class="wh-search">
+            <input class="gm-input" id="cat-q" type="search" placeholder="Un tema, un artista, un álbum…" spellcheck="false" autocomplete="off">
+            <button class="gm-chip gm-chip-primary" id="cat-go">Buscar</button>
+          </div>
+          <div class="chips group" id="cat-kind" role="group" aria-label="Qué buscar">
+            <button class="gm-chip gm-chip-plain" value="songs" aria-pressed="true">Temas</button>
+            <button class="gm-chip gm-chip-plain" value="albums" aria-pressed="false">Álbumes</button>
+            <button class="gm-chip gm-chip-plain" value="artists" aria-pressed="false">Artistas</button>
+            <button class="gm-chip gm-chip-plain" value="playlists" aria-pressed="false">Playlists</button>
+          </div>
+          <div class="cat-page-head" id="cat-page-head" hidden>
+            <button type="button" class="gm-chip gm-chip-plain" id="cat-back">← Resultados</button>
+            <img class="cat-page-art" id="cat-page-art" alt="">
+            <div class="cat-page-text"><strong id="cat-page-title"></strong><small id="cat-page-sub"></small></div>
+            <button type="button" class="gm-chip" id="cat-page-all" hidden>Bajar todo</button>
+          </div>
+          <p class="hint" id="cat-status">Busca en YouTube Music. Lo que ya tienes aparece marcado.</p>
+          <div class="cat-scroll" id="cat-scroll">
+            <div class="cat-songs" id="cat-songs" role="list"></div>
+            <h3 class="cat-sub" id="cat-albums-title" hidden>Álbumes y sencillos</h3>
+            <div class="cat-tiles" id="cat-tiles" role="list"></div>
+          </div>
+          <div class="cat-actions">
+            <span class="hint" id="cat-picked"></span>
+            <button class="gm-chip gm-chip-primary" id="cat-download" disabled>Bajar</button>
+          </div>
+        </div>
+        </section>
+        <section data-sec="wallhaven" hidden>
+        <div class="dialog-form wh">
+          <div class="wh-search">
+            <input class="gm-input" id="wh-q" type="search" placeholder="Buscar por tags: paisaje, espacio, anime…" spellcheck="false" autocomplete="off">
+            <button class="gm-chip gm-chip-plain" id="wh-filters-btn" aria-expanded="false" aria-controls="wh-filters" title="Categorías, orden, pantalla">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M7 12h10M10 18h4"/></svg><span id="wh-filters-label">Filtros</span></button>
+            <button class="gm-chip gm-chip-primary" id="wh-go">Buscar</button>
+          </div>
+          <!-- minimal by default (0.13 review): the filters fold under «Filtros» -->
+          <div class="wh-filters" id="wh-filters" hidden>
+            <div class="chips group" id="wh-cats" role="group" aria-label="Categorías">
+              <button class="gm-chip gm-chip-plain" value="general" aria-pressed="true">General</button>
+              <button class="gm-chip gm-chip-plain" value="anime" aria-pressed="true">Anime</button>
+              <button class="gm-chip gm-chip-plain" value="people" aria-pressed="true">Personas</button>
+            </div>
+            <gm-select class="wh-select">
+              <select id="wh-sort" aria-label="Orden">
+                <option value="toplist:1M">Populares del mes</option>
+                <option value="toplist:1w">Populares de la semana</option>
+                <option value="toplist:1y">Populares del año</option>
+                <option value="date_added">Recientes</option>
+                <option value="random">Al azar</option>
+                <option value="views">Más vistos</option>
+                <option value="favorites">Más guardados</option>
+              </select>
+            </gm-select>
+            <gm-select class="wh-select">
+              <select id="wh-for" aria-label="Para qué pantalla">
+                <option value="">Cualquier pantalla</option>
+              </select>
+            </gm-select>
+            <label class="wh-sketchy" title="Contenido algo subido de tono, sin desnudos. Nunca se baja contenido NSFW.">
+              <input type="checkbox" class="gm-toggle" role="switch" id="wh-sketchy"><span>Incluir «sketchy»</span>
+            </label>
+          </div>
+          <div class="chips compact wh-mine" id="wh-mine" hidden role="group" aria-label="Mis colecciones"></div>
+          <p class="hint" id="wh-status" title="Los fondos son de sus autores: para uso personal.">Elegí qué buscar: por defecto, lo más popular del mes, solo contenido apto.</p>
+          <div class="wh-scroll" id="wh-scroll"><div class="wh-grid" id="wh-grid"></div></div>
+          <div class="wh-preview" id="wh-preview" hidden>
+            <img id="wh-preview-img" alt="" referrerpolicy="no-referrer">
+            <div class="wh-preview-bar">
+              <span id="wh-preview-info"></span>
+              <button class="gm-chip gm-chip-plain" id="wh-preview-open" title="Ver en wallhaven.cc">Abrir en Wallhaven</button>
+              <button class="gm-chip gm-chip-primary" id="wh-preview-pick">Elegir</button>
+              <button class="gm-chip gm-chip-plain" id="wh-preview-close">Volver</button>
+            </div>
+          </div>
+          <div class="chips compact wh-more-row"><button class="gm-chip gm-chip-plain" id="wh-more" hidden>Más resultados</button></div>
+          <div class="dialog-actions wh-actions">
+            <button class="gm-chip gm-chip-plain gm-chip-round" id="wh-follow" aria-label="Más opciones" title="Elegir todos · Seguir esta búsqueda (Bakin baja lo nuevo cada tanto, también con la ventana cerrada)">
+              <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg></button>
+            <gm-menu id="wh-follow-menu" anchor="wh-follow" placement="top">
+              <button value="all" id="wh-all">Elegir todos</button>
+              <hr>
+              <button value="6">Seguir: revisar cada 6 horas</button>
+              <button value="24">Seguir: revisar cada día</button>
+              <button value="168">Seguir: revisar cada semana</button>
+            </gm-menu>
+            <button class="gm-chip gm-chip-primary" id="wh-download" disabled>Bajar</button>
+          </div>
+        </div>
+        </section>
+        <section data-sec="link" hidden>
+          <div class="dialog-form">
+            <p class="lead" id="link-lead">Pegá el enlace de un tema, un video, una playlist o un canal.</p>
+      <gm-search id="go" class="go" material="frost"
+                 label="Enlace para descargar"
+                 placeholder="Pega un enlace (Wallhaven, YouTube…)"
+                 empty="Pega un enlace http(s): un fondo de Wallhaven, o música o video (con yt-dlp)."></gm-search>
+            <p class="hint">Enter: elegís el formato y se baja. En la lista también: «Descargar ya» o «Seguir…» (baja solo lo nuevo, cada tanto).</p>
+            <div class="hub-card" id="hub-liked">
+              <span class="hub-card-text"><strong>Tus «Me gusta» de YouTube Music</strong><small id="hub-liked-hint"></small></span>
+              <button class="gm-chip gm-chip-plain" id="hub-liked-go">Bajarlos</button>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+  </gm-dialog>
+
+
+  <!-- big dialogs: light glass (blur). Refraction on a large surface costs frames whenever
+       something changes behind or inside it (measured, 0.13 review C52/C56); small static ones keep it -->
+  <gm-dialog id="settings-dialog" heading="Configuración">
+    <div class="settings">
+      <nav class="scopes settings-nav" id="settings-nav" aria-label="Secciones">
+        <button type="button" class="scope" data-sec="general"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg><span>General</span></button>
+        <button type="button" class="scope" data-sec="appearance"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 0 0 18z" fill="currentColor"/></svg><span>Apariencia</span></button>
+        <button type="button" class="scope" data-sec="wallpapers"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="13" height="9" rx="2"/><rect x="17" y="3" width="5" height="11" rx="1.5"/><path d="M6 17h5M8.5 13v4M19.5 14v3"/></svg><span>Fondos de pantalla</span></button>
+        <button type="button" class="scope" data-sec="music"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg><span>Música</span></button>
+        <button type="button" class="scope" data-sec="keys"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 14h10"/></svg><span>Atajos</span></button>
+        <button type="button" class="scope" data-sec="downloads"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg><span>Descargas</span><small><span class="gm-badge" id="tools-badge" hidden></span></small></button>
+        <button type="button" class="scope" data-sec="accounts"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="15" r="4"/><path d="m11 12 9-9M17 6l3 3M14 9l2 2"/></svg><span>Cuentas</span></button>
+        <button type="button" class="scope" data-sec="home"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/><path d="M9.5 15.5a3.5 3.5 0 0 1 5 0M11.2 17.6a1 1 0 0 1 1.6 0"/></svg><span>En tu casa</span></button>
+        <button type="button" class="scope" data-sec="perf"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 14l4-4M3.3 17a9 9 0 1 1 17.4 0"/><circle cx="12" cy="14" r="1.5"/></svg><span>Rendimiento</span></button>
+        <button type="button" class="scope" data-sec="usage"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 20h18M7 16V9M12 16V4M17 16v-5"/></svg><span>Consumo</span></button>
+      </nav>
+      <div class="settings-body">
+        <section data-sec="general">
+          <h3>Idioma</h3>
+            <div class="row">
+              <label class="gm-label" for="ui-lang">Idioma</label>
+              <gm-select id="ui-lang-box"><select id="ui-lang" aria-label="Idioma"><option value="auto">Automático</option><option value="es">Español</option><option value="en">English</option></select></gm-select>
+            </div>
+          <h3>Segundo plano</h3>
+            <label class="gm-toggle-row">
+              <span class="gm-toggle-row-text"><strong>Seguir con la ventana cerrada</strong><small>Si hay algo en cola, Bakin queda en la bandeja (junto al reloj) y sigue.</small></span>
+              <input id="bg-keep" type="checkbox" class="gm-toggle" role="switch" checked>
+            </label>
+            <label class="gm-toggle-row">
+              <span class="gm-toggle-row-text"><strong>Avisos de Windows</strong><small>Cuando termina la cola o se pausa, si Bakin no está a la vista.</small></span>
+              <input id="bg-notify" type="checkbox" class="gm-toggle" role="switch" checked>
+            </label>
+            <label class="gm-toggle-row">
+              <span class="gm-toggle-row-text"><strong>Iniciar con Windows</strong><small>Arranca oculto en la bandeja y retoma la cola.</small></span>
+              <input id="bg-autostart" type="checkbox" class="gm-toggle" role="switch">
+            </label>
+          <h3>Navegador</h3>
+            <div class="chips compact">
+              <button class="gm-chip gm-chip-plain" id="btn-extension">Extensión del navegador…</button>
+            </div>
+            <label class="gm-toggle-row">
+              <span class="gm-toggle-row-text"><strong>Vigilar el portapapeles</strong><small>Si copias un enlace, Bakin ofrece descargarlo. Solo mira enlaces; no guarda nada.</small></span>
+              <input id="clip-watch" type="checkbox" class="gm-toggle" role="switch">
+            </label>
+          <h3>Copia de seguridad</h3>
+            <p class="hint">Tus playlists, reproducciones, favoritas y etiquetas, presets, seguidos, letras y ajustes en un .zip; nunca cookies, claves ni registros. Importar suma: no se borra nada.</p>
+            <div class="chips compact">
+              <button type="button" class="gm-chip gm-chip-plain" id="backup-export">Exportar…</button>
+              <button type="button" class="gm-chip gm-chip-plain" id="backup-import">Importar…</button>
+            </div>
+          <h3>Datos de Bakin</h3>
+            <p class="hint">Playlists, reproducciones, favoritas, ajustes y cookies cifradas. Se pueden llevar a otro disco; tu música y tus fotos no se mueven.</p>
+            <div class="settings-row">
+              <span class="settings-label"><strong id="data-dir">…</strong><small id="data-dir-note"></small></span>
+              <button type="button" class="gm-chip gm-chip-plain" id="data-dir-move">Mover…</button>
+            </div>
+        </section>
+        <section data-sec="appearance" hidden>
+          <h3>Fondo</h3>
+            <label class="gm-toggle-row">
+              <span class="gm-toggle-row-text"><strong>Con el color de la portada</strong><small>El fondo toma el tono del tema que suena. Se dibuja una vez por tema, no cuesta mientras suena.</small></span>
+              <input id="bg-tint" type="checkbox" class="gm-toggle" role="switch">
+            </label>
+          <h3>Desplazamiento</h3>
+            <label class="gm-toggle-row">
+              <span class="gm-toggle-row-text"><strong>Desplazamiento suave</strong><small>Con la rueda del mouse las listas se deslizan en vez de saltar. Apagado: el de Windows, sin ninguna demora.</small></span>
+              <input id="smooth-scroll" type="checkbox" class="gm-toggle" role="switch">
+            </label>
+          <h3>Pestañas de arriba</h3>
+            <p class="hint">Música e Imágenes siempre están. Las demás se muestran si las elegís (también con el «+» de arriba).</p>
+            <label class="gm-toggle-row">
+              <span class="gm-toggle-row-text"><strong>Descargas</strong><small>La cola, lo que se está bajando y lo que terminó.</small></span>
+              <input type="checkbox" class="gm-toggle tab-toggle" role="switch" value="downloads">
+            </label>
+            <label class="gm-toggle-row">
+              <span class="gm-toggle-row-text"><strong>Convertir</strong><small>Pasar fotos, música o videos a otro formato.</small></span>
+              <input type="checkbox" class="gm-toggle tab-toggle" role="switch" value="convert">
+            </label>
+        </section>
+        <section data-sec="wallpapers" hidden>
+          <p class="lead">Cada monitor puede ir cambiando de fondo solo, desde Wallhaven, tus favoritas o una carpeta. Sigue con la ventana cerrada.</p>
+          <div id="wp-list" class="wp-list"></div>
+          <label class="gm-toggle-row">
+            <span class="gm-toggle-row-text"><strong>Pausar la rotación</strong><small>Los fondos quedan como están hasta que la reanudes (también desde la bandeja).</small></span>
+            <input id="wp-paused" type="checkbox" class="gm-toggle" role="switch">
+          </label>
+          <p class="hint">Mientras algún monitor rota, Bakin queda en la bandeja al cerrar la ventana. Para una foto suelta: clic derecho › «Poner de fondo».</p>
+        </section>
+        <section data-sec="music" hidden>
+        <h3>Botones ⏮ ⏭</h3>
+        <div class="chips group" id="po-skip" role="group" aria-label="Segundos que saltan">
+          <button class="gm-chip gm-chip-plain" value="5" aria-pressed="false">5 s</button>
+          <button class="gm-chip gm-chip-plain" value="10" aria-pressed="true">10 s</button>
+          <button class="gm-chip gm-chip-plain" value="15" aria-pressed="false">15 s</button>
+          <button class="gm-chip gm-chip-plain" value="30" aria-pressed="false">30 s</button>
+        </div>
+        <p class="hint">Clic: atrasan o adelantan esos segundos. Clic derecho: tema anterior o siguiente.</p>
+        <h3>Fundido entre temas</h3>
+        <div class="row">
+          <span class="gm-label">Duración <span id="po-fade-label">sin fundido</span></span>
+          <gm-slider class="po-slider"><input id="po-fade" type="range" min="0" max="12" step="1" value="0" aria-label="Segundos de fundido"></gm-slider>
+        </div>
+        <p class="hint">Sin fundido, un tema sigue al otro sin ningún silencio entre medio.</p>
+        <h3>Volumen parejo</h3>
+        <p class="hint">Que todos los temas suenen igual de fuerte, sin tocar los archivos. Bakin mide cada tema una vez (despacio, de a uno).</p>
+        <div class="chips group" id="ld-mode" role="group" aria-label="Volumen parejo">
+          <button class="gm-chip gm-chip-plain" value="off" aria-pressed="true">Apagado</button>
+          <button class="gm-chip gm-chip-plain" value="track" aria-pressed="false">Por tema</button>
+          <button class="gm-chip gm-chip-plain" value="album" aria-pressed="false">Por álbum</button>
+        </div>
+        <div class="row">
+          <span class="gm-label">Más fuerte <span id="ld-preamp-label">+0 dB</span></span>
+          <gm-slider class="po-slider"><input id="ld-preamp" type="range" min="0" max="6" step="1" value="0" aria-label="Pre-amplificación"></gm-slider>
+        </div>
+        <p class="hint" id="ld-status"></p>
+        <h3>Ecualizador</h3>
+        <label class="gm-toggle-row">
+          <span class="gm-toggle-row-text"><strong>Usar el ecualizador</strong><small>Diez bandas; lo que subas no satura (baja el resto).</small></span>
+          <input id="eq-on" type="checkbox" class="gm-toggle" role="switch">
+        </label>
+        <div class="chips group" id="eq-presets" role="group" aria-label="Preajustes">
+          <button class="gm-chip gm-chip-plain" value="flat">Plano</button>
+          <button class="gm-chip gm-chip-plain" value="bass">Graves</button>
+          <button class="gm-chip gm-chip-plain" value="vocal">Voces</button>
+          <button class="gm-chip gm-chip-plain" value="treble">Agudos</button>
+        </div>
+        <div class="eq" id="eq">
+            <label class="eq-band"><gm-slider class="eq-slider"><input type="range" min="-12" max="12" step="1" value="0" data-band="0" aria-label="31 Hz"></gm-slider><span>31</span></label>
+            <label class="eq-band"><gm-slider class="eq-slider"><input type="range" min="-12" max="12" step="1" value="0" data-band="1" aria-label="63 Hz"></gm-slider><span>63</span></label>
+            <label class="eq-band"><gm-slider class="eq-slider"><input type="range" min="-12" max="12" step="1" value="0" data-band="2" aria-label="125 Hz"></gm-slider><span>125</span></label>
+            <label class="eq-band"><gm-slider class="eq-slider"><input type="range" min="-12" max="12" step="1" value="0" data-band="3" aria-label="250 Hz"></gm-slider><span>250</span></label>
+            <label class="eq-band"><gm-slider class="eq-slider"><input type="range" min="-12" max="12" step="1" value="0" data-band="4" aria-label="500 Hz"></gm-slider><span>500</span></label>
+            <label class="eq-band"><gm-slider class="eq-slider"><input type="range" min="-12" max="12" step="1" value="0" data-band="5" aria-label="1k Hz"></gm-slider><span>1k</span></label>
+            <label class="eq-band"><gm-slider class="eq-slider"><input type="range" min="-12" max="12" step="1" value="0" data-band="6" aria-label="2k Hz"></gm-slider><span>2k</span></label>
+            <label class="eq-band"><gm-slider class="eq-slider"><input type="range" min="-12" max="12" step="1" value="0" data-band="7" aria-label="4k Hz"></gm-slider><span>4k</span></label>
+            <label class="eq-band"><gm-slider class="eq-slider"><input type="range" min="-12" max="12" step="1" value="0" data-band="8" aria-label="8k Hz"></gm-slider><span>8k</span></label>
+            <label class="eq-band"><gm-slider class="eq-slider"><input type="range" min="-12" max="12" step="1" value="0" data-band="9" aria-label="16k Hz"></gm-slider><span>16k</span></label>
+        </div>
+        <h3>Salida de audio</h3>
+        <gm-select><select id="out-device" aria-label="Dispositivo de salida"><option value="">Predeterminado de Windows</option></select></gm-select>
+        <h3>Letras</h3>
+        <label class="gm-toggle-row">
+          <span class="gm-toggle-row-text"><strong>Buscar letras en LRCLIB</strong><small>Cuando un tema no tiene letra, «Letra» la busca en LRCLIB (gratis y abierta). Se envían el título, el artista, el álbum y la duración; nada más.</small></span>
+          <input id="ly-online" type="checkbox" class="gm-toggle" role="switch">
+        </label>
+        <label class="gm-toggle-row">
+          <span class="gm-toggle-row-text"><strong>Guardar la letra al lado del tema</strong><small>Como «tema.lrc»: la leen también otros reproductores. Apagado: queda dentro de Bakin.</small></span>
+          <input id="ly-beside" type="checkbox" class="gm-toggle" role="switch" checked>
+        </label>
+        <h3>Títulos y portadas</h3>
+        <label class="gm-toggle-row">
+          <span class="gm-toggle-row-text"><strong>Consultar MusicBrainz</strong><small>En «Limpiar títulos y artistas…», busca el artista, el título, el álbum y la portada oficiales. Se envían el título, el artista y la duración de los temas que elijas; nada más. Siempre te muestra el cambio antes.</small></span>
+          <input id="mb-on" type="checkbox" class="gm-toggle" role="switch">
+        </label>
+        <h3>Modo mínimo</h3>
+            <label class="gm-toggle-row">
+              <span class="gm-toggle-row-text"><strong>Recordar dónde estaba</strong><small>La barrita vuelve al mismo lugar y tamaño, también después de reiniciar Bakin.</small></span>
+              <input id="mini-remember" type="checkbox" class="gm-toggle" role="switch" checked>
+            </label>
+            <label class="gm-toggle-row">
+              <span class="gm-toggle-row-text"><strong>Atenuarse sin el mouse encima</strong><small>A los 3 segundos queda más transparente; vuelve al pasar el mouse.</small></span>
+              <input id="mini-dim" type="checkbox" class="gm-toggle" role="switch">
+            </label>
+        </section>
+        <section data-sec="keys" hidden>
+          <h3>En cualquier lado</h3>
+            <p class="hint">Funcionan en cualquier lado, también con un juego en primer plano. Tocá una acción y apretá la combinación (Esc cancela, Retroceso la borra).</p>
+            <div class="hotkeys" id="hotkeys"></div>
+          <h3>Con la ventana de Bakin</h3>
+            <dl class="keylist">
+              <dt><kbd>Espacio</kbd></dt><dd>Reproducir o pausar</dd>
+              <dt><kbd>Ctrl</kbd> <kbd>←</kbd> <kbd>→</kbd></dt><dd>Tema anterior o siguiente</dd>
+              <dt><kbd>←</kbd> <kbd>→</kbd></dt><dd>Atrasar o adelantar (los segundos de Música)</dd>
+              <dt><kbd>F</kbd></dt><dd>Favorita</dd>
+              <dt><kbd>M</kbd></dt><dd>Silencio</dd>
+              <dt><kbd>S</kbd></dt><dd>Aleatorio</dd>
+              <dt><kbd>R</kbd></dt><dd>Repetir</dd>
+              <dt><kbd>Q</kbd></dt><dd>Cola</dd>
+              <dt><kbd>L</kbd></dt><dd>Mostrar el tema en la lista</dd>
+              <dt><kbd>N</kbd></dt><dd>Modo mínimo</dd>
+              <dt><kbd>Ctrl</kbd> <kbd>K</kbd></dt><dd>Buscar</dd>
+              <dt><kbd>Ctrl</kbd> <kbd>D</kbd></dt><dd>Descargar</dd>
+              <dt><kbd>Ctrl</kbd> <kbd>B</kbd></dt><dd>Barra lateral</dd>
+            </dl>
+            <p class="hint">Las teclas multimedia del teclado y el control de Windows también funcionan.</p>
+        </section>
+        <section data-sec="downloads" hidden>
+          <h3>Carpeta</h3>
+            <div class="gm-input-group">
+              <input id="out-dir" class="gm-input" type="text" spellcheck="false" aria-label="Carpeta de descargas">
+              <button type="button" id="btn-folder" class="gm-chip gm-chip-plain gm-chip-round" aria-label="Elegir carpeta" title="Elegir carpeta">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+              </button>
+            </div>
+            <div class="move-progress" id="move-progress" hidden>
+              <span class="gm-meter" id="move-meter" role="meter" aria-label="Moviendo descargas" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" style="--value: 0"></span>
+              <p class="hint" id="move-status"></p>
+            </div>
+            <p class="hint previous-dir" id="previous-dir" hidden>
+              <span id="previous-dir-text"></span>
+              <button type="button" class="gm-link" id="btn-undo-move">Deshacer</button>
+            </p>
+          <h3>Música y video</h3>
+
+            <div class="row">
+              <label class="gm-label" for="media-preset">Preset <span>por defecto</span></label>
+              <gm-select class="media-preset-select"><select id="media-preset" aria-label="Preset por defecto"></select></gm-select>
+            </div>
+            <div class="row">
+              <span class="gm-label">Límite diario <span>descargas; 0 = sin límite</span></span>
+              <gm-quantity><input id="media-limit" type="number" min="0" max="5000" step="50" value="0" aria-label="Límite diario de descargas de música y video"></gm-quantity>
+            </div>
+            <div class="chips compact">
+              <button class="gm-chip gm-chip-plain" id="btn-presets">Presets…</button>
+              <button class="gm-chip gm-chip-plain" id="btn-tools">Herramientas</button>
+            </div>
+            <p class="hint cookies-health" id="cookies-health" hidden></p>
+          <h3>Horario</h3>
+            <label class="gm-toggle-row">
+              <span class="gm-toggle-row-text"><strong>Descargar solo en un horario</strong><small>Fuera de ese horario la cola espera sola. Útil para bajar de noche.</small></span>
+              <input id="hours-on" type="checkbox" class="gm-toggle" role="switch">
+            </label>
+            <div class="row" id="hours-row" hidden>
+              <span class="gm-label">De</span>
+              <gm-select><select id="hours-from" aria-label="Desde la hora"><option value="0">00:00</option><option value="1">01:00</option><option value="2">02:00</option><option value="3">03:00</option><option value="4">04:00</option><option value="5">05:00</option><option value="6">06:00</option><option value="7">07:00</option><option value="8">08:00</option><option value="9">09:00</option><option value="10">10:00</option><option value="11">11:00</option><option value="12">12:00</option><option value="13">13:00</option><option value="14">14:00</option><option value="15">15:00</option><option value="16">16:00</option><option value="17">17:00</option><option value="18">18:00</option><option value="19">19:00</option><option value="20">20:00</option><option value="21">21:00</option><option value="22">22:00</option><option value="23">23:00</option></select></gm-select>
+              <span class="gm-label">a</span>
+              <gm-select><select id="hours-to" aria-label="Hasta la hora"><option value="0">00:00</option><option value="1">01:00</option><option value="2">02:00</option><option value="3">03:00</option><option value="4">04:00</option><option value="5">05:00</option><option value="6">06:00</option><option value="7">07:00</option><option value="8">08:00</option><option value="9">09:00</option><option value="10">10:00</option><option value="11">11:00</option><option value="12">12:00</option><option value="13">13:00</option><option value="14">14:00</option><option value="15">15:00</option><option value="16">16:00</option><option value="17">17:00</option><option value="18">18:00</option><option value="19">19:00</option><option value="20">20:00</option><option value="21">21:00</option><option value="22">22:00</option><option value="23">23:00</option></select></gm-select>
+            </div>
+        </section>
+        <section data-sec="accounts" hidden>
+          <h3>YouTube (cookies)</h3>
+            <p class="hint">Para tus «Me gusta» y lo privado. Bakin las guarda cifradas con tu usuario de Windows: en otra PC o con otro usuario no se pueden leer, y nunca se muestran.</p>
+            <p class="cookies-vault" id="cv-status">…</p>
+            <div class="chips compact">
+              <button type="button" class="gm-chip" id="cv-import" hidden>Pasar a Bakin</button>
+              <button type="button" class="gm-chip gm-chip-plain" id="cv-pick">Importar un cookies.txt…</button>
+              <button type="button" class="gm-chip gm-chip-plain danger" id="cv-delete-file" hidden>Borrar el archivo original</button>
+              <button type="button" class="gm-chip gm-chip-plain danger" id="cv-forget" hidden>Quitar de Bakin</button>
+            </div>
+          <h3>Wallhaven</h3>
+            <p class="hint">Opcional: con tu clave de API ves y sigues tus colecciones de Wallhaven, también las privadas. Se copia de wallhaven.cc › Settings › Account. Se guarda en el Administrador de credenciales de Windows, nunca en un archivo.</p>
+            <div class="row wh-account">
+              <input id="wh-user" class="gm-input" type="text" spellcheck="false" autocomplete="off" placeholder="Tu usuario" aria-label="Tu usuario de Wallhaven">
+              <input id="wh-key" class="gm-input" type="password" spellcheck="false" autocomplete="off" placeholder="Clave de API" aria-label="Clave de API de Wallhaven">
+              <button type="button" class="gm-chip gm-chip-plain" id="wh-key-save">Guardar</button>
+              <button type="button" class="gm-chip gm-chip-plain danger" id="wh-key-clear" hidden>Quitar la clave</button>
+            </div>
+            <p class="hint" id="wh-key-status">Sin clave: solo lo público.</p>
+        </section>
+        <!-- the heavy things behind a switch (0.15.5, the user: «lo que consuma mucho, con toggle») -->
+        <section data-sec="home" hidden>
+          <p class="lead">Escucha tu biblioteca desde el celular, por el wifi de tu casa. Sin nube: los temas van directo de esta PC al teléfono.</p>
+          <label class="gm-toggle-row">
+            <span class="gm-toggle-row-text"><strong>Compartir en la red de casa</strong><small>Solo en redes privadas (el wifi de tu casa); nunca hacia internet. Mientras está prendido, Bakin queda abierto en segundo plano.</small></span>
+            <input id="lan-on" type="checkbox" class="gm-toggle" role="switch">
+          </label>
+          <div class="lan-pair" id="lan-pair" hidden>
+            <div class="lan-qr" id="lan-qr" aria-hidden="true"></div>
+            <div class="lan-how">
+              <p>En una app de Subsonic del celular (Symfonium, Tempo, Ultrasonic, DSub, substreamer…), agrega un servidor con:</p>
+              <dl class="lan-fields">
+                <dt>Dirección</dt><dd id="lan-url">…</dd>
+                <dt>Usuario</dt><dd>bakin</dd>
+                <dt>Contraseña</dt><dd id="lan-code" class="lan-code">…</dd>
+              </dl>
+              <div class="chips compact">
+                <button type="button" class="gm-chip gm-chip-plain" id="lan-new-code" title="Los celulares que ya estaban tienen que volver a conectarse con el código nuevo">Cambiar el código</button>
+              </div>
+            </div>
+          </div>
+          <p class="hint" id="lan-status"></p>
+          <p class="hint">La contraseña es un código de Bakin, no una tuya. Cambiarlo desconecta a todos los celulares: así se quita uno. La primera vez Windows pregunta por el firewall: marca «Redes privadas». La conexión dentro de tu casa no va cifrada (como cualquier servidor de música casero).</p>
+        </section>
+        <section data-sec="perf" hidden>
+          <p class="lead">Bakin hace lo que pidas; lo que consume más está acá, con su costo, para apagarlo.</p>
+          <h3>Buscar música</h3>
+            <div class="row">
+              <span class="gm-label">Tope de búsquedas por hora <span>0 = sin tope</span></span>
+              <gm-quantity><input id="perf-hourly" type="number" min="0" max="1000" step="25" value="100" aria-label="Búsquedas por hora en YouTube Music"></gm-quantity>
+            </div>
+            <p class="hint">YouTube frena alrededor de 300 temas o páginas por hora sin cuenta; con el tope, nunca llegas. Las listas de Spotify usan el triple.</p>
+            <label class="gm-toggle-row">
+              <span class="gm-toggle-row-text"><strong>Portadas en los resultados</strong><small>Una imagen chica por resultado (unos 15 KB), guardadas para la próxima. Apagado: más rápido y sin imágenes.</small></span>
+              <input id="perf-covers" type="checkbox" class="gm-toggle" role="switch" checked>
+            </label>
+          <h3>Ventana</h3>
+            <p class="hint">El desplazamiento suave y el fondo con el color de la portada están en Apariencia; el modo mínimo, en Música. La medida de todo, en Consumo.</p>
+        </section>
+        <section data-sec="usage" hidden>
+          <p class="lead">Todo lo que Bakin tiene abierto ahora, contado como el Administrador de tareas.</p>
+          <div class="usage-total"><strong id="usage-total">…</strong><small>en total</small></div>
+          <ul class="usage-list" id="usage-list"></ul>
+          <p class="hint">Con la ventana cerrada y nada por bajar, Bakin es un solo proceso: el reproductor. El motor de descargas y la ventana aparecen aparte en el Administrador de tareas solo mientras existen, y vuelven solos cuando hacen falta.</p>
+          <div class="chips compact"><button type="button" class="gm-chip gm-chip-plain" id="usage-refresh">Volver a medir</button></div>
+          <h3>Registro de actividad</h3>
+          <div class="settings-row">
+            <span class="settings-label"><strong id="log-size">…</strong><small>Lo que hace Bakin, sin secretos. Se recorta solo: nunca pasa de unos 8 MB.</small></span>
+            <button type="button" class="gm-chip gm-chip-plain" id="log-open">Abrir carpeta</button>
+          </div>
+        </section>
+      </div>
+    </div>
+  </gm-dialog>
+
+  <gm-dialog id="playlist-dialog" heading="Nueva playlist">
+    <div class="dialog-form">
+      <label class="gm-field"><span class="gm-label">Nombre</span><input class="gm-input" id="pd-name" maxlength="80" spellcheck="false"></label>
+      <div class="chips group" id="pd-kind" role="group" aria-label="Tipo de playlist">
+        <button class="gm-chip gm-chip-plain" value="list" aria-pressed="true">Normal</button>
+        <button class="gm-chip gm-chip-plain" value="smart" aria-pressed="false">Inteligente (por reglas)</button>
+      </div>
+      <p class="hint" id="pd-list-hint">Guarda los temas que le agregues, en ese orden: selecciona temas en la biblioteca y usa «Agregar a playlist…».</p>
+      <div class="pd-smart" id="pd-smart" hidden>
+        <div class="row">
+          <span class="gm-label">Temas que cumplan <span>las reglas</span></span>
+          <div class="chips group" id="pd-match" role="group" aria-label="Cuántas reglas">
+            <button class="gm-chip gm-chip-plain" value="all" aria-pressed="true">todas</button>
+            <button class="gm-chip gm-chip-plain" value="any" aria-pressed="false">alguna</button>
+          </div>
+        </div>
+        <div class="pd-rules" id="pd-rules"></div>
+        <button type="button" class="gm-chip gm-chip-plain" id="pd-add-rule">+ Agregar regla</button>
+        <div class="pair">
+          <label class="gm-field"><span class="gm-label">Orden</span>
+            <select class="gm-input" id="pd-sort">
+              <option value="new">Agregadas más recientes</option>
+              <option value="plays">Más escuchadas</option>
+              <option value="last_played">Escuchadas hace poco</option>
+              <option value="title">Título</option>
+              <option value="artist">Artista</option>
+              <option value="random">Al azar (cambia cada día)</option>
+            </select></label>
+          <label class="gm-field"><span class="gm-label">Máximo de temas <span>0 = todos</span></span><input class="gm-input" id="pd-limit" type="number" min="0" max="5000" value="0"></label>
+        </div>
+        <p class="hint" id="pd-preview"></p>
+      </div>
+      <div class="dialog-actions">
+        <button class="gm-chip gm-chip-plain" id="pd-cancel">Cancelar</button>
+        <button class="gm-chip gm-chip-primary" id="pd-save">Guardar</button>
+      </div>
+    </div>
+  </gm-dialog>
+
+  <gm-dialog id="addpl-dialog" heading="Agregar a playlist">
+    <div class="dialog-form">
+      <p class="lead" id="ap-lead"></p>
+      <ul class="collections" id="ap-lists"></ul>
+      <div class="pair ap-new">
+        <input class="gm-input" id="ap-new" placeholder="Nueva playlist" maxlength="80" spellcheck="false" aria-label="Nombre de la nueva playlist">
+        <button class="gm-chip gm-chip-primary" id="ap-create">Crear y agregar</button>
+      </div>
+      <div class="dialog-actions"><button class="gm-chip gm-chip-plain" id="ap-cancel">Cancelar</button></div>
+    </div>
+  </gm-dialog>
+
+  <gm-dialog id="playopts-dialog" heading="Temporizador">
+    <div class="dialog-form">
+      <p class="lead">La música se detiene sola.</p>
+      <div class="chips group wrap" id="po-sleep" role="group" aria-label="Detener la música">
+        <button class="gm-chip gm-chip-plain" value="0" aria-pressed="true">Apagado</button>
+        <button class="gm-chip gm-chip-plain" value="15" aria-pressed="false">15 min</button>
+        <button class="gm-chip gm-chip-plain" value="30" aria-pressed="false">30 min</button>
+        <button class="gm-chip gm-chip-plain" value="60" aria-pressed="false">1 hora</button>
+        <button class="gm-chip gm-chip-plain" value="end" aria-pressed="false">Al terminar el tema</button>
+      </div>
+      <p class="lead">Repetir un tramo del tema que suena.</p>
+      <div class="chips" id="po-ab">
+        <button class="gm-chip gm-chip-plain" id="ab-a">Desde acá (A)</button>
+        <button class="gm-chip gm-chip-plain" id="ab-b" disabled>Hasta acá (B)</button>
+        <button class="gm-chip gm-chip-plain" id="ab-off" hidden>Quitar</button>
+        <span class="hint" id="ab-label"></span>
+      </div>
+      <div class="dialog-actions"><button class="gm-chip" id="po-close">Listo</button></div>
+    </div>
+  </gm-dialog>
+
+  <gm-dialog id="viewer" class="viewer">
+    <div class="viewer-body" id="viewer-body">
+      <div class="viewer-stage" id="viewer-stage"></div>
+      <div class="v-bar v-top">
+        <span class="v-title" id="v-title"></span>
+        <span class="v-actions">
+          <button class="gm-chip gm-chip-plain gm-chip-round" id="v-fav" aria-pressed="false" title="Favorita (F)" aria-label="Favorita"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/></svg></button>
+          <button class="gm-chip gm-chip-plain gm-chip-round" id="v-info" aria-pressed="false" title="Detalles (I)" aria-label="Detalles">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg></button>
+          <button class="gm-chip gm-chip-plain gm-chip-round" id="v-close" title="Cerrar (Esc)" aria-label="Cerrar">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+        </span>
+      </div>
+      <button class="gm-chip gm-chip-plain gm-chip-round v-arrow v-prev" id="v-prev" title="Anterior (←)" aria-label="Anterior"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></button>
+      <button class="gm-chip gm-chip-plain gm-chip-round v-arrow v-next" id="v-next" title="Siguiente (→)" aria-label="Siguiente"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg></button>
+      <div class="v-bar v-bottom"><span id="v-count"></span></div>
+      <aside class="viewer-side" id="viewer-side" hidden>
+        <p class="viewer-meta" id="viewer-meta"></p>
+        <div class="chips">
+          <button class="gm-chip gm-chip-plain" id="v-open">Abrir con…</button>
+          <button class="gm-chip gm-chip-plain" id="v-wallpaper">Poner de fondo…</button>
+          <button class="gm-chip gm-chip-plain" id="v-reveal">Mostrar en carpeta</button>
+          <button class="gm-chip gm-chip-plain danger" id="v-delete">Eliminar</button>
+        </div>
+        <div class="tag-edit">
+          <h3>Tags</h3>
+          <div class="chips" id="v-tags"></div>
+          <input class="gm-input" id="v-tag-input" list="tag-options" placeholder="Agregar tag y Enter" aria-label="Agregar tag" spellcheck="false">
+        </div>
+      </aside>
+    </div>
+  </gm-dialog>
+  <datalist id="tag-options"></datalist>
+
+  <gm-dialog id="frame-dialog" heading="Ajustar encuadre">
+    <div class="frame-body">
+      <div class="chips group" id="frame-monitors" role="group" aria-label="Monitor"></div>
+      <div class="frame-stage" id="frame-stage">
+        <img id="frame-img" alt="" draggable="false">
+        <div class="frame-box" id="frame-box" role="slider" tabindex="0" aria-label="Encuadre: arrastrá o usá las flechas"></div>
+      </div>
+      <p class="hint" id="frame-hint">Arrastrá el recuadro: es lo que va a verse en ese monitor.</p>
+      <div class="dialog-actions">
+        <button class="gm-chip gm-chip-plain" id="frame-reset">Centrar</button>
+        <button class="gm-chip gm-chip-plain" id="frame-cancel">Cancelar</button>
+        <button class="gm-chip gm-chip-primary" id="frame-go">Poner de fondo</button>
+      </div>
+    </div>
+  </gm-dialog>
+
+  <gm-dialog id="tag-dialog" heading="Etiquetar">
+    <div class="dialog-form">
+      <p class="hint" id="tag-dialog-meta"></p>
+      <input class="gm-input" id="tag-add" list="tag-options" placeholder="Tags separados por coma" aria-label="Tags para agregar" spellcheck="false">
+      <div class="tag-existing" id="tag-existing-wrap" hidden>
+        <h3>Quitar de la selección</h3>
+        <div class="chips" id="tag-existing"></div>
+      </div>
+      <div class="dialog-actions">
+        <button class="gm-chip gm-chip-plain" id="btn-tag-cancel">Cancelar</button>
+        <button class="gm-chip gm-chip-primary" id="btn-tag-apply">Agregar</button>
+      </div>
+    </div>
+  </gm-dialog>
+
+  <gm-dialog id="delete-dialog" heading="¿Eliminar?">
+    <p id="delete-text"></p>
+    <p class="hint">Van a la Papelera de Windows: puedes recuperarlas desde «Eliminadas» en Bakin o desde la Papelera.</p>
+    <form method="dialog" class="dialog-actions">
+      <button class="gm-chip gm-chip-plain" value="cancel">Cancelar</button>
+      <button class="gm-chip gm-chip-primary danger" value="ok">Enviar a la Papelera</button>
+    </form>
+  </gm-dialog>
+
+  <!-- «Limpiar títulos y artistas…» (PLAN 0.14.1–0.14.2): before → after, ticked by the user -->
+  <gm-dialog id="clean-dialog" heading="Limpiar títulos y artistas">
+    <p class="hint" id="cl-lead">Bakin propone, tú eliges: nada cambia hasta «Aplicar». Las marcadas «revisar» no están tildadas.</p>
+    <div class="cl-bar">
+      <span id="cl-count"></span>
+      <button type="button" class="gm-link" id="cl-all">Tildar todas</button>
+      <button type="button" class="gm-link" id="cl-none">Ninguna</button>
+      <button type="button" class="gm-chip gm-chip-plain" id="cl-mb" hidden>Buscar en MusicBrainz</button>
+      <span class="hint" id="cl-mb-status"></span>
+    </div>
+    <div class="cl-list" id="cl-list" role="list"></div>
+    <div class="dialog-actions">
+      <button type="button" class="gm-chip gm-chip-plain" id="cl-undo" hidden>Deshacer lo último</button>
+      <button type="button" class="gm-chip gm-chip-plain" value="cancel" id="cl-close">Cerrar</button>
+      <button type="button" class="gm-chip gm-chip-primary" id="cl-apply">Aplicar</button>
+    </div>
+  </gm-dialog>
+  <!-- «Buscar duplicados…» (PLAN 0.14.3): one copy stays, the rest to the Recycle Bin -->
+  <gm-dialog id="dupes-dialog" heading="Duplicados">
+    <p class="hint" id="du-lead"></p>
+    <div class="du-list" id="du-list"></div>
+    <div class="dialog-actions">
+      <button type="button" class="gm-chip gm-chip-plain" value="cancel" id="du-close">Cerrar</button>
+      <button type="button" class="gm-chip gm-chip-primary" id="du-apply">Dejar uno de cada grupo</button>
+    </div>
+  </gm-dialog>
+  <!-- Spotify → YouTube Music (PLAN 0.15.2): each song found, the doubtful ones to confirm -->
+  <gm-dialog id="spotify-dialog" heading="Desde Spotify">
+    <p class="hint" id="sp-lead"></p>
+    <div class="cl-bar"><span id="sp-count"></span><span class="hint" id="sp-status"></span>
+      <button type="button" class="gm-chip gm-chip-plain" id="sp-csv">Importar CSV…</button></div>
+    <div class="cl-list" id="sp-list" role="list"></div>
+    <div class="dialog-actions">
+      <button type="button" class="gm-chip gm-chip-plain" id="sp-close">Cerrar</button>
+      <button type="button" class="gm-chip gm-chip-primary" id="sp-download" disabled>Bajar</button>
+    </div>
+  </gm-dialog>
+  <!-- the guided first start (PLAN 0.22.2): only when Bakin was never used here -->
+  <gm-dialog id="welcome-dialog" heading="Te damos la bienvenida a Bakin">
+    <div class="welcome-step" data-step="1">
+      <p>Bakin junta tu música y tus fondos de pantalla, los baja de internet y los reproduce. Tres pasos y listo.</p>
+      <h3>¿Dónde guardamos lo que bajes?</h3>
+      <div class="welcome-row"><span>Idioma</span><gm-select id="welcome-lang"><select aria-label="Idioma"><option value="es">Español</option><option value="en">English</option></select></gm-select></div>
+      <div class="welcome-row"><code id="welcome-out"></code><button type="button" class="gm-chip gm-chip-plain" id="welcome-out-pick">Cambiar…</button></div>
+      <p class="hint">Bakin arma ahí una carpeta por tipo (Música, Videos, Wallhaven…). Se puede cambiar después en Configuración › Descargas.</p>
+    </div>
+    <div class="welcome-step" data-step="2" hidden>
+      <h3>¿Ya tienes música en esta PC?</h3>
+      <p>Agrega tus carpetas y aparecen en Música, con sus portadas. Bakin no mueve ni cambia tus archivos.</p>
+      <ul class="welcome-folders" id="welcome-folders"></ul>
+      <button type="button" class="gm-chip gm-chip-plain" id="welcome-add">Agregar una carpeta…</button>
+    </div>
+    <div class="welcome-step" data-step="3" hidden>
+      <h3>Dónde está cada cosa</h3>
+      <dl class="welcome-map">
+        <dt>Fotos</dt><dd>Tus imágenes y fondos; clic derecho › «Poner de fondo».</dd>
+        <dt>Música</dt><dd>Tu biblioteca, playlists y mixes. El reproductor sigue sonando con la ventana cerrada.</dd>
+        <dt>Descargar</dt><dd>Pega un enlace en la búsqueda de arriba, o busca en YouTube Music y en Wallhaven.</dd>
+        <dt>Configuración</dt><dd>El engranaje: sonido, fondos, cuentas y el celular («En tu casa»).</dd>
+      </dl>
+    </div>
+    <form method="dialog" class="dialog-actions">
+      <button class="gm-chip gm-chip-plain" value="skip" id="welcome-skip">Saltar</button>
+      <button type="button" class="gm-chip gm-chip-plain" id="welcome-back" hidden>Atrás</button>
+      <button type="button" class="gm-chip gm-chip-primary" id="welcome-next">Siguiente</button>
+    </form>
+  </gm-dialog>
+  <!-- a yes/no question (ask() in app.js) -->
+  <gm-dialog id="ask-dialog" heading="">
+    <p id="ask-text"></p>
+    <form method="dialog" class="dialog-actions">
+      <button class="gm-chip gm-chip-plain" value="cancel">Cancelar</button>
+      <button class="gm-chip gm-chip-primary" value="ok" id="ask-ok">Aceptar</button>
+    </form>
+  </gm-dialog>
+  <gm-dialog id="remove-folder-dialog" heading="¿Quitar esta carpeta de la biblioteca?">
+    <p id="remove-folder-text"></p>
+    <p class="hint">Sus archivos no se tocan: solo deja de mostrarse en Bakin (sus favoritas y tags se conservan si la vuelves a agregar).</p>
+    <form method="dialog" class="dialog-actions">
+      <button class="gm-chip gm-chip-plain" value="cancel">Cancelar</button>
+      <button class="gm-chip gm-chip-primary" value="ok">Quitar</button>
+    </form>
+  </gm-dialog>
+
+  <gm-dialog id="move-dialog" heading="¿Mover tus descargas?">
+    <div class="dialog-form">
+      <p class="lead" id="move-summary"></p>
+      <dl class="move-paths">
+        <dt>Ahora</dt><dd id="move-from"></dd>
+        <dt>Nueva</dt><dd id="move-to"></dd>
+      </dl>
+      <p class="hint">Solo se mueven las carpetas que hizo Bakin; lo demás de esa carpeta queda donde está. Entre discos distintos cada foto se copia y se comprueba antes de borrar el original. Puedes deshacerlo después.</p>
+      <form method="dialog" class="dialog-actions">
+        <button class="gm-chip gm-chip-plain" value="cancel">Cancelar</button>
+        <button class="gm-chip gm-chip-plain" value="switch">Solo cambiar la carpeta</button>
+        <button class="gm-chip gm-chip-primary" value="move">Mover descargas</button>
+      </form>
+    </div>
+  </gm-dialog>
+
+  <gm-dialog id="news-dialog" heading="Novedades">
+    <div class="dialog-form">
+      <p class="hint" id="news-meta"></p>
+      <div class="changelog" id="news-list"></div>
+      <div class="dialog-actions">
+        <button class="gm-chip gm-chip-plain" id="btn-check-update">Buscar actualizaciones</button>
+        <button class="gm-chip gm-chip-primary" id="btn-news-close">Cerrar</button>
+      </div>
+    </div>
+  </gm-dialog>
+
+  <gm-dialog id="update-dialog" heading="Hay una versión nueva">
+    <div class="dialog-form">
+      <p class="lead" id="update-lead"></p>
+      <div class="changelog" id="update-list"></div>
+      <div class="move-progress" id="update-progress" hidden>
+        <span class="gm-meter" id="update-meter" role="meter" aria-label="Descargando la actualización" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" style="--value: 0"></span>
+        <p class="hint" id="update-status"></p>
+      </div>
+      <p class="hint">La actualización está firmada: Bakin comprueba la firma antes de instalarla. Tus ajustes y fotos se conservan.</p>
+      <div class="dialog-actions">
+        <button class="gm-chip gm-chip-plain" id="btn-update-later">Más tarde</button>
+        <button class="gm-chip gm-chip-primary" id="btn-update-now">Actualizar ahora</button>
+      </div>
+    </div>
+  </gm-dialog>
+
+  <!-- ============================================ music & video -->
+  <gm-dialog id="media-dialog" heading="Descargar música o video">
+    <div class="dialog-form">
+      <ul class="media-urls" id="md-urls"></ul>
+      <p class="hint md-analyzing" id="md-analyzing" hidden>Analizando el enlace… (no se descarga nada)</p>
+      <div class="md-info" id="md-info" hidden>
+        <img id="md-thumb" alt="" hidden>
+        <div class="md-info-text"><strong id="md-title"></strong><small id="md-meta"></small></div>
+      </div>
+      <p class="md-detected" id="md-detected" hidden><span class="gm-badge" id="md-detected-kind"></span><span id="md-detected-why"></span></p>
+      <div class="md-pl" id="md-pl" hidden>
+        <div class="row">
+          <span class="hint" id="md-pl-count"></span>
+          <div class="chips compact">
+            <button class="gm-chip gm-chip-plain" id="md-pl-all">Todos</button>
+            <button class="gm-chip gm-chip-plain" id="md-pl-new">Solo nuevos</button>
+            <button class="gm-chip gm-chip-plain" id="md-pl-none">Ninguno</button>
+          </div>
+        </div>
+        <ul class="md-pl-list" id="md-pl-list"></ul>
+      </div>
+      <div class="md-extras" id="md-extras" hidden>
+        <label class="gm-toggle-row"><span class="gm-toggle-row-text"><strong>Solo un tramo</strong><small>Por ejemplo de 1:02:10 a 1:15:00.</small></span><input id="md-clip" type="checkbox" class="gm-toggle" role="switch"></label>
+        <div class="pair" id="md-clip-row" hidden>
+          <input class="gm-input" id="md-from" placeholder="Desde (ej. 1:02:10)" spellcheck="false" aria-label="Desde">
+          <input class="gm-input" id="md-to" placeholder="Hasta (vacío = hasta el final)" spellcheck="false" aria-label="Hasta">
+        </div>
+        <label class="gm-toggle-row" id="md-chapters-row" hidden><span class="gm-toggle-row-text"><strong>Un archivo por capítulo</strong><small id="md-chapters-n"></small></span><input id="md-chapters" type="checkbox" class="gm-toggle" role="switch"></label>
+        <label class="gm-toggle-row" id="md-subs-row" hidden><span class="gm-toggle-row-text"><strong>Subtítulos dentro del video</strong><small id="md-subs-n"></small></span><input id="md-subs" type="checkbox" class="gm-toggle" role="switch"></label>
+      </div>
+      <div class="row">
+        <label class="gm-label" for="md-preset">Preset</label>
+        <gm-select><select id="md-preset" aria-label="Preset"></select></gm-select>
+      </div>
+      <div class="chips group" id="md-mode" role="group" aria-label="Qué bajar">
+        <button class="gm-chip gm-chip-plain" value="audio" aria-pressed="true">Solo audio</button>
+        <button class="gm-chip gm-chip-plain" value="video" aria-pressed="false">Video</button>
+      </div>
+      <div class="md-audio" id="md-audio">
+        <h3>Formato</h3>
+        <div class="chips group wrap" id="md-format" role="group" aria-label="Formato de audio">
+          <button class="gm-chip gm-chip-plain" value="mp3" title="Universal, compatible con todo">MP3</button>
+          <button class="gm-chip gm-chip-plain" value="m4a" title="Apple/iTunes; mejor que MP3 al mismo bitrate">M4A</button>
+          <button class="gm-chip gm-chip-plain" value="opus" title="Mejor relación calidad/tamaño">OPUS</button>
+          <button class="gm-chip gm-chip-plain" value="flac" title="Sin pérdida (archivos grandes)">FLAC</button>
+          <button class="gm-chip gm-chip-plain" value="ogg" title="Vorbis, open source">OGG</button>
+          <button class="gm-chip gm-chip-plain" value="wav" title="Sin comprimir (muy grande)">WAV</button>
+          <button class="gm-chip gm-chip-plain" value="best" title="El mejor audio disponible, sin reconvertir">Original</button>
+        </div>
+        <div id="md-quality-wrap">
+          <h3>Calidad</h3>
+          <div class="chips group" id="md-quality" role="group" aria-label="Calidad de audio">
+            <button class="gm-chip gm-chip-plain" value="0" title="VBR, ~245 kbps (recomendado)">Máxima</button>
+            <button class="gm-chip gm-chip-plain" value="320">320 kbps</button>
+            <button class="gm-chip gm-chip-plain" value="192">192 kbps</button>
+            <button class="gm-chip gm-chip-plain" value="128">128 kbps</button>
+          </div>
+        </div>
+      </div>
+      <div class="md-video" id="md-video" hidden>
+        <h3>Resolución máxima</h3>
+        <div class="chips group wrap" id="md-height" role="group" aria-label="Resolución máxima">
+          <button class="gm-chip gm-chip-plain" value="0">Máxima</button>
+          <button class="gm-chip gm-chip-plain" value="2160">4K</button>
+          <button class="gm-chip gm-chip-plain" value="1440">1440p</button>
+          <button class="gm-chip gm-chip-plain" value="1080">1080p</button>
+          <button class="gm-chip gm-chip-plain" value="720">720p</button>
+          <button class="gm-chip gm-chip-plain" value="480">480p</button>
+        </div>
+      </div>
+      <p class="hint" id="md-summary"></p>
+      <div class="dialog-actions">
+        <button class="gm-chip gm-chip-plain" id="md-cancel">Cancelar</button>
+        <button class="gm-chip gm-chip-primary" id="md-go">Descargar</button>
+      </div>
+    </div>
+  </gm-dialog>
+
+  <gm-dialog id="preset-dialog" heading="Presets de música y video">
+    <div class="dialog-form preset-form">
+      <div class="row">
+        <gm-select><select id="ps-pick" aria-label="Preset a editar"></select></gm-select>
+        <div class="chips compact">
+          <button class="gm-chip gm-chip-plain" id="ps-new">Nuevo</button>
+          <button class="gm-chip gm-chip-plain" id="ps-dup">Duplicar</button>
+          <button class="gm-chip gm-chip-plain danger" id="ps-del">Eliminar</button>
+        </div>
+      </div>
+      <p class="gm-note" id="ps-builtin-note" data-tone="info" hidden></p>
+      <div class="preset-grid">
+        <label class="gm-field"><span class="gm-label">Nombre</span><input class="gm-input" id="ps-name" maxlength="60"></label>
+        <label class="gm-field"><span class="gm-label">Descripción</span><input class="gm-input" id="ps-desc" maxlength="120"></label>
+        <label class="gm-field wide"><span class="gm-label">Carpeta <span>dentro de la carpeta de descargas, o una ruta completa</span></span>
+          <span class="gm-input-group"><input class="gm-input" id="ps-folder" spellcheck="false">
+          <button type="button" class="gm-chip gm-chip-plain gm-chip-round" id="ps-folder-pick" aria-label="Elegir carpeta" title="Elegir carpeta"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></button></span></label>
+        <label class="gm-field"><span class="gm-label">Modo</span>
+          <gm-select><select id="ps-mode"><option value="audio">Solo audio</option><option value="video">Video (MP4)</option></select></gm-select></label>
+        <label class="gm-field"><span class="gm-label">Formato de audio</span>
+          <gm-select><select id="ps-format"><option value="mp3">MP3</option><option value="m4a">M4A</option><option value="opus">OPUS</option><option value="flac">FLAC</option><option value="ogg">OGG</option><option value="wav">WAV</option><option value="best">Original (sin reconvertir)</option></select></gm-select></label>
+        <label class="gm-field"><span class="gm-label">Calidad de audio</span>
+          <gm-select><select id="ps-quality"><option value="0">Máxima (VBR)</option><option value="320">320 kbps</option><option value="192">192 kbps</option><option value="128">128 kbps</option></select></gm-select></label>
+        <label class="gm-field"><span class="gm-label">Resolución máx. de video</span>
+          <gm-select><select id="ps-height"><option value="0">Máxima</option><option value="2160">4K</option><option value="1440">1440p</option><option value="1080">1080p</option><option value="720">720p</option><option value="480">480p</option></select></gm-select></label>
+        <label class="gm-field wide"><span class="gm-label">Nombre de archivo</span>
+          <gm-select><select id="ps-template">
+            <option value="artist">Artista - Título [ID]</option>
+            <option value="index">01 - Título [ID] (orden de la playlist)</option>
+            <option value="title">Título [ID]</option>
+            <option value="date">AAAAMMDD - Título [ID]</option>
+            <option value="artist_folder">Artista\Título [ID] (carpeta por artista)</option>
+            <option value="custom">Personalizado…</option>
+          </select></gm-select>
+          <input class="gm-input" id="ps-template-custom" spellcheck="false" placeholder="%(title)s [%(id)s].%(ext)s" hidden></label>
+        <label class="gm-field"><span class="gm-label">SponsorBlock</span>
+          <gm-select><select id="ps-sb">
+            <option value="off">Desactivado</option>
+            <option value="conservative">Conservador: solo sponsors (recomendado)</option>
+            <option value="moderate">Moderado: + autopromoción</option>
+            <option value="aggressive">Agresivo: + intro y outro</option>
+            <option value="custom">Personalizado…</option>
+          </select></gm-select>
+          <input class="gm-input" id="ps-sb-custom" spellcheck="false" placeholder="sponsor,selfpromo,interaction" hidden></label>
+        <label class="gm-field"><span class="gm-label">Pausa entre videos <span>segundos, mín–máx</span></span>
+          <span class="pair"><input class="gm-input" id="ps-smin" type="number" min="0" max="600"><input class="gm-input" id="ps-smax" type="number" min="0" max="600"></span></label>
+        <label class="gm-field"><span class="gm-label">Pausa entre enlaces <span>segundos</span></span><input class="gm-input" id="ps-pdelay" type="number" min="0" max="3600"></label>
+        <label class="gm-field"><span class="gm-label">Límite de velocidad <span>ej. 2M, 500K; vacío = sin límite</span></span><input class="gm-input" id="ps-rate" spellcheck="false"></label>
+        <label class="gm-field"><span class="gm-label">Rango de playlist <span>ej. 1:10, -10:, 1,3,5</span></span><input class="gm-input" id="ps-items" spellcheck="false"></label>
+        <label class="gm-toggle-row wide"><span class="gm-toggle-row-text"><strong>Registro anti-duplicados</strong><small>archive.txt en la carpeta: lo ya bajado se saltea.</small></span><input id="ps-archive" type="checkbox" class="gm-toggle" role="switch"></label>
+        <label class="gm-toggle-row"><span class="gm-toggle-row-text"><strong>Miniatura incrustada</strong></span><input id="ps-thumb" type="checkbox" class="gm-toggle" role="switch"></label>
+        <label class="gm-toggle-row"><span class="gm-toggle-row-text"><strong>Metadatos incrustados</strong></span><input id="ps-meta" type="checkbox" class="gm-toggle" role="switch"></label>
+      </div>
+
+      <details class="advanced" id="ps-cookies-box">
+        <summary>Cookies (opcional)</summary>
+        <div class="preset-grid">
+          <label class="gm-field"><span class="gm-label">Usar cookies</span>
+            <gm-select><select id="ps-cmode"><option value="off">No</option><option value="auto">Solo si el sitio lo pide</option><option value="always">Siempre</option></select></gm-select></label>
+          <label class="gm-field"><span class="gm-label">De dónde</span>
+            <gm-select><select id="ps-csource"><option value="browser">Del navegador</option><option value="file">Archivo cookies.txt</option><option value="vault">Guardadas en Bakin (cifradas)</option></select></gm-select></label>
+          <label class="gm-field" id="ps-cbrowser-wrap"><span class="gm-label">Navegador</span>
+            <gm-select><select id="ps-cbrowser"></select></gm-select></label>
+          <label class="gm-field" id="ps-cprofile-wrap"><span class="gm-label">Perfil <span>vacío = el principal; ej. Profile 1</span></span><input class="gm-input" id="ps-cprofile" spellcheck="false"></label>
+          <label class="gm-field wide" id="ps-cfile-wrap" hidden><span class="gm-label">Archivo cookies.txt</span>
+            <span class="gm-input-group"><input class="gm-input" id="ps-cfile" spellcheck="false">
+            <button type="button" class="gm-chip gm-chip-plain" id="ps-cfile-pick">Elegir…</button></span></label>
+        </div>
+        <p class="hint">Solo hacen falta para contenido con restricción de edad, privado o de miembros. En Windows, yt-dlp no puede leer las cookies de Brave, Chrome ni Edge (el navegador las cifra): usa un archivo cookies.txt o Firefox. Para YouTube lo más estable es un cookies.txt exportado desde una ventana privada (ver la guía de yt-dlp). Usar tu cuenta puede hacer que YouTube la suspenda: úsalas solo cuando sea necesario. Bakin no copia ni guarda tus cookies.</p>
+      </details>
+
+      <div class="dialog-actions spread">
+        <div class="chips compact">
+          <button class="gm-chip gm-chip-plain" id="ps-import" title="yt-dlp-presets.json o yt-dlp-config.json de YT-Download.ps1">Importar del script…</button>
+          <button class="gm-chip gm-chip-plain" id="ps-scan" title="Anota en archive.txt lo que ya está en la carpeta, para no bajarlo de nuevo">Registrar lo que ya tengo</button>
+          <button class="gm-chip gm-chip-plain" id="ps-restore" title="Vuelve a agregar los presets de Bakin que borraste (los que editaste no se tocan)">Restaurar presets de Bakin</button>
+        </div>
+        <div class="chips compact">
+          <button class="gm-chip gm-chip-plain" id="ps-close">Cerrar</button>
+          <button class="gm-chip gm-chip-primary" id="ps-save">Guardar</button>
+        </div>
+      </div>
+    </div>
+  </gm-dialog>
+
+  <gm-dialog id="tools-dialog" heading="Herramientas">
+    <div class="dialog-form">
+      <p class="hint">Bakin baja estas herramientas de sus sitios oficiales en GitHub y comprueba su checksum antes de usarlas. yt-dlp se actualiza solo, porque los sitios cambian seguido.</p>
+      <ul class="tools-list" id="tools-list"></ul>
+      <label class="gm-toggle-row"><span class="gm-toggle-row-text"><strong>Actualizar yt-dlp automáticamente</strong><small>Al abrir Bakin, si hay una versión nueva.</small></span><input id="tl-auto" type="checkbox" class="gm-toggle" role="switch"></label>
+      <label class="gm-toggle-row"><span class="gm-toggle-row-text"><strong>Mostrar salida completa de yt-dlp</strong><small>En Actividad, sin filtrar (para diagnosticar).</small></span><input id="tl-verbose" type="checkbox" class="gm-toggle" role="switch"></label>
+      <div class="dialog-actions">
+        <button class="gm-chip gm-chip-plain" id="tl-check">Buscar actualizaciones</button>
+        <button class="gm-chip gm-chip-primary" id="tl-install">Instalar lo que falta</button>
+        <button class="gm-chip gm-chip-plain" id="tl-close">Cerrar</button>
+      </div>
+    </div>
+  </gm-dialog>
+
+  <gm-dialog id="leftovers-dialog" heading="Videos que quedaron en MP4">
+    <div class="dialog-form">
+      <p id="lo-text"></p>
+      <ul class="media-urls" id="lo-list"></ul>
+      <p class="hint">Suele pasar cuando YouTube entrega un formato de baja calidad o la conversión no llegó a correr. Re-descargar manda los MP4 a la Papelera, los saca del archive y los baja de nuevo con el preset.</p>
+      <div class="dialog-actions">
+        <button class="gm-chip gm-chip-plain" id="lo-close">Ahora no</button>
+        <button class="gm-chip gm-chip-primary" id="lo-go">Re-descargar</button>
+      </div>
+    </div>
+  </gm-dialog>
+
+  <gm-dialog id="upgrade-dialog" heading="Mejorar calidad">
+    <div class="dialog-form">
+      <p class="lead" id="up-lead"></p>
+      <h3>Bajar de nuevo como</h3>
+      <div class="chips group" id="up-format" role="group" aria-label="Formato">
+        <button class="gm-chip gm-chip-plain" value="opus" aria-pressed="true" title="El audio original de YouTube, sin recodificar">OPUS</button>
+        <button class="gm-chip gm-chip-plain" value="best" aria-pressed="false" title="El mejor audio disponible, tal cual">Original</button>
+        <button class="gm-chip gm-chip-plain" value="m4a" aria-pressed="false">M4A</button>
+        <button class="gm-chip gm-chip-plain" value="mp3" aria-pressed="false">MP3</button>
+      </div>
+      <div class="row">
+        <label class="gm-label" for="up-preset">Usar cookies y SponsorBlock de</label>
+        <gm-select><select id="up-preset" aria-label="Preset"></select></gm-select>
+      </div>
+      <p class="hint">Cada tema se baja otra vez desde su video de YouTube (el ID está en el nombre o en sus etiquetas), con el mismo nombre y en la misma carpeta. Recién cuando el nuevo está guardado, el anterior va a la Papelera de Windows (aparece en «Eliminadas»); si el video ya no existe, tu archivo se queda como está. Favoritas y tags pasan al archivo nuevo.</p>
+      <div class="dialog-actions">
+        <button class="gm-chip gm-chip-plain" id="up-cancel">Cancelar</button>
+        <button class="gm-chip gm-chip-primary" id="up-go">Mejorar</button>
+      </div>
+    </div>
+  </gm-dialog>
+
+  <gm-dialog id="extension-dialog" heading="Extensión «Descargar con Bakin»">
+    <div class="dialog-form">
+      <p class="lead">Agrega un botón y la opción de clic derecho «Descargar con Bakin» en tu navegador. La extensión solo pasa la dirección que eliges; Bakin siempre te pide confirmar antes de bajar.</p>
+      <h3>Brave, Chrome o Edge</h3>
+      <ol class="steps-plain">
+        <li>Abre <code class="gm-code-inline">brave://extensions</code> (o <code class="gm-code-inline">chrome://extensions</code>, <code class="gm-code-inline">edge://extensions</code>) en una pestaña.</li>
+        <li>Activa el <strong>Modo de desarrollador</strong>.</li>
+        <li>Toca <strong>Cargar extensión sin empaquetar</strong> y elige la carpeta de la extensión.</li>
+      </ol>
+      <div class="chips compact">
+        <button class="gm-chip gm-chip-primary" id="ext-open">Abrir la carpeta de la extensión</button>
+        <button class="gm-chip gm-chip-plain" id="ext-copy-url">Copiar brave://extensions</button>
+      </div>
+      <h3>Firefox</h3>
+      <p class="hint">Abre <code class="gm-code-inline">about:debugging#/runtime/this-firefox</code>, toca «Cargar complemento temporal» y elige <code class="gm-code-inline">manifest.json</code> de esa carpeta. Firefox lo quita al cerrarse, salvo que la extensión se publique firmada.</p>
+      <h3>Sin extensión</h3>
+      <p class="hint">Guarda este marcador y tócalo en la página que quieras bajar:</p>
+      <div class="gm-input-group"><input class="gm-input" id="ext-bookmarklet" readonly spellcheck="false"><button class="gm-chip gm-chip-plain" id="ext-copy-bm">Copiar</button></div>
+      <p class="hint">La primera vez el navegador pregunta si abrir Bakin: puedes marcar que lo recuerde.</p>
+      <div class="dialog-actions"><button class="gm-chip gm-chip-plain" id="ext-close">Cerrar</button></div>
+    </div>
+  </gm-dialog>
+
+  <gm-dialog id="follow-dialog" heading="Seguir">
+    <div class="dialog-form">
+      <p class="lead" id="fw-lead"></p>
+      <div class="row" id="fw-preset-row">
+        <label class="gm-label" for="fw-preset">Preset</label>
+        <gm-select><select id="fw-preset" aria-label="Preset"></select></gm-select>
+      </div>
+      <h3>Revisar</h3>
+      <div class="chips group" id="fw-every" role="group" aria-label="Cada cuánto">
+        <button class="gm-chip gm-chip-plain" value="6" aria-pressed="false">Cada 6 h</button>
+        <button class="gm-chip gm-chip-plain" value="12" aria-pressed="false">Cada 12 h</button>
+        <button class="gm-chip gm-chip-plain" value="24" aria-pressed="true">Cada día</button>
+        <button class="gm-chip gm-chip-plain" value="168" aria-pressed="false">Cada semana</button>
+      </div>
+      <label class="gm-toggle-row"><span class="gm-toggle-row-text"><strong>Solo lo nuevo de ahora en adelante</strong><small id="fw-new-hint">Lo que ya publicó se marca como visto y no se baja.</small></span><input id="fw-new" type="checkbox" class="gm-toggle" role="switch" checked></label>
+      <p class="hint" id="fw-status"></p>
+      <div class="dialog-actions">
+        <button class="gm-chip gm-chip-plain" id="fw-cancel">Cancelar</button>
+        <button class="gm-chip gm-chip-primary" id="fw-go">Seguir</button>
+      </div>
+    </div>
+  </gm-dialog>
+
+  <gm-dialog id="quit-dialog" heading="Hay una descarga en curso">
+    <p>Si sales ahora se cancela. Lo ya descargado se conserva y podrás reanudar después.</p>
+    <form method="dialog" class="dialog-actions">
+      <button class="gm-chip gm-chip-plain" value="cancel">Seguir descargando</button>
+      <button class="gm-chip gm-chip-primary" value="quit">Cancelar y salir</button>
+    </form>
+  </gm-dialog>
+</body>
+</html>

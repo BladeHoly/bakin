@@ -1,0 +1,108 @@
+@layer gm-base, gm-components, gm-overrides;
+
+@layer gm-components {
+  /*
+ * Select: a field-like button, and its list on frosted glass in the top layer, with a droplet
+ * under the option in focus. The native select stays underneath for forms and validation.
+ */
+  :where(gm-select) {
+    position: relative;
+    display: block;
+    min-width: 0;
+  }
+  :where(.gm-select-native) {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    pointer-events: none;
+  }
+  :where(.gm-select-trigger) {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--gm-space-sm, 8px);
+    text-align: start;
+    cursor: pointer;
+  }
+  :where(.gm-select-value) {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  :where(.gm-select-placeholder .gm-select-value) {
+    color: var(--gm-ink-muted);
+  }
+  :where(.gm-select-trigger svg) {
+    flex: none;
+    width: 1.1em;
+    height: 1.1em;
+    color: var(--gm-ink-muted);
+    transition: rotate 0.2s;
+  }
+  :where(.gm-select-trigger[aria-expanded='true'] svg) {
+    rotate: 180deg;
+  }
+
+  /* The list is a gm-popover; this sheet places it without needing popover.css. */
+  :where(.gm-select-list) {
+    margin: 0;
+    inset: auto;
+    border: 0;
+    border-radius: 16px;
+    color: var(--gm-ink);
+    max-height: min(20rem, 50vh);
+    padding: 0.3rem;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  :where(.gm-select-list:popover-open) {
+    display: flex;
+    flex-direction: column;
+  }
+  :where(.gm-select-option) {
+    position: relative;
+    z-index: 1;
+    flex: none;
+    padding: 0.5rem 0.75rem;
+    border-radius: 10px;
+    outline: 0;
+    font-size: 0.9rem;
+    cursor: pointer;
+  }
+  :where(.gm-select-option[aria-selected='true']) {
+    font-weight: 600;
+  }
+  :where(.gm-select-option[aria-selected='true'])::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    right: 0.7rem;
+    width: 0.9rem;
+    height: 0.9rem;
+    translate: 0 -50%;
+    background: currentColor;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M3 8.5l3.2 3L13 4.5' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")
+      center / contain no-repeat;
+  }
+  :where(.gm-select-option[aria-selected='true']) {
+    padding-right: 2.2rem;
+  }
+  :where(.gm-select-option[aria-disabled='true']) {
+    opacity: 0.45;
+    cursor: default;
+  }
+  :where(.gm-select-group) {
+    flex: none;
+    padding: 0.6rem 0.75rem 0.25rem;
+    color: var(--gm-ink-muted);
+    font-size: var(--gm-text-xs, 0.75rem);
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+  :where(.gm-select-list > .gm-droplet) {
+    border-radius: 10px;
+  }
+}

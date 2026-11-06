@@ -1,0 +1,176 @@
+@layer gm-base, gm-components, gm-overrides;
+
+@layer gm-components {
+  /*
+ * Stat: one number, what it is, how it moved, and its recent shape. Content, not glass: a plain
+ * fill. The change is colored by whether it's good, with an arrow for its direction, so it reads
+ * without the color.
+ */
+  :where(.gm-stat) {
+    display: grid;
+    align-content: start;
+    gap: var(--gm-space-xs, 4px);
+    min-width: 0;
+    padding: var(--gm-space-lg, 16px);
+    border-radius: var(--gm-radius-md, 18px);
+    background: var(--gm-stat-fill, var(--gm-chip-fill, rgb(255 255 255 / 0.1)));
+    color: var(--gm-ink);
+  }
+  :where(.gm-stat-label) {
+    margin: 0;
+    color: var(--gm-ink-muted);
+    font-size: var(--gm-text-sm, 0.875rem);
+  }
+  :where(.gm-stat-value) {
+    margin: 0;
+    font-size: var(--gm-text-2xl, 1.75rem);
+    font-weight: 600;
+    line-height: 1.15;
+    letter-spacing: -0.01em;
+  }
+  /* data-tone on the stat colours its value: errors in red, warnings in amber. */
+  :where(.gm-stat[data-tone='good'] .gm-stat-value) {
+    color: var(--gm-status-success, rgb(90 210 150));
+  }
+  :where(.gm-stat[data-tone='warning'] .gm-stat-value) {
+    color: var(--gm-status-warning, rgb(255 196 90));
+  }
+  :where(.gm-stat[data-tone='bad'] .gm-stat-value) {
+    color: var(--gm-status-danger, rgb(255 110 110));
+  }
+  /* A grid of stats: as many to a row as fit at --gm-stat-min, or data-columns of them. */
+  :where(.gm-stat-grid) {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(var(--gm-stat-min, 10rem), 1fr));
+    gap: var(--gm-space-sm, 8px);
+  }
+  :where(.gm-stat-grid[data-columns='2']) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  :where(.gm-stat-grid[data-columns='3']) {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  :where(.gm-stat-grid[data-columns='4']) {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+  /* Compact: smaller numbers and padding, for many stats in a narrow column. */
+  :where(.gm-stat-grid[data-density='compact'] .gm-stat, .gm-stat[data-density='compact']) {
+    padding: var(--gm-space-md, 12px);
+  }
+  :where(
+    .gm-stat-grid[data-density='compact'] .gm-stat-value,
+    .gm-stat[data-density='compact'] .gm-stat-value
+  ) {
+    font-size: var(--gm-text-xl, 1.375rem);
+  }
+  :where(.gm-stat-delta) {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3em;
+    color: var(--gm-ink-muted);
+    font-size: var(--gm-text-xs, 0.75rem);
+    font-weight: 600;
+  }
+  :where(.gm-stat-delta[data-direction])::before {
+    content: '';
+    width: 0.6em;
+    height: 0.6em;
+    background: currentColor;
+    clip-path: polygon(50% 0, 100% 100%, 0 100%);
+  }
+  :where(.gm-stat-delta[data-direction='down'])::before {
+    rotate: 180deg;
+  }
+  :where(.gm-stat-delta[data-tone='good']) {
+    color: var(--gm-status-success, rgb(90 210 150));
+  }
+  :where(.gm-stat-delta[data-tone='bad']) {
+    color: var(--gm-status-danger, rgb(255 110 110));
+  }
+  :where(.gm-stat-delta > span) {
+    color: var(--gm-ink-muted);
+    font-weight: 400;
+  }
+  :where(.gm-stat-trend) {
+    display: block;
+    width: 100%;
+    height: 2rem;
+    margin-top: var(--gm-space-xs, 4px);
+    overflow: visible;
+  }
+
+  /*
+ * Meter: a share of a whole, on a track of the same color, lighter. data-tone moves it to a
+ * status color when the value means trouble.
+ */
+  :where(.gm-meter) {
+    --gm-meter-fill: var(--gm-ink);
+    display: block;
+    height: 0.4rem;
+    border-radius: var(--gm-radius-pill, 999px);
+    background: color-mix(in srgb, var(--gm-meter-fill) 22%, transparent);
+    overflow: hidden;
+  }
+  :where(.gm-meter)::before {
+    content: '';
+    display: block;
+    width: calc(var(--value, 0) * 100%);
+    height: 100%;
+    border-radius: inherit;
+    background: var(--gm-meter-fill);
+  }
+  :where(.gm-meter[data-tone='success']) {
+    --gm-meter-fill: var(--gm-status-success, rgb(90 210 150));
+  }
+  :where(.gm-meter[data-tone='warning']) {
+    --gm-meter-fill: var(--gm-status-warning, rgb(255 196 90));
+  }
+  :where(.gm-meter[data-tone='danger']) {
+    --gm-meter-fill: var(--gm-status-danger, rgb(255 110 110));
+  }
+  /*
+   * Indeterminate: work under way whose size isn't known yet. aria-busy="true" (or
+   * data-state="indeterminate") slides a segment along the track; leave aria-valuenow out
+   * meanwhile. With reduced motion it pulses in place instead.
+   */
+  :where(.gm-meter:is([aria-busy='true'], [data-state='indeterminate']))::before {
+    width: 35%;
+    animation: gm-meter-slide 1.4s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+  }
+  @keyframes gm-meter-slide {
+    from {
+      translate: -100%;
+    }
+    to {
+      translate: 290%;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    :where(.gm-meter:is([aria-busy='true'], [data-state='indeterminate']))::before {
+      width: 100%;
+      animation: gm-meter-pulse 1.6s ease-in-out infinite;
+    }
+  }
+  @keyframes gm-meter-pulse {
+    50% {
+      opacity: 0.35;
+    }
+  }
+  /* A label on the track (data-label="12 / 514"): the meter grows to hold it. */
+  :where(.gm-meter[data-label]) {
+    position: relative;
+    height: 1.25rem;
+  }
+  :where(.gm-meter[data-label])::after {
+    content: attr(data-label);
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    color: var(--gm-ink);
+    font-size: var(--gm-text-xs, 0.75rem);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    mix-blend-mode: difference;
+  }
+}

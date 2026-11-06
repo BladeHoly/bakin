@@ -1,0 +1,65 @@
+[package]
+name = "bakin-desktop"
+version = "0.13.2"
+description = "Bakin desktop shell (Tauri)"
+license = "MIT"
+edition = "2021"
+
+[lib]
+name = "bakin_desktop_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["protocol-asset", "tray-icon"] }
+tauri-plugin-dialog = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tauri-plugin-updater = "2"
+tauri-plugin-autostart = "2"
+tauri-plugin-single-instance = { version = "2", features = ["deep-link"] }
+tauri-plugin-notification = "2"
+tauri-plugin-deep-link = "2"
+# Bakin Música's player (src/player.rs): decoding, libopus for Opus, the
+# Windows audio output and resampling to the output's rate
+symphonia = { version = "0.6.1", default-features = false, features = ["mp3", "aac", "isomp4", "flac", "vorbis", "ogg", "wav", "pcm"] }
+symphonia-adapter-libopus = "0.3"
+cpal = "0.18"
+rubato = "5"
+audioadapter-buffers = "5.2"
+base64 = "0.22"
+sha1_smol = "1"
+imagesize = "0.13"
+tauri-plugin-global-shortcut = "2"
+image = { version = "0.25", default-features = false, features = ["jpeg", "png", "webp", "bmp"] }
+
+# the home-network OpenSubsonic server (src/lan.rs, PLAN 0.21.1)
+axum = { version = "0.8", default-features = false, features = ["tokio", "http1"] }
+tokio = { version = "1", features = ["rt-multi-thread", "net", "fs", "io-util", "sync", "time"] }
+tokio-util = { version = "0.7", features = ["io"] }
+md-5 = "0.10"
+if-addrs = "0.13"
+qrcode = { version = "0.14", default-features = false, features = ["svg"] }
+form_urlencoded = "1"
+
+[dev-dependencies]
+tokio = { version = "1", features = ["macros", "rt"] }
+tower = { version = "0.5", features = ["util"] }
+
+[target.'cfg(windows)'.dependencies]
+# media keys and the Windows media overlay for the player (src/smtc.rs)
+windows = { version = "0.62", features = ["Media", "Foundation", "Storage_Streams", "Win32_Foundation", "Win32_System_WinRT", "Win32_UI_WindowsAndMessaging", "Win32_System_ProcessStatus", "Win32_System_Diagnostics_ToolHelp", "Win32_System_Threading", "Win32_UI_Shell", "Win32_System_Com", "Win32_System_SystemInformation", "System_UserProfile", "Storage"] }
+# Same version Tauri already pulls in; used for the DWM window border colour.
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Graphics_Dwm", "Win32_System_DataExchange", "Win32_System_Memory"] }
+# the WebView2 interfaces Tauri already brings (PLAN 0.17.2: the mini's memory level)
+webview2-com = "0.39"
+windows-core = "0.62"
+
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = "s"
+panic = "abort"
+strip = true
