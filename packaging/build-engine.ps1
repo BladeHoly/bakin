@@ -53,6 +53,7 @@ VSVersionInfo(
     --exclude-module tkinter --exclude-module sv_ttk `
     --exclude-module webview --exclude-module pythonnet --exclude-module clr_loader `
     --exclude-module playwright --exclude-module pytest `
+    --exclude-module cryptography --exclude-module OpenSSL --exclude-module urllib3.contrib.pyopenssl `
     --distpath desktop\src-tauri\engine-dist `
     --workpath build\pyinstaller `
     --specpath build\pyinstaller `

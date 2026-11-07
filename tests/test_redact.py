@@ -74,3 +74,10 @@ def test_log_size_for_consumo(tmp_path, monkeypatch):
     svc = service.Service()
     info = svc.log_info()
     assert info["bytes"] >= 0 and info["folder"]
+
+
+def test_google_session_cookies_are_scrubbed():
+    # security review 2026-11-07: the list still named the old photo site's cookies only
+    line = "cookie jar: SAPISID=abc123def456; __Secure-3PSID=g.a000xyz; LOGIN_INFO=AFmmF2sw"
+    out = redact.redact(line)
+    assert "abc123def456" not in out and "g.a000xyz" not in out and "AFmmF2sw" not in out

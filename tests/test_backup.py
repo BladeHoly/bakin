@@ -148,9 +148,26 @@ def test_round_trip(world):
     assert mine["cookies_file"] == "" and mine["cookies_source"] == "browser" and mine["cookies_mode"] == "off"
     assert json.loads((app_dir() / "follows.json").read_text(encoding="utf-8"))["follows"][0]["url"].endswith("@canal")
     assert (app_dir() / "music" / "lyrics" / ("0" * 40 + ".lrc")).read_text(encoding="utf-8") == "[00:01.00]hola"
-    ui = json.loads((app_dir() / "ui-settings.json").read_text(encoding="utf-8"))
-    assert ui["out_dir"] == str(world["root"]) and ui["musicbrainz"] is True and "api_token" not in ui
+    ui_file = app_dir() / "ui-settings.json"
+    ui = json.loads(ui_file.read_text(encoding="utf-8")) if ui_file.exists() else {}
+    # what moves downloads, opens the home server or sends things out is turned on by hand
+    assert not {"out_dir", "musicbrainz", "lan_enabled", "lyrics_online"} & set(ui) and "api_token" not in ui
     assert not (app_dir() / "vault").exists() and not (app_dir() / "queue.json").exists()
+
+
+def test_the_preview_names_what_acts_on_its_own(world):
+    # security review 2026-11-07: a backup from someone else showed only «N carpetas»
+    z = backup.export(world["tmp"] / "b.zip", download_root=world["root"])["path"]
+    review = backup.inspect(Path(z))["review"]
+    assert review["folders"] and any("@canal" in f for f in review["follows"]) and review["presets"]
+    assert all(" → " in p for p in review["presets"])  # the name and where it saves
+
+
+def test_a_preset_template_cannot_climb_out_of_its_folder():
+    for bad in ("..\..\%(title)s", "../x/%(title)s.%(ext)s", "C:\Windows\%(title)s", "/etc/%(title)s"):
+        assert ".." not in mediadl.clean_preset({"name": "x", "template": bad})["template"]
+        assert mediadl.clean_preset({"name": "x", "template": bad})["template"] == mediadl.TEMPLATES["artist"]
+    assert mediadl.clean_preset({"name": "x", "template": "%(uploader)s/%(title)s.%(ext)s"})["template"] == "%(uploader)s/%(title)s.%(ext)s"
 
 
 def test_merge_never_deletes_and_sums(world):

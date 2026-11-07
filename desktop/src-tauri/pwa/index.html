@@ -52,7 +52,7 @@
   <section class="login" id="login" hidden>
     <h1>Bakin</h1>
     <p>Pon el código que muestra Bakin en la PC (Configuración › En tu casa).</p>
-    <input id="code" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="ABCD-EFGH" aria-label="Código de Bakin">
+    <input id="code" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="ABCD-EFGH-JKMN" aria-label="Código de Bakin">
     <button class="gm-chip" id="enter">Entrar</button>
     <p class="err" id="login-err"></p>
   </section>
@@ -222,7 +222,7 @@
   // «Mandar a Bakin» (PLAN 0.21.3): a link goes to the PC's download hub
   function showSend() {
     const wrap = document.createElement('div');
-    wrap.innerHTML = '<p class="empty" style="padding:8px 0">Pega un enlace (YouTube, SoundCloud, Bandcamp, Wallhaven…): aparece en Bakin, en la PC, listo para bajar.</p>';
+    wrap.innerHTML = '<p class="empty" style="padding:8px 0">Pega un enlace (YouTube, SoundCloud, Bandcamp, Wallhaven…): Bakin lo baja en la PC con tu preset de siempre.</p>';
     const form = document.createElement('div'); form.className = 'send';
     const input = Object.assign(document.createElement('input'), { type: 'url', placeholder: 'https://…', value: new URLSearchParams(location.search).get('url') || new URLSearchParams(location.search).get('text') || '' });
     const go = Object.assign(document.createElement('button'), { className: 'gm-chip', textContent: 'Mandar' });
@@ -230,7 +230,7 @@
     go.addEventListener('click', async () => {
       const link = (input.value.match(/https?:\/\/\S+/) || [''])[0];
       if (!link) { out.textContent = 'Eso no parece un enlace.'; return; }
-      try { await api('bakinLink', { url: link }); out.textContent = 'Llegó a Bakin: confírmalo en la PC para que se baje.'; input.value = ''; }
+      try { await api('bakinLink', { url: link }); out.textContent = 'En la cola de Bakin: se baja en la PC.'; input.value = ''; }
       catch (e) { out.textContent = `No se pudo: ${e.message}`; }
     });
     form.append(input, go);

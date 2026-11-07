@@ -78,9 +78,13 @@ fn is_cached_cover(path: &std::path::Path, thumbs: &std::path::Path) -> bool {
     !path.as_os_str().is_empty() && path.starts_with(thumbs)
 }
 
-/// The download flow's link for a URL sent from the phone.
-fn download_link(url: &str) -> String {
-    format!("bakin://download?url={}", form_urlencoded::byte_serialize(url.as_bytes()).collect::<String>())
+/// The notification's text for a link sent from the phone: the site and the start of the path,
+/// short enough for a toast.
+fn phone_link_body(url: &str) -> String {
+    let rest = url.split_once("://").map(|(_, r)| r).unwrap_or(url);
+    let short: String = rest.chars().take(60).collect();
+    let dots = if rest.chars().count() > 60 { "…" } else { "" };
+    format!("{} {short}{dots}", crate::i18n::tr("En la cola:"))
 }
 
 /// The address the phone opens: the first one on the network (not this PC's loopback).
@@ -118,16 +122,21 @@ impl Library for EngineLibrary {
         Some(text(&r, "text")).filter(|t| !t.is_empty())
     }
 
-    /// The phone's link opens the download flow on the PC, like the browser extension: nothing is
-    /// queued until the user confirms there.
+    /// The phone's link goes straight to the queue, with that site's preset or the default one
+    /// (the user's call, 2026-11-07): the engine says why when it can't.
     fn link(&self, url: &str) -> Result<(), String> {
-        let deep = download_link(url);
-        if self.0.get_webview_window("main").is_some() {
-            self.0.emit("bakin-links", json!({ "urls": [deep] })).map_err(|e| e.to_string())
-        } else {
-            // the window is closed (tray): the page picks it up when it opens
-            self.0.state::<crate::links::Inbox>().0.lock().unwrap().push(deep);
+        let r = self.call("lan_download", json!({ "url": url }), 30)?;
+        if r["ok"].as_bool() == Some(true) {
+            // always said on the PC, window open or not: a download nobody started here (security
+            // review 2026-11-07: anyone with the Wi-Fi and the code could send one)
+            use tauri_plugin_notification::NotificationExt;
+            let _ = self.0.notification().builder()
+                .title(crate::i18n::tr("Bakin: un enlace desde el teléfono"))
+                .body(phone_link_body(url))
+                .show();
             Ok(())
+        } else {
+            Err(r["error"].as_str().unwrap_or("Bakin no pudo ponerlo en la cola.").to_string())
         }
     }
 }
@@ -287,8 +296,10 @@ mod tests {
     }
 
     #[test]
-    fn a_link_from_the_phone_opens_the_download_dialog() {
-        assert_eq!(download_link("https://youtu.be/x?t=1&a=b c"), "bakin://download?url=https%3A%2F%2Fyoutu.be%2Fx%3Ft%3D1%26a%3Db+c");
+    fn the_notification_names_the_site_briefly() {
+        assert!(phone_link_body("https://youtu.be/abc").ends_with(" youtu.be/abc"));
+        let long = format!("https://example.com/{}", "x".repeat(200));
+        assert!(phone_link_body(&long).ends_with('…') && phone_link_body(&long).chars().count() < 80);
     }
 
     #[test]

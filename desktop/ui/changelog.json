@@ -1,5 +1,23 @@
 [
  {
+  "version": "0.24.0",
+  "date": "2026-11-07",
+  "items": [
+   "Buscar música sin salir de Bakin: canciones, artistas y álbumes de YouTube Music; tildas lo que quieres y «Bajar». También desde una playlist de Spotify.",
+   "Música ordena como Spotify (también por «Agregada»), seleccionas desde la lista con el tilde de cada tema, y «Aleatorio ⌄» ofrece al azar, inteligente, por álbum o por artista.",
+   "Biblioteca limpia: limpiar títulos y artistas (con MusicBrainz si quieres, y se puede deshacer), duplicados, estadísticas, «Más escuchadas», «Nunca escuchadas» y mixes que aprenden de lo que saltas.",
+   "Sonido: volumen parejo entre temas, ecualizador de 10 bandas, elegir la salida de audio, letras sincronizadas al costado y repetir un tramo con clic derecho en la barra de progreso.",
+   "Playlists inteligentes que se arman solas, y playlists espejo en una carpeta o un pendrive.",
+   "Descargas como una lista: lo que baja, lo que sigue, lo que tuvo problemas (con «Reintentar») y lo que ya está; una sola pausa que dice por qué y hasta cuándo.",
+   "Seguir un canal, una playlist o una búsqueda de Wallhaven, con historial; tus cookies se guardan cifradas en Bakin.",
+   "En tu casa: escucha tu música en el celular por la red de casa y manda enlaces desde el teléfono. Si ya lo usabas, empareja el celular de nuevo: el código ahora es más largo.",
+   "El modo mínimo rehecho (barra o tarjeta con la portada), la barra del reproductor ordenada y menús de clic derecho completos.",
+   "Imágenes en mosaicos apaisados y Wallhaven en filas sin huecos.",
+   "Primer arranque guiado, Bakin en inglés, copia de seguridad de tus datos y mover la carpeta de datos sin sorpresas.",
+   "La música ya no se corta cuando la PC está exigida (por ejemplo, con un juego abierto), y Bakin escribe menos en el disco mientras suena."
+  ]
+ },
+ {
   "version": "0.13.2",
   "date": "2026-11-03",
   "items": [

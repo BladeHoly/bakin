@@ -159,7 +159,7 @@ pub fn hotkeys_set(app: AppHandle, action: String, combo: String) -> Result<Valu
     let combo = combo.trim().to_string();
     let mut map = load();
     if !combo.is_empty() {
-        let sc: Shortcut = combo.parse().map_err(|_| "Esa combinación no sirve: usá Ctrl, Alt o Shift con una tecla.".to_string())?;
+        let sc: Shortcut = combo.parse().map_err(|_| "Esa combinación no sirve: usa Ctrl, Alt o Shift con una tecla.".to_string())?;
         if map.iter().any(|(a, c)| a != &action && c.parse::<Shortcut>().is_ok_and(|o| o.id() == sc.id())) {
             return Err("Esa combinación ya es de otra acción de Bakin.".into());
         }

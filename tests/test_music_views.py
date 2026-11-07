@@ -222,7 +222,7 @@ def test_lan_pairing_code():
     from bakin import vault
     svc = service.Service(lambda e: None)
     first = svc.lan_code()["code"]
-    assert len(first) == 9 and first[4] == "-" and not set(first.replace("-", "")) - set(svc._CODE_CHARS)
+    assert len(first) == 14 and first[4] == first[9] == "-" and not set(first.replace("-", "")) - set(svc._CODE_CHARS)
     assert svc.lan_code()["code"] == first and vault.get(svc.LAN_CODE) == first.encode()
     assert svc.lan_code(new=True)["code"] != first
     s = svc.settings_set({"lan_enabled": True, "lan_port": 80})["settings"]
@@ -239,3 +239,13 @@ def test_mirror_open_only_its_own_folder(tmp_path, monkeypatch):
     assert not service.Service.music_mirror_open(pl["id"])["ok"]                   # unplugged
     music.playlist_mirror(pl["id"], {"folder": str(tmp_path), "mode": "copy"})
     assert service.Service.music_mirror_open(pl["id"])["ok"] and opened == [str(tmp_path)]
+
+
+def test_a_link_from_the_phone_goes_straight_to_the_queue(monkeypatch):
+    # pulido P2 #19 (the user, 2026-11-07): «que baje solo», no confirming on the PC
+    svc = service.Service()
+    seen = []
+    monkeypatch.setattr(svc, "start", lambda mode, url, opts=None: seen.append((mode, url, opts)) or {"ok": True})
+    assert svc.lan_download(" https://youtu.be/abc ")["ok"]
+    assert seen == [("download", "https://youtu.be/abc", {})]
+    assert not svc.lan_download("javascript:alert(1)")["ok"] and len(seen) == 1

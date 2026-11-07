@@ -59,6 +59,8 @@ fn english_of(es: &'static str) -> &'static str {
         "Bakin pausó la cola" => "Bakin paused the queue",
         "Bakin: cookies vencidas" => "Bakin: cookies expired",
         "Exporta un cookies.txt nuevo para los temas que piden tu cuenta." => "Export a new cookies.txt for the songs that need your account.",
+        "Bakin: un enlace desde el teléfono" => "Bakin: a link from the phone",
+        "En la cola:" => "Queued:",
         _ => es,
     }
 }

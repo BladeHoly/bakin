@@ -12,9 +12,9 @@
 use std::collections::VecDeque;
 use std::fs::File;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, AtomicUsize, Ordering};
 use std::sync::mpsc::{self, Receiver, RecvTimeoutError, Sender};
-use std::sync::{Arc, Mutex, OnceLock};
+use std::sync::{Arc, OnceLock};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
@@ -419,9 +419,98 @@ pub fn output_devices() -> Vec<String> {
 }
 
 // -------------------------------------------------------------------- output
+/// Room for the samples kept in front of the output: half a second of stereo even at 192 kHz.
+const RING_CAP: usize = 1 << 18;
+
+/// The decoded audio between the decoder thread (the only writer) and the output callback (the
+/// only reader), without a lock: the callback never waits and never plays silence because the
+/// decoder happened to be holding the buffer (it used to, with a Mutex and `try_lock`, when a game
+/// kept the CPU busy). A flush (a seek, a new song) is asked by the writer and done by the
+/// reader, so what was already played is counted exactly.
+struct Ring {
+    buf: Box<[AtomicU32]>, // f32 bits
+    head: AtomicUsize,     // next sample to read; only the reader moves it
+    tail: AtomicUsize,     // next sample to write; only the writer moves it
+    flush_req: AtomicU64,
+    flush_ack: AtomicU64,
+}
+
+impl Ring {
+    fn new() -> Ring {
+        Ring {
+            buf: (0..RING_CAP).map(|_| AtomicU32::new(0)).collect(),
+            head: AtomicUsize::new(0),
+            tail: AtomicUsize::new(0),
+            flush_req: AtomicU64::new(0),
+            flush_ack: AtomicU64::new(0),
+        }
+    }
+
+    /// Samples waiting to be played.
+    fn len(&self) -> usize {
+        self.tail.load(Ordering::Acquire).wrapping_sub(self.head.load(Ordering::Acquire))
+    }
+
+    /// Writer: appends what fits (the decoder never asks for more than the room it saw).
+    fn push(&self, samples: &[f32]) {
+        let tail = self.tail.load(Ordering::Relaxed);
+        let room = RING_CAP - tail.wrapping_sub(self.head.load(Ordering::Acquire));
+        let n = samples.len().min(room);
+        for (i, x) in samples[..n].iter().enumerate() {
+            self.buf[tail.wrapping_add(i) & (RING_CAP - 1)].store(x.to_bits(), Ordering::Relaxed);
+        }
+        self.tail.store(tail.wrapping_add(n), Ordering::Release);
+    }
+
+    /// Reader: does a pending flush first (dropping everything written before it was asked).
+    fn take_flush(&self) {
+        let req = self.flush_req.load(Ordering::Acquire);
+        if req != self.flush_ack.load(Ordering::Relaxed) {
+            self.head.store(self.tail.load(Ordering::Acquire), Ordering::Release);
+            self.flush_ack.store(req, Ordering::Release);
+        }
+    }
+
+    /// Reader: the next sample, if there is one.
+    fn pop(&self) -> Option<f32> {
+        let head = self.head.load(Ordering::Relaxed);
+        if head == self.tail.load(Ordering::Acquire) {
+            return None;
+        }
+        let x = f32::from_bits(self.buf[head & (RING_CAP - 1)].load(Ordering::Relaxed));
+        self.head.store(head.wrapping_add(1), Ordering::Release);
+        Some(x)
+    }
+
+    /// Reader: drops up to `n` samples (the silent clock of the test copies).
+    fn skip(&self, n: usize) -> usize {
+        let head = self.head.load(Ordering::Relaxed);
+        let n = n.min(self.tail.load(Ordering::Acquire).wrapping_sub(head));
+        self.head.store(head.wrapping_add(n), Ordering::Release);
+        n
+    }
+
+    /// Writer: empties the ring. With a reader running, it asks and waits for the reader to do it
+    /// (a callback comes every few ms); without one, or if the device stopped calling back, it
+    /// does it itself, since nothing else is reading.
+    fn flush(&self, reader: bool) {
+        let req = self.flush_req.fetch_add(1, Ordering::AcqRel) + 1;
+        if reader {
+            let until = Instant::now() + Duration::from_millis(250);
+            while self.flush_ack.load(Ordering::Acquire) < req && Instant::now() < until {
+                std::thread::sleep(Duration::from_millis(1));
+            }
+        }
+        if self.flush_ack.load(Ordering::Acquire) < req {
+            self.head.store(self.tail.load(Ordering::Acquire), Ordering::Release);
+            self.flush_ack.store(req, Ordering::Release);
+        }
+    }
+}
+
 /// What the output callback shares with the decoder thread.
 struct Shared {
-    ring: Mutex<VecDeque<f32>>,
+    ring: Ring,
     paused: AtomicBool,
     gain: AtomicU32,     // f32 bits
     consumed: AtomicU64, // frames played since the start
@@ -453,14 +542,13 @@ fn open_silent(shared: Arc<Shared>) -> (Output, u32) {
         while !s2.load(Ordering::Relaxed) {
             std::thread::sleep(tick);
             if shared.paused.load(Ordering::Relaxed) {
+                shared.ring.take_flush();
                 continue;
             }
             let frames = (rate / 100) as usize;
-            if let Ok(mut ring) = shared.ring.lock() {
-                let have = (ring.len() / 2).min(frames);
-                ring.drain(..have * 2);
-                shared.consumed.fetch_add(have as u64, Ordering::Relaxed);
-            }
+            shared.ring.take_flush();
+            let have = shared.ring.skip(frames * 2) / 2;
+            shared.consumed.fetch_add(have as u64, Ordering::Relaxed);
         }
     });
     (Output::Silent(stop), rate)
@@ -490,16 +578,17 @@ fn open_output(shared: Arc<Shared>, want: &str) -> Result<(Output, u32), String>
             config.config(),
             move |out: &mut [f32], _| {
                 out.fill(0.0);
+                let ring = &s2.ring;
+                ring.take_flush();
                 if s2.paused.load(Ordering::Relaxed) {
                     return;
                 }
                 let gain = f32::from_bits(s2.gain.load(Ordering::Relaxed));
-                let Ok(mut ring) = s2.ring.try_lock() else { return };
                 let frames = out.len() / channels.max(1);
                 let have = (ring.len() / 2).min(frames);
                 for f in 0..have {
-                    let l = ring.pop_front().unwrap_or(0.0) * gain;
-                    let r = ring.pop_front().unwrap_or(0.0) * gain;
+                    let l = ring.pop().unwrap_or(0.0) * gain;
+                    let r = ring.pop().unwrap_or(0.0) * gain;
                     let o = &mut out[f * channels..(f + 1) * channels];
                     if channels == 1 {
                         o[0] = (l + r) * 0.5;
@@ -579,12 +668,68 @@ pub struct Player {
     tx: Sender<Command>,
 }
 
+/// Writes a file atomically on a background thread, one at a time and in order; a newer version of
+/// the same file waiting in line replaces the older one. With `wait`, returns once it's on disk
+/// (closing Bakin): going through the same line, an older write can't land after it.
+fn write_later(path: PathBuf, text: String, wait: bool) {
+    type Job = (PathBuf, String, Option<Sender<()>>);
+    static TX: OnceLock<Sender<Job>> = OnceLock::new();
+    let tx = TX.get_or_init(|| {
+        let (tx, rx) = mpsc::channel::<Job>();
+        let _ = std::thread::Builder::new().name("bakin-player-save".into()).spawn(move || {
+            while let Ok(mut job) = rx.recv() {
+                while job.2.is_none() {
+                    match rx.try_recv() {
+                        Ok(newer) => {
+                            if newer.0 != job.0 {
+                                write_atomic(&job.0, &job.1);
+                            }
+                            job = newer;
+                        }
+                        Err(_) => break,
+                    }
+                }
+                write_atomic(&job.0, &job.1);
+                if let Some(done) = job.2 {
+                    let _ = done.send(());
+                }
+            }
+        });
+        tx
+    });
+    let (done_tx, done_rx) = mpsc::channel();
+    match tx.send((path, text, wait.then_some(done_tx))) {
+        Ok(()) if wait => {
+            let _ = done_rx.recv_timeout(Duration::from_secs(5));
+        }
+        Ok(()) => {}
+        Err(mpsc::SendError((path, text, _))) => write_atomic(&path, &text),
+    }
+}
+
+fn write_atomic(path: &Path, text: &str) {
+    let tmp = path.with_extension("tmp");
+    if std::fs::write(&tmp, text).is_ok() {
+        let _ = std::fs::rename(&tmp, path);
+    }
+}
+
 impl Player {
     pub fn start(emit: impl Fn(&str, Value) + Send + 'static) -> Player {
         let (tx, rx) = mpsc::channel();
         std::thread::Builder::new()
             .name("bakin-player".into())
-            .spawn(move || Engine::new(Box::new(emit)).run(rx))
+            .spawn(move || {
+                // the decoder keeps the output fed: above the usual threads, so a game or a scan
+                // busy on every core doesn't leave the ring empty (the output thread itself is
+                // already real time: cpal registers it with MMCSS)
+                #[cfg(windows)]
+                unsafe {
+                    use windows::Win32::System::Threading::{GetCurrentThread, SetThreadPriority, THREAD_PRIORITY_ABOVE_NORMAL};
+                    let _ = SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_ABOVE_NORMAL);
+                }
+                Engine::new(Box::new(emit)).run(rx)
+            })
             .expect("player thread");
         Player { tx }
     }
@@ -652,7 +797,7 @@ struct Engine {
 impl Engine {
     fn new(emit: Box<dyn Fn(&str, Value) + Send>) -> Engine {
         let shared = Arc::new(Shared {
-            ring: Mutex::new(VecDeque::new()),
+            ring: Ring::new(),
             paused: AtomicBool::new(true),
             gain: AtomicU32::new(0.8f32.to_bits()),
             consumed: AtomicU64::new(0),
@@ -715,7 +860,7 @@ impl Engine {
                     let _ = reply.send(out);
                 }
                 Ok(Command::Shutdown) | Err(RecvTimeoutError::Disconnected) => {
-                    self.save();
+                    self.save_with(true);
                     break;
                 }
                 Err(RecvTimeoutError::Timeout) => {}
@@ -744,13 +889,11 @@ impl Engine {
                 self.pause();
                 (self.emit)("notice", json!({ "message": "Temporizador: se detuvo la música." }));
             }
+            // the queue file only after a change (a song, a pause, the queue edited); where in
+            // the song goes to its own small file, often, so nothing big is written while it plays
             if self.dirty && self.saved_at.elapsed() > Duration::from_secs(2) {
                 self.save();
             }
-            if self.playing && self.saved_at.elapsed() > Duration::from_secs(20) {
-                self.save();
-            }
-            // where in the song: a small file, often (the queue file is big)
             if self.playing && self.pos_saved_at.elapsed() > Duration::from_secs(5) {
                 self.save_position();
             }
@@ -816,7 +959,7 @@ impl Engine {
     /// Keeps about half a second decoded in front of the output.
     fn fill(&mut self) {
         let target = (AHEAD_SECS * self.rate as f64) as usize * 2;
-        let have = self.shared.ring.lock().map(|r| r.len()).unwrap_or(target);
+        let have = self.shared.ring.len();
         if have >= target {
             return;
         }
@@ -858,9 +1001,7 @@ impl Engine {
             return;
         }
         self.eq.process(&mut buf);
-        if let Ok(mut ring) = self.shared.ring.lock() {
-            ring.extend(buf.iter());
-        }
+        self.shared.ring.push(&buf);
         self.written += got as u64;
     }
 
@@ -1019,11 +1160,8 @@ impl Engine {
             self.dirty = true;
             return false;
         }
-        let consumed = {
-            let mut ring = self.shared.ring.lock().unwrap();
-            ring.clear();
-            self.shared.consumed.load(Ordering::Relaxed)
-        };
+        self.shared.ring.flush(self.stream.is_some());
+        let consumed = self.shared.consumed.load(Ordering::Relaxed);
         self.written = consumed;
         self.last_consumed = consumed;
         self.marks.clear();
@@ -1456,7 +1594,7 @@ impl Engine {
                     self.dirty = true;
                 }
             }
-            "save" => self.save(),
+            "save" => self.save_with(true),
             _ => {}
         }
         self.state_json()
@@ -1515,6 +1653,11 @@ impl Engine {
     }
 
     fn save(&mut self) {
+        self.save_with(false);
+    }
+
+    /// `wait`: on disk before returning (Bakin is closing).
+    fn save_with(&mut self, wait: bool) {
         self.dirty = false;
         self.saved_at = Instant::now();
         let data = json!({
@@ -1540,10 +1683,8 @@ impl Engine {
             let _ = std::fs::create_dir_all(dir);
         }
         self.save_position();
-        let tmp = path.with_extension("tmp");
-        if std::fs::write(&tmp, data.to_string()).is_ok() {
-            let _ = std::fs::rename(&tmp, &path);
-        }
+        // the queue can be megabytes: written by another thread, so the decoder never waits on the disk
+        write_later(path, data.to_string(), wait);
     }
 
     fn position_file() -> PathBuf {
@@ -1744,6 +1885,50 @@ fn shuffled(tracks: &[Track], first: usize, mode: ShuffleMode) -> Vec<usize> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_ring_keeps_order_across_the_wrap_and_never_overfills() {
+        let ring = Ring::new();
+        let mut next = 0u32;
+        let mut want = 0u32;
+        for _ in 0..5 {
+            // three quarters in, three quarters out: the indices wrap past the end
+            let chunk: Vec<f32> = (0..RING_CAP * 3 / 4).map(|_| { next += 1; next as f32 }).collect();
+            ring.push(&chunk);
+            assert_eq!(ring.len(), chunk.len());
+            for _ in 0..chunk.len() {
+                want += 1;
+                assert_eq!(ring.pop(), Some(want as f32));
+            }
+            assert_eq!(ring.pop(), None);
+        }
+        ring.push(&vec![1.0; RING_CAP + 10]);
+        assert_eq!(ring.len(), RING_CAP); // what doesn't fit is not written over unread samples
+    }
+
+    #[test]
+    fn a_flush_is_done_by_the_reader_and_drops_only_what_came_before() {
+        let ring = Arc::new(Ring::new());
+        ring.push(&[1.0; 1000]);
+        ring.flush(false); // no output: the writer empties it itself
+        assert_eq!(ring.len(), 0);
+        ring.push(&[2.0; 1000]);
+        let reader = {
+            let ring = ring.clone();
+            std::thread::spawn(move || {
+                for _ in 0..500 {
+                    ring.take_flush();
+                    std::thread::sleep(Duration::from_millis(1));
+                }
+            })
+        };
+        ring.flush(true); // returns once the reader did it
+        ring.push(&[3.0; 10]);
+        assert_eq!(ring.len(), 10);
+        assert_eq!(ring.pop(), Some(3.0));
+        reader.join().unwrap();
+        assert_eq!(ring.len(), 9); // the reader's later checks don't flush again
+    }
 
     /// A sine wave as a 16-bit WAV file.
     fn wav(path: &Path, rate: u32, channels: u16, secs: f64) {

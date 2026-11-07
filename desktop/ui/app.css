@@ -649,7 +649,8 @@ body[data-space='music'] .lib-filters { display: none; }
 .lib-row .c-lead { display: flex; align-items: center; gap: var(--sp-6); }
 /* selecting is right in the list (the user, 2026-11-07): each row's tick shows on hover, the
    head's ticks them all; while selecting they stay */
-.lib-row .sel-mark { position: static; display: inline-grid; visibility: hidden; }
+.lib-row .sel-mark { position: static; display: inline-grid; place-items: center; visibility: hidden;
+  min-width: var(--hit-min); min-height: var(--hit-min); }  /* the box looks 20 px; it clicks at 24 (C105) */
 .lib-row:hover .sel-mark, #lib-grid:hover > .lib-row-head .sel-mark, body.selecting .lib-row .sel-mark { visibility: visible; pointer-events: auto; cursor: pointer; }
 .lib-row .fav-mark { position: static; padding: 0; background: none; backdrop-filter: none; font-size: var(--fs-14); }
 /* the row's ♥: filled when a favourite, an outline on hover, clickable (0.13 review) */
@@ -1147,3 +1148,6 @@ body.list-empty #lib-grid > .lib-row-head { display: none; }
 body.compact #lib-grid .lib-row:not(.lib-row-head) { padding-block: var(--sp-2); }
 body.compact #lib-grid .lib-row .c-title small { display: none; }
 body.compact #lib-grid .lib-row .c-cover { width: 1.6rem; }
+
+/* a question can carry a list under its text (the backup preview names folders, follows, presets) */
+#ask-text { white-space: pre-line; }

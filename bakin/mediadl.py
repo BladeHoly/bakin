@@ -33,6 +33,7 @@ from typing import Callable
 
 from . import tools
 from .paths import app_dir, is_inside
+from .redact import redact
 
 CREATE_NO_WINDOW = 0x08000000
 ARCHIVE = "archive.txt"
@@ -164,6 +165,11 @@ def clean_preset(p: dict) -> dict:
     out["section"] = parse_section(str(out["section"]))
     out["split_chapters"] = bool(out["split_chapters"])
     out["template"] = str(out["template"]).strip() or TEMPLATES["artist"]
+    # subfolders are fine («%(uploader)s/%(title)s»), climbing out or a drive is not: the files
+    # land where the preset's folder says, never elsewhere (security review 2026-11-07)
+    parts = re.split(r"[\\/]+", out["template"])
+    if ".." in parts or re.match(r"^([A-Za-z]:|[\\/])", out["template"]):
+        out["template"] = TEMPLATES["artist"]
     if "%(ext)s" not in out["template"]:
         out["template"] += ".%(ext)s"
     out["folder"] = str(out["folder"]).strip() or "Música"
@@ -651,12 +657,12 @@ class Runner:
         elif line.startswith("ERROR:"):
             msg = line[6:].strip()
             seen["errors"].append(msg)
-            self.emit({"kind": "error", "message": friendly_error(msg)})
+            self.emit({"kind": "error", "message": redact(friendly_error(msg))})
         elif self.verbose or line.startswith("WARNING:"):
             if COOKIES_EXPIRED.search(line):
                 seen["cookies_expired"] = True
             if self.verbose or not re.search(r"Falling back|has already been|sleeping", line, re.I):
-                self.emit({"kind": "media_raw", "message": line})
+                self.emit({"kind": "media_raw", "message": redact(line)})  # signed URLs, cookie names
 
 
 def _cookies_failed(seen: dict) -> bool:

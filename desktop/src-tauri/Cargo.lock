@@ -330,7 +330,7 @@ dependencies = [
 
 [[package]]
 name = "bakin-desktop"
-version = "0.13.2"
+version = "0.24.0"
 dependencies = [
  "audioadapter-buffers",
  "axum",

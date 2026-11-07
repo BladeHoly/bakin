@@ -1,6 +1,6 @@
 [package]
 name = "bakin-desktop"
-version = "0.13.2"
+version = "0.24.0"
 description = "Bakin desktop shell (Tauri)"
 license = "MIT"
 edition = "2021"

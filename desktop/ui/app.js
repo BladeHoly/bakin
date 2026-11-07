@@ -234,7 +234,16 @@ function wireBackdrop() {
     if (!p.ok) { toast(tr(p.error), { duration: 7000 }); return; }
     const when = p.manifest?.created ? new Date(p.manifest.created).toLocaleDateString(LOCALE) : '';
     const what = (p.lines || []).join(', ') || tr('nada para sumar');
-    if (!(await ask(tr('¿Importar esta copia?'), tr('Copia del {when} (Bakin {x}): {what}. Se combina con lo que ya tienes; no se borra nada. Antes se guarda una copia de lo de hoy.', { when, x: p.manifest?.bakin_version || '', what }), tr('Importar')))) return;
+    // what acts on its own, by name: a copy from someone else can't slip a folder or a follow in
+    const few = (xs) => xs.slice(0, 8).join('; ') + (xs.length > 8 ? '…' : '');
+    const rv = p.review || {};
+    const named = [
+      rv.folders?.length && tr('Carpetas que se suman a la biblioteca: {list}', { list: few(rv.folders) }),
+      rv.follows?.length && tr('Seguidos que bajan solos: {list}', { list: few(rv.follows) }),
+      rv.presets?.length && tr('Presets (sin cookies): {list}', { list: few(rv.presets) }),
+    ].filter(Boolean);
+    const intro = tr('Copia del {when} (Bakin {x}): {what}. Se combina con lo que ya tienes; no se borra nada. Antes se guarda una copia de lo de hoy.', { when, x: p.manifest?.bakin_version || '', what });
+    if (!(await ask(tr('¿Importar esta copia?'), [intro, ...named].join('\n\n'), tr('Importar')))) return;
     const r = await call('backup_import', { path: f }).catch((e) => ({ ok: false, error: String(e) }));
     if (!r.ok) { toast(tr(r.error), { duration: 7000 }); return; }
     const skipped = r.collections_skipped?.length ? tr(' Carpetas que no están en esta PC: {collections_skipped}.', { collections_skipped: r.collections_skipped.join(', ') }) : '';
@@ -4071,7 +4080,7 @@ function frameLayout() {
   Object.assign(box.style, { width: `${w}px`, height: `${h}px`, left: `${(W - w) * FR.fx}px`, top: `${(H - h) * FR.fy}px` });
   // only the side that is cut moves
   box.dataset.axis = W - w > 1 ? 'x' : H - h > 1 ? 'y' : '';
-  $('frame-hint').textContent = box.dataset.axis ? tr('Arrastrá el recuadro: es lo que va a verse en ese monitor.') : tr('La foto ya tiene la forma de ese monitor: se ve entera.');
+  $('frame-hint').textContent = box.dataset.axis ? tr('Arrastra el recuadro: es lo que va a verse en ese monitor.') : tr('La foto ya tiene la forma de ese monitor: se ve entera.');
 }
 
 function wireFrame() {
@@ -4175,7 +4184,7 @@ async function whSearch(more = false) {
     $('wh-grid').append(...res.items.map(whTile));
     $('wh-status').textContent = res.total
       ? tr('{total} fondos. Toca los que quieras bajar.', { total: res.total.toLocaleString(LOCALE) })
-      : tr('No hay fondos con esos filtros. Probá con otros tags o «Cualquier pantalla».');
+      : tr('No hay fondos con esos filtros. Prueba con otros tags o «Cualquier pantalla».');
     $('wh-more').hidden = WH.page >= WH.last;
   } catch (err) {
     $('wh-status').textContent = String(err);
@@ -4926,9 +4935,18 @@ async function loadCatalogThumbs() {
   for (const i of imgs) if (r?.thumbs?.[i.dataset.thumb]) { i.src = r.thumbs[i.dataset.thumb]; i.dataset.loaded = ''; }
 }
 
+// With a daily limit, how many are left today, next to «Bajar (N)» (pulido P2 #12: it used to
+// show only once the queue paused); '' without a limit or with nothing picked
+function todayLeft(n) {
+  const st = queueState;
+  if (!n || !st.daily_limit) return '';
+  const left = Math.max(0, st.daily_limit - (st.downloads_today || 0));
+  return n > left ? tr('hoy quedan {left}: el resto sigue mañana', { left }) : tr('hoy quedan {left}', { left });
+}
+
 function syncCatalog() {
   const n = CAT.picked.size;
-  $('cat-picked').textContent = n ? tn('{n} elegido', '{n} elegidos', n) : '';
+  $('cat-picked').textContent = [n ? tn('{n} elegido', '{n} elegidos', n) : '', todayLeft(n)].filter(Boolean).join(' · ');
   $('cat-download').disabled = !n;
   $('cat-download').textContent = n ? tr('Bajar ({n})', { n }) : tr('Bajar');
 }
@@ -5063,7 +5081,7 @@ function onSpotify(ev) {
 
 function syncSpotify() {
   const n = SP.rows.filter((r) => r.check?.checked && r.pick).length;
-  $('sp-count').textContent = tr('{n} de {rows} para bajar', { n, rows: SP.rows.length });
+  $('sp-count').textContent = [tr('{n} de {rows} para bajar', { n, rows: SP.rows.length }), todayLeft(n)].filter(Boolean).join(' · ');
   $('sp-download').disabled = !n;
   $('sp-download').textContent = n ? tr('Bajar ({n})', { n }) : tr('Bajar');
 }
@@ -5736,7 +5754,7 @@ async function renderHotkeys() {
 
 async function recordHotkey(key, h) {
   await tauri.core.invoke('hotkeys_pause', { paused: true }).catch(() => {});
-  key.textContent = tr('Apretá la combinación…');
+  key.textContent = tr('Presiona la combinación…');
   key.setAttribute('aria-pressed', 'true');
   const done = async (combo) => {
     removeEventListener('keydown', onKey, true);

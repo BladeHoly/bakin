@@ -350,8 +350,15 @@ def inspect(zip_path: Path) -> dict:
              _plural(counts["presets"], "preset", "presets"),
              _plural(counts["follows"], "seguimiento", "seguimientos"),
              _plural(counts["lyrics"], "letra", "letras")]
+    # what it would add that does something on its own, by name, for the preview: folders shown
+    # in the library (and to paired phones), follows that download, presets and where they save
+    folders = [f for f in b.dict("library-folders.json").get("folders") or [] if isinstance(f, str)]
+    follows = [str(f.get("label") or f.get("url")) for f in b.follows()]
+    presets = [f'{p.get("name") or p.get("id")} → {p.get("folder") or "Música"}'
+               for p in b.presets() if isinstance(p, dict)]
+    review = {"folders": folders, "follows": follows, "presets": presets}
     m = b.manifest
-    return {"manifest": {"bakin_version": str(m.get("bakin_version") or ""), "schema": m.get("schema"),
+    return {"review": review, "manifest": {"bakin_version": str(m.get("bakin_version") or ""), "schema": m.get("schema"),
                          "id": str(m.get("id") or ""), "created": str(m.get("created") or ""),
                          "files": [str(x) for x in m.get("files") or []],
                          "collections": {str(k): str(v) for k, v in (m.get("collections") or {}).items()}},
@@ -492,6 +499,11 @@ def _merge_music(b: _Backup, out: dict, count_plays: bool) -> None:
             out["lyrics"] += 1
 
 
+# Settings a backup never turns on here: they open the home server, send things to a service, or
+# move where downloads go; the user turns them on by hand (security review 2026-11-07)
+NEVER_IMPORTED = {"lan_enabled", "lan_port", "out_dir", "musicbrainz", "lyrics_online"}
+
+
 def _merge_settings(b: _Backup, out: dict) -> None:
     base = app_dir()
     # the shortcuts and the mini's layout ride along (pulido P2 #21); like the rest, what this
@@ -504,10 +516,8 @@ def _merge_settings(b: _Backup, out: dict) -> None:
         cur = cur if isinstance(cur, dict) else {}
         add = {}
         for k, v in new.items():
-            if k in cur:
+            if k in cur or (name == "ui-settings.json" and k in NEVER_IMPORTED):
                 continue
-            if k == "out_dir" and not (isinstance(v, str) and Path(v).is_dir()):
-                continue  # a folder of the other PC
             add[k] = v
         if add:
             _atomic_json(base / name, {**cur, **add})
@@ -526,8 +536,13 @@ def _merge_settings(b: _Backup, out: dict) -> None:
             if p["id"] in have:
                 continue
             p["cookies_file"] = ""
-            if p["cookies_source"] in ("file", "vault"):  # nothing to log in with here
-                p["cookies_source"], p["cookies_mode"] = "browser", "off"
+            # a preset from elsewhere never reads this PC's browser or vault on its own: cookies
+            # are turned on by hand, preset by preset
+            p["cookies_mode"] = "off"
+            if p["cookies_source"] in ("file", "vault"):
+                p["cookies_source"] = "browser"
+            if Path(p["folder"]).is_absolute() and not Path(p["folder"]).is_dir():
+                p["folder"] = "Música"  # a folder of the other PC
             ms["presets"].append(p)
             have.add(p["id"])
             out["presets"] += 1

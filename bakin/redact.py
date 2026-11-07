@@ -7,9 +7,12 @@ import re
 import threading
 
 SENSITIVE_NAMES = (
-    "sessionid", "ds_user_id", "csrftoken", "mid", "ig_did", "datr", "rur",
-    "shbid", "shbts", "fb_dtsg", "lsd", "x-csrftoken", "x-fb-lsd",
-    "x-ig-www-claim", "authorization", "password", "apikey", "x-api-key",
+    # YouTube / Google sessions (the cookies Bakin keeps in the vault)
+    "SID", "HSID", "SSID", "APISID", "SAPISID", "__Secure-1PSID", "__Secure-3PSID",
+    "__Secure-1PAPISID", "__Secure-3PAPISID", "__Secure-1PSIDTS", "__Secure-3PSIDTS",
+    "__Secure-1PSIDCC", "__Secure-3PSIDCC", "SIDCC", "LOGIN_INFO", "po_token",
+    # generic
+    "sessionid", "csrftoken", "authorization", "password", "apikey", "x-api-key",
 )
 
 _NAME_ALT = "|".join(re.escape(n) for n in SENSITIVE_NAMES)

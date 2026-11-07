@@ -1136,6 +1136,11 @@ await check('buscar música: el catálogo de YouTube Music (C90)', async () => {
     const box = document.querySelector('#cat-songs input');
     box.checked = true; box.dispatchEvent(new Event('change')); await wait(100);
     out.button = document.getElementById('cat-download').textContent;
+    // pulido P2 #12: with a daily limit, what's left today shows next to «Bajar (N)»
+    await window.__TAURI__.core.invoke('engine_call', { method: 'media_set_option', params: { key: 'daily_limit', value: 40 } }); await wait(800);
+    box.checked = false; box.dispatchEvent(new Event('change')); box.checked = true; box.dispatchEvent(new Event('change')); await wait(100);
+    out.left = document.getElementById('cat-picked').textContent;
+    await window.__TAURI__.core.invoke('engine_call', { method: 'media_set_option', params: { key: 'daily_limit', value: 0 } }); await wait(800);
     document.querySelector('#cat-kind button[value=albums]').click(); await wait(1500);
     document.querySelector('#cat-tiles .cat-tile')?.click(); await wait(1500);
     out.album = document.getElementById('cat-page-title').textContent;
@@ -1147,6 +1152,7 @@ await check('buscar música: el catálogo de YouTube Music (C90)', async () => {
   if (!r.shown) return 'el panel «Descargar» no abre en «Buscar música»';
   if (r.songs.join() !== 'Tema de prueba,Otro tema' || r.button !== 'Bajar (1)') return `búsqueda: ${JSON.stringify(r)}`;
   if (r.album !== 'Disco de prueba' || r.tracks !== 2 || !r.all) return `álbum: ${JSON.stringify(r)}`;
+  if (!/quedan \d+/.test(r.left || '')) return `con un límite diario no dice cuántas quedan hoy: «${r.left}»`;
   return '';
 });
 
@@ -1334,7 +1340,7 @@ await check('en tu casa: servidor Subsonic, página del celular (C100, C101, R31
   try {
     if (!st.running || st.error) return `no prendió: ${JSON.stringify({ ...st, code: st.code ? '…' : '', qr_svg: '' })}`;
     if (st.addresses.some((a) => !a.startsWith('127.0.0.1:'))) return `la copia de prueba escucha fuera de esta PC: ${st.addresses}`;
-    if (!/^[A-Z2-9]{4}-[A-Z2-9]{4}$/.test(st.code)) return 'el código no tiene la forma esperada';
+    if (!/^[A-Z2-9]{4}-[A-Z2-9]{4}-[A-Z2-9]{4}$/.test(st.code)) return 'el código no tiene la forma esperada (12 caracteres, C114)';
     const base = `http://127.0.0.1:${port}`;
     const ping = await (await fetch(`${base}/rest/ping?u=bakin&p=${encodeURIComponent(st.code)}&v=1.16.1&c=smoke&f=json`)).json();
     if (ping['subsonic-response']?.status !== 'ok') return `ping: ${JSON.stringify(ping)}`;

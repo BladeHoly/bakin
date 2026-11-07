@@ -77,8 +77,7 @@ pub trait Library: Send + Sync + 'static {
     fn cover(&self, song_id: &str, size: u32) -> Option<Vec<u8>>;
     /// The song's lyrics as LRC text (synced or plain).
     fn lyrics(&self, song_id: &str) -> Option<String>;
-    /// «Mandar a Bakin» from the phone (PLAN 0.21.3): a link for the PC's download hub, where
-    /// the user still confirms it.
+    /// «Mandar a Bakin» from the phone (PLAN 0.21.3): queued on the PC with the default preset.
     fn link(&self, _url: &str) -> Result<(), String> {
         Err("not supported".into())
     }

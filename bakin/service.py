@@ -1273,10 +1273,14 @@ class Service:
         from . import vault
         raw = None if new else vault.get(self.LAN_CODE)
         code = raw.decode("ascii", "replace") if raw else ""
-        if len(code) != 9:
-            code = "".join(secrets.choice(self._CODE_CHARS) for _ in range(8))
-            code = f"{code[:4]}-{code[4:]}"
+        # 12 characters (≈ 2^59): the home network is plain HTTP, so a captured Subsonic token can be
+        # tried offline; 8 (an earlier code) fell in minutes on a GPU, so one is replaced
+        if len(code) != 14:
+            code = "".join(secrets.choice(self._CODE_CHARS) for _ in range(12))
+            code = f"{code[:4]}-{code[4:8]}-{code[8:]}"
             vault.put(self.LAN_CODE, code.encode("ascii"))
+        from . import redact
+        redact.register_secret(code)  # never in a log, whatever prints it
         return {"code": code}
 
     def lan_library(self) -> dict:
@@ -1320,6 +1324,14 @@ class Service:
         from . import lyrics
         it = self._songs_by_id([id]).get(str(id))
         return {"text": (lyrics.find(Path(it["path"])) or "") if it else ""}
+
+    def lan_download(self, url: str) -> dict:
+        """«Mandar a Bakin» from the phone: straight to the queue, with that site's preset or the
+        default one, like «Bajar» on the PC (the user's call, 2026-11-07: no confirming there)."""
+        url = str(url or "").strip()
+        if not _is_web_url(url):
+            return {"ok": False, "error": "Eso no es un enlace."}
+        return self.start("download", url, {})
 
     def music_cover(self, item_id: str, size: int = 320) -> dict:
         from . import library
@@ -1456,7 +1468,7 @@ class Service:
                             self._mb_covers[hit["release_mbid"]] = img
                     cover = bool(hit and self._mb_covers.get(hit.get("release_mbid") or ""))
                 except musicbrainz.Busy:
-                    note = "MusicBrainz pidió esperar: probá de nuevo en un minuto."
+                    note = "MusicBrainz pidió esperar: prueba de nuevo en un minuto."
                     break
                 except musicbrainz.MBError as exc:
                     self._push({"kind": "mb_result", "id": it["id"], "index": n, "count": len(songs), "error": str(exc)})
@@ -1669,7 +1681,7 @@ class Service:
                 try:
                     cards = ytmusic.search(matching.query(t), "songs", hourly * 3 if hourly else 0)
                 except ytmusic.Busy as exc:
-                    note = f"{exc} Lo encontrado hasta acá se puede bajar igual."
+                    note = f"{exc} Lo encontrado hasta aquí se puede bajar igual."
                     break
                 except ytmusic.CatalogError as exc:
                     self._push({"kind": "sp_track", "index": n, "error": str(exc)})
@@ -3008,6 +3020,8 @@ class Service:
         else:
             return {"ok": False, "error": "opción inválida"}
         mediadl.save_settings(ms)
+        if key == "daily_limit":
+            self._push_queue()  # «hoy quedan N» next to «Bajar» follows the new limit at once
         return {"ok": True}
 
     def media_import_presets(self, path: str) -> dict:

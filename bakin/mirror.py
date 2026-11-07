@@ -95,12 +95,12 @@ def _check_folder(folder: Path, songs: list[dict], forbidden: list[Path]) -> Non
     for root in forbidden:
         root = Path(root)
         if is_inside(folder, root):
-            raise MirrorError("Esa carpeta está dentro de la biblioteca de música; elegí otra.")
+            raise MirrorError("Esa carpeta está dentro de la biblioteca de música; elige otra.")
         if is_inside(root, folder):
-            raise MirrorError("Esa carpeta contiene la biblioteca de música; elegí otra.")
+            raise MirrorError("Esa carpeta contiene la biblioteca de música; elige otra.")
     for s in songs:
         if is_inside(Path(s["path"]), folder):
-            raise MirrorError("Esa carpeta contiene canciones de la lista; elegí otra.")
+            raise MirrorError("Esa carpeta contiene canciones de la lista; elige otra.")
 
 
 def _src_stat(song: dict) -> tuple[int, float] | None:
@@ -144,7 +144,7 @@ def plan(songs: list[dict], folder: Path, mode: str = "copy", forbidden: list[Pa
     adopted: list[str] = []
     if man is None:
         if present and not adopt:
-            raise MirrorError("La carpeta no está vacía. Elegí una vacía, o usala igual: "
+            raise MirrorError("La carpeta no está vacía. Elige una vacía, o úsala igual: "
                               "lo que ya tiene no se va a tocar nunca.")
         adopted = sorted(present.values())
         man = {"files": {}, "adopted": adopted, "removals": 0, "m3u8": PLAYLIST}

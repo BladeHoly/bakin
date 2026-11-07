@@ -134,3 +134,39 @@ def test_lang_setting():
     assert service.DEFAULT_SETTINGS["lang"] == "es"  # Spanish unless chosen (an English Windows too)
     check = service.Service.SETTABLE["lang"]
     assert [check(v) for v in ("es", "en", "auto", "fr", None)] == ["es", "en", "auto", "es", "es"]
+
+
+# Imperatives and verbs in «vos» (pulido 2026-11-07, R35: the interface talks in «tú»).
+_VOSEO_WORDS = {
+    "arrastrá", "usá", "apretá", "probá", "tocá", "pegá", "elegí", "mirá", "abrí", "poné", "hacé",
+    "escribí", "volvé", "esperá", "conectá", "instalá", "cerrá", "buscá", "agregá", "activá",
+    "revisá", "copiá", "guardá", "dejá", "importá", "cambiá", "intentá", "tenés", "querés",
+    "podés", "necesitás", "acá", "fijate", "usala", "usalo", "elegila", "probalo",
+}
+
+
+def test_texts_speak_in_tu_not_vos():
+    files = JS + HTML + [ROOT / "desktop" / "src-tauri" / "pwa" / "index.html",
+                         *sorted((ROOT / "desktop" / "src-tauri" / "src").glob("*.rs")),
+                         *sorted((ROOT / "bakin").glob("*.py"))]
+    found = []
+    for f in files:
+        for n, line in enumerate(f.read_text(encoding="utf-8").splitlines(), 1):
+            for w in re.findall(r"[A-Za-záéíóúñ]+", line):
+                if w.lower() in _VOSEO_WORDS:
+                    found.append(f"{f.relative_to(ROOT)}:{n}: {w}")
+    assert not found, "voseo in the interface:\n" + "\n".join(found)
+
+
+def test_page_scripts_parse():
+    # a stray newline inside a string literal broke the whole page once (2026-11-07): caught here
+    # in a second instead of by 61 smoke failures
+    import shutil
+    import subprocess
+    node = shutil.which("node")
+    if not node:
+        import pytest
+        pytest.skip("node not installed")
+    for f in JS + [UI / "i18n" / "en.js"]:
+        r = subprocess.run([node, "--check", str(f)], capture_output=True, text=True)
+        assert r.returncode == 0, f"{f.name}: {r.stderr.strip()[:400]}"
