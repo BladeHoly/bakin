@@ -24,6 +24,25 @@ use windows::Win32::UI::WindowsAndMessaging::{
 
 use crate::player::Player;
 
+/// Stopped with no song, else playing or paused as the player says (paused when it doesn't).
+fn status_of(state: &Value) -> MediaPlaybackStatus {
+    match (state.get("track").is_some_and(|t| !t.is_null()), state.get("playing").and_then(|p| p.as_bool())) {
+        (false, _) => MediaPlaybackStatus::Stopped,
+        (true, Some(true)) => MediaPlaybackStatus::Playing,
+        _ => MediaPlaybackStatus::Paused,
+    }
+}
+
+fn track_text(track: &Value, key: &str) -> String {
+    track.get(key).and_then(|v| v.as_str()).unwrap_or("").to_string()
+}
+
+/// The song's title, or its file name when it has none.
+fn title_of(track: &Value) -> String {
+    let title = track_text(track, "title");
+    if title.is_empty() { track_text(track, "name") } else { title }
+}
+
 pub struct Smtc {
     controls: SystemMediaTransportControls,
     shown: Mutex<String>, // id of the song on display
@@ -95,12 +114,7 @@ impl Smtc {
 
     /// Shows the player's state (a "state" event).
     pub fn update(&self, app: &AppHandle, state: &Value) {
-        let status = match (state.get("track").is_some_and(|t| !t.is_null()), state.get("playing").and_then(|p| p.as_bool())) {
-            (false, _) => MediaPlaybackStatus::Stopped,
-            (true, Some(true)) => MediaPlaybackStatus::Playing,
-            _ => MediaPlaybackStatus::Paused,
-        };
-        let _ = self.controls.SetPlaybackStatus(status);
+        let _ = self.controls.SetPlaybackStatus(status_of(state));
         let Some(track) = state.get("track").filter(|t| !t.is_null()) else { return };
         let id = track.get("id").and_then(|v| v.as_str()).unwrap_or("").to_string();
         {
@@ -110,8 +124,8 @@ impl Smtc {
             }
             *shown = id.clone();
         }
-        let text = |k: &str| track.get(k).and_then(|v| v.as_str()).unwrap_or("").to_string();
-        let title = if text("title").is_empty() { text("name") } else { text("title") };
+        let text = |k: &str| track_text(track, k);
+        let title = title_of(track);
         if let Ok(updater) = self.controls.DisplayUpdater() {
             let _ = updater.SetType(MediaPlaybackType::Music);
             if let Ok(props) = updater.MusicProperties() {
@@ -144,5 +158,27 @@ impl Smtc {
         let updater = self.controls.DisplayUpdater()?;
         updater.SetThumbnail(&RandomAccessStreamReference::CreateFromStream(&stream)?)?;
         updater.Update()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn what_windows_shows() {
+        assert_eq!(status_of(&json!({})), MediaPlaybackStatus::Stopped);
+        assert_eq!(status_of(&json!({"track": null, "playing": true})), MediaPlaybackStatus::Stopped);
+        assert_eq!(status_of(&json!({"track": {"id": "a"}, "playing": true})), MediaPlaybackStatus::Playing);
+        assert_eq!(status_of(&json!({"track": {"id": "a"}, "playing": false})), MediaPlaybackStatus::Paused);
+        assert_eq!(status_of(&json!({"track": {"id": "a"}})), MediaPlaybackStatus::Paused);
+    }
+
+    #[test]
+    fn a_song_without_a_title_shows_its_name() {
+        assert_eq!(title_of(&json!({"title": "Tema", "name": "tema.opus"})), "Tema");
+        assert_eq!(title_of(&json!({"title": "", "name": "tema.opus"})), "tema.opus");
+        assert_eq!(title_of(&json!({"title": 3})), "");
+        assert_eq!(track_text(&json!({"artist": "X"}), "album"), "");
     }
 }

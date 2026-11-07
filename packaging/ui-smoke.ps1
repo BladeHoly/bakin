@@ -6,6 +6,10 @@
 # The copy cannot touch the installed Bakin: its own identifier (so it is not
 # "the running Bakin" for the single-instance check), no bakin:// registration,
 # and its own data folder (BAKIN_HOME) and WebView2 profile, deleted afterwards.
+#
+#   -Only <regex>   run only the checks whose name matches (an area, e.g. 'C9|C10|bandeja'
+#                   or 'Configuración'); the build and the seeding still happen (PLAN 0.23.3)
+param([string]$Only = '')
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
 $py = Join-Path $root '.venv\Scripts\python.exe'
@@ -24,7 +28,7 @@ New-Item -ItemType Directory -Force $musicDl | Out-Null
 # a followed list whose last check brought 2, had 1 and failed 1 (C97); checked just now, so the
 # scheduler leaves it alone (no network)
 & $py -c "import json, sys, time; t = time.time(); json.dump({'_v': 1, 'follows': [{'id': 'smoke1', 'kind': 'media', 'url': 'https://www.youtube.com/playlist?list=PLsmoke', 'title': 'Lista seguida de prueba', 'preset': 'bimusic', 'every_hours': 168, 'last_check': t, 'enabled': True, 'history': [{'at': t - 60, 'outcome': 'ok', 'new': 2, 'skipped': 1, 'failed': ['El video es privado.']}]}]}, open(sys.argv[1], 'w', encoding='utf-8'))" (Join-Path $home_ 'follows.json')
-& $py -c "import sys; from PIL import Image; Image.new('RGB', (40, 40), (200, 40, 40)).save(sys.argv[1] + '/Tema que baja.webp'); open(sys.argv[1] + '/Tema que baja.f251.webm.part', 'wb').write(b'0' * 100)" $musicDl
+& $py -c "import sys; from PIL import Image; Image.new('RGB', (40, 40), (200, 40, 40)).save(sys.argv[1] + '/Tema que baja.webp'); Image.new('RGB', (64, 36), (40, 200, 40)).save(sys.argv[1] + '/Portada huerfana [dQw4w9WgXcQ].webp'); open(sys.argv[1] + '/Tema que baja.f251.webm.part', 'wb').write(b'0' * 100)" $musicDl
 
 # 300 small images for the library
 & $py -c "import sys; from PIL import Image; [Image.new('RGB', (64, 80), ((i * 7) % 255, (i * 13) % 255, (i * 29) % 255)).save(f'{sys.argv[1]}/foto-{i:03d}.png') for i in range(300)]" $seed
@@ -99,6 +103,7 @@ try {
     $proc = Start-Process (Join-Path $root 'desktop\src-tauri\target\debug\bakin-desktop.exe') -PassThru `
         -RedirectStandardOutput (Join-Path $work 'app-out.txt') -RedirectStandardError (Join-Path $work 'app-err.txt')
     $env:BAKIN_SMOKE_SONGS = $songs
+    if ($Only) { $env:SMOKE_ONLY = $Only }
     node (Join-Path $PSScriptRoot 'ui-smoke.mjs') $port $seed (Join-Path $root 'desktop\src-tauri\target\debug\bakin-desktop.exe') 120 $long $home_ (Join-Path $work 'wv2') $many
     $code = $LASTEXITCODE
     if ($code) {
@@ -113,7 +118,7 @@ try {
         if ($proc.HasExited) { Write-Host "--- Bakin se cerró con código $($proc.ExitCode)" }
     }
 } finally {
-    Remove-Item Env:BAKIN_HOME, Env:BAKIN_MUTE, Env:BAKIN_LAN_LOOPBACK, Env:BAKIN_SMOKE_SONGS, Env:BAKIN_FAKE_ANALYZE, Env:BAKIN_FAKE_YTMUSIC, Env:BAKIN_FAKE_SPOTIFY, Env:BAKIN_FAKE_WALLHAVEN, Env:BAKIN_DRY_WALLPAPER, Env:BAKIN_DRY_MONITORS, Env:RUST_BACKTRACE, Env:WEBVIEW2_USER_DATA_FOLDER -ErrorAction SilentlyContinue
+    Remove-Item Env:SMOKE_ONLY, Env:BAKIN_HOME, Env:BAKIN_MUTE, Env:BAKIN_LAN_LOOPBACK, Env:BAKIN_SMOKE_SONGS, Env:BAKIN_FAKE_ANALYZE, Env:BAKIN_FAKE_YTMUSIC, Env:BAKIN_FAKE_SPOTIFY, Env:BAKIN_FAKE_WALLHAVEN, Env:BAKIN_DRY_WALLPAPER, Env:BAKIN_DRY_MONITORS, Env:RUST_BACKTRACE, Env:WEBVIEW2_USER_DATA_FOLDER -ErrorAction SilentlyContinue
     if ($proc) { Stop-Process -Id $proc.Id -ErrorAction SilentlyContinue }
     Start-Sleep 3
     Remove-Item -Recurse -Force $work -ErrorAction SilentlyContinue

@@ -1,0 +1,33 @@
+{
+  "total": 85,
+  "modules": {
+    "bakin/__init__.py": 100,
+    "bakin/audiotags.py": 90,
+    "bakin/backup.py": 90,
+    "bakin/convert.py": 85,
+    "bakin/credstore.py": 25,
+    "bakin/dupes.py": 95,
+    "bakin/imageinfo.py": 90,
+    "bakin/library.py": 90,
+    "bakin/loudness.py": 95,
+    "bakin/lyrics.py": 90,
+    "bakin/matching.py": 95,
+    "bakin/mediadl.py": 80,
+    "bakin/migrate.py": 85,
+    "bakin/mirror.py": 90,
+    "bakin/music.py": 95,
+    "bakin/musicbrainz.py": 90,
+    "bakin/paths.py": 85,
+    "bakin/redact.py": 95,
+    "bakin/relocate.py": 90,
+    "bakin/service.py": 75,
+    "bakin/sidecar.py": 75,
+    "bakin/spotify.py": 95,
+    "bakin/tagclean.py": 95,
+    "bakin/tagfix.py": 100,
+    "bakin/tools.py": 95,
+    "bakin/vault.py": 90,
+    "bakin/wallhaven.py": 85,
+    "bakin/ytmusic.py": 85
+  }
+}

@@ -199,10 +199,13 @@ def scan(col: Collection) -> list[dict]:
     changed = False
     for base, dirs, names in os.walk(col.root):
         dirs[:] = [d for d in dirs if d.lower() not in SKIP_DIRS and not d.startswith(".")]
-        covers = _cover_stems(names) if col.kind == "media" else set()
+        # in one of Bakin's music or video folders every picture is a cover (yt-dlp's, kept while a
+        # song downloads, or left behind when it was renamed, cancelled or failed), never a photo:
+        # one stayed in Imágenes for good (2026-11-07). Wallhaven's folder has no songs: shown.
+        covers_only = col.kind == "media" and _has_media(names)
         for name in names:
-            if covers and Path(name).suffix[1:].lower() in IMAGE and Path(name).stem.lower() in covers:
-                continue  # a song's or video's cover, not a photo (yt-dlp keeps it there while it downloads)
+            if covers_only and Path(name).suffix[1:].lower() in IMAGE:
+                continue
             if name.lower() in SKIP_FILES or name.startswith(".") or name.lower().endswith(SKIP_SUFFIXES) \
                     or ".part-frag" in name or re.search(r"\.f\d+\.\w+$", name):
                 continue
@@ -241,21 +244,14 @@ def scan(col: Collection) -> list[dict]:
     return items
 
 
-def _cover_stems(names: list[str]) -> set[str]:
-    """In a music or video folder, the names an image would have if it were the cover of one
-    of its songs or videos, finished or still downloading («Tema.opus», «Tema.webm.part»,
-    «Tema.f251.webm.part»): yt-dlp writes «Tema.webp» next to it and embeds it at the end."""
-    stems: set[str] = set()
+def _has_media(names: list[str]) -> bool:
+    """A folder with songs or videos in it, finished or still downloading («Tema.opus»,
+    «Tema.webm.part», «Tema.f251.webm.part»)."""
     for name in names:
-        parts = name.lower().split(".")
-        if len(parts) < 2:
-            continue
-        exts = parts[1:]
-        if not any(e in AUDIO or e in VIDEO or e in ("part", "ytdl", "temp", "tmp") for e in exts):
-            continue
-        for i in range(1, len(parts)):  # every prefix: «tema.webm», «tema»
-            stems.add(".".join(parts[:i]))
-    return stems
+        exts = name.lower().split(".")[1:]
+        if any(e in AUDIO or e in VIDEO or e in ("part", "ytdl") for e in exts):
+            return True
+    return False
 
 
 def query(items: list[dict], f: dict) -> list[dict]:
@@ -306,14 +302,19 @@ def query(items: list[dict], f: dict) -> list[dict]:
         out.sort(key=lambda i: i["name"].lower())
     elif sort == "size":
         out.sort(key=lambda i: -i["size"])
-    elif sort in ("title", "artist", "album"):
-        # Empty values last; then by the rest so albums keep a stable order.
-        def key(i, k=sort):
+    elif sort.removesuffix("_desc") in ("title", "artist", "album"):
+        # Empty values last (both ways); then by the rest so albums keep a stable order.
+        k = sort.removesuffix("_desc")
+
+        def key(i):
             v = str(i.get(k) or "").casefold()
-            return (v == "", v, str(i.get("album") or "").casefold(), str(i.get("title") or i["name"]).casefold())
-        out.sort(key=key)
+            return (v, str(i.get("album") or "").casefold(), str(i.get("title") or i["name"]).casefold())
+        full = sorted((i for i in out if str(i.get(k) or "")), key=key, reverse=sort.endswith("_desc"))
+        out[:] = full + [i for i in out if not str(i.get(k) or "")]
     elif sort in ("duration", "bitrate"):
         out.sort(key=lambda i, k=sort: (i.get(k) is None, -(i.get(k) or 0)))
+    elif sort == "duration_asc":
+        out.sort(key=lambda i: (i.get("duration") is None, i.get("duration") or 0))
     elif sort == "bitrate_asc":
         out.sort(key=lambda i: (i.get("bitrate") is None, i.get("bitrate") or 0))
     else:  # newest first; carousel slides keep their order

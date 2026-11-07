@@ -1,9 +1,12 @@
 // «Modo mínimo»: a remote control for the player in the shell (player.rs),
 // in a window of its own. It keeps nothing: it asks the player for its state
 // and follows its events, like the big window does.
+//
+// 0.24 (the user's biggest complaint, docs/research/2026-11-07-pulido.md): two shapes, a bar
+// with everything in sight and the cover as a card; window options in ⋯ only; double click or
+// Esc goes back to the full window; the wheel sets the volume, said over the song for a moment.
 import { tr } from './i18n.js';  // first: translates the page before the components draw
 import { tokensToCss } from '@glass-midas/core';
-import './vendor/glass-midas/components/slider.js';
 
 document.head.insertAdjacentHTML('beforeend', `<style>${tokensToCss()}</style>`);
 
@@ -15,6 +18,7 @@ const store = {
   set: (k, v) => { try { localStorage.setItem(k, v); } catch { /* private storage off */ } },
 };
 const skipSecs = () => Number(store.get('bakin.skip', '10')) || 10;
+const expand = () => tauri.core.invoke('mini_expand');
 
 let state = {};
 let coverOf = '';
@@ -28,8 +32,6 @@ function draw(s) {
   $('m-artist').textContent = t ? [t.artist, t.album].filter(Boolean).join(' · ') : '';
   document.title = t ? `${t.title || t.name} · Bakin` : 'Bakin';
   drawTime();
-  const vol = $('m-volume');
-  if (document.activeElement !== vol && state.volume != null) { vol.value = String(Math.round(state.volume * 100)); vol.parentElement.sync?.(); }
   if (t && t.id !== coverOf) {
     coverOf = t.id;
     // from the covers the library cached: does not wake a sleeping engine
@@ -41,6 +43,7 @@ function draw(s) {
       const img = new Image();
       img.alt = '';
       img.src = cover;
+      img.setAttribute('data-tauri-drag-region', '');
       box.querySelector('svg').setAttribute('hidden', '');
       box.append(img);
     }).catch(() => {});
@@ -62,7 +65,7 @@ tauri.event.listen('player', (e) => {
 });
 
 $('m-play').addEventListener('click', () => pc({ cmd: 'toggle' }));
-// like the big player: a click jumps a few seconds, a right click changes the song
+// like the big player: a click jumps a few seconds, a right click changes the song (the user's choice)
 $('m-prev').title = tr('Clic: atrasar {secs} s · Clic derecho: tema anterior', { secs: skipSecs() });
 $('m-next').title = tr('Clic: adelantar {secs} s · Clic derecho: tema siguiente', { secs: skipSecs() });
 $('m-prev').addEventListener('click', () => pc({ cmd: 'skip_secs', secs: -skipSecs() }));
@@ -73,19 +76,22 @@ $('m-seek').addEventListener('click', (e) => {
   const r = e.currentTarget.getBoundingClientRect();
   if (state.duration) pc({ cmd: 'seek', time: (e.clientX - r.left) / r.width * state.duration });
 });
-// volume: the slider, or the wheel anywhere
+
+// volume: the wheel anywhere; «Volumen 62 %» over the song for a moment
+let volTimer = 0;
 const setVolume = (v) => {
   state.volume = Math.max(0, Math.min(1, v));
-  for (const id of ['m-volume', 'm-volume-v']) { $(id).value = String(Math.round(state.volume * 100)); $(id).parentElement.sync?.(); }
   pc({ cmd: 'set', volume: state.volume });
+  const note = $('m-volnote');
+  note.textContent = tr('Volumen {pct} %', { pct: Math.round(state.volume * 100) });
+  note.hidden = false;
+  clearTimeout(volTimer);
+  volTimer = setTimeout(() => { note.hidden = true; }, 1200);
 };
-$('m-volume').addEventListener('input', (e) => setVolume(Number(e.target.value) / 100));
-$('m-volume-v').addEventListener('input', (e) => setVolume(Number(e.target.value) / 100));
 addEventListener('wheel', (e) => setVolume((state.volume ?? 0.8) + (e.deltaY < 0 ? 0.05 : -0.05)), { passive: true });
 
-// What opens from ⋯ and 🔊 (0.13 review): vertical, in room the window makes for it (down, or up
-// near the screen's bottom edge), never over the song; it folds when the pointer leaves.
-const POP = { menu: 196, vol: 150 };
+// ⋯: the window options, a vertical menu in room the window makes for it, never over the song
+const POP = { menu: 168, ask: 128 };
 let popping = null;
 async function openPop(kind) {
   if (popping === kind) { closePop(); return; }
@@ -95,17 +101,12 @@ async function openPop(kind) {
   const where = await tauri.core.invoke('mini_popup', { extra: POP[kind] }).catch(() => 'down');
   document.body.dataset.pop = where;
   document.body.dataset.popKind = kind;
-  if (kind === 'vol') {
-    const r = $('m-vol').getBoundingClientRect();
-    $('m-volpop').style.left = `${Math.round(r.left + r.width / 2 - 20)}px`;
-    $('m-volume-v').value = String(Math.round((state.volume ?? 0.8) * 100));
-    $('m-volume-v').parentElement.sync?.();
-  }
   syncMenu();
+  $('m-menu').hidden = kind !== 'menu';
+  $('m-ask').hidden = kind !== 'ask';
   $('m-pop').hidden = false;
   $('m-more').setAttribute('aria-expanded', String(kind === 'menu'));
-  $('m-vol').setAttribute('aria-pressed', String(kind === 'vol'));
-  if (kind === 'menu') $('m-menu').querySelector('button')?.focus();
+  (kind === 'menu' ? $('m-menu').querySelector('button') : $('m-ask-yes'))?.focus();
 }
 async function closePop() {
   if (!popping) return;
@@ -114,46 +115,51 @@ async function closePop() {
   delete document.body.dataset.pop;
   delete document.body.dataset.popKind;
   $('m-more').setAttribute('aria-expanded', 'false');
-  $('m-vol').setAttribute('aria-pressed', 'false');
   await tauri.core.invoke('mini_popup', { extra: 0 }).catch(() => {});
 }
-$('m-vol').addEventListener('click', () => openPop('vol'));
+$('m-more').addEventListener('click', () => openPop('menu'));
+let leaving;
+document.addEventListener('pointerleave', () => { leaving = setTimeout(closePop, 350); });
+document.addEventListener('pointerenter', () => clearTimeout(leaving));
+
 // the card shows its controls while the pointer is on it (CSS: body.hot)
 document.addEventListener('pointerenter', () => document.body.classList.add('hot'));
 document.addEventListener('pointerleave', () => document.body.classList.remove('hot'));
 // «Atenuarse sin el mouse encima» (PLAN 0.17.4, Configuración › Música): 3 s after the pointer
 // leaves, the small window fades to 55 %; it comes back on hover
 let dimTimer = 0;
-const dimOn = () => { try { return localStorage.getItem('bakin.mini.dim') === 'on'; } catch { return false; } };
+const dimOn = () => store.get('bakin.mini.dim', '') === 'on';
 document.addEventListener('pointerleave', () => { clearTimeout(dimTimer); if (dimOn()) dimTimer = setTimeout(() => document.body.classList.add('dim'), 3000); });
 document.addEventListener('pointerenter', () => { clearTimeout(dimTimer); document.body.classList.remove('dim'); });
 if (dimOn()) dimTimer = setTimeout(() => document.body.classList.add('dim'), 3000);
-let leaving;
-document.addEventListener('pointerleave', () => { leaving = setTimeout(closePop, 350); });
-document.addEventListener('pointerenter', () => clearTimeout(leaving));
 
-// the size: a bar, a card, the song only (the shell resizes the window and remembers it)
-const LAYOUTS = { bar: tr('Barra'), card: tr('Tarjeta'), info: tr('Solo el tema') };
-const NEXT = { bar: 'card', card: 'info', info: 'bar' };
+// the shape: a bar or a card (the shell resizes the window and remembers it); the song only is
+// what the gaming mode shows, not a shape to pick
 const showLayout = (l) => {
-  if (!LAYOUTS[l]) l = 'bar';
-  document.body.dataset.layout = l;
+  document.body.dataset.layout = ['bar', 'card', 'info'].includes(l) ? l : 'bar';
   closePop();
-  $('m-size').title = tr('Tamaño: {now} · clic: {next}', { now: LAYOUTS[l].toLowerCase(), next: LAYOUTS[NEXT[l]].toLowerCase() });
 };
-$('m-size').addEventListener('click', () => tauri.core.invoke('mini_layout', { layout: NEXT[document.body.dataset.layout] || 'bar' }));
-// ⋯ (the song only): the window options, a vertical menu under it; «Cerrar» last, far from ⋯
-$('m-more').addEventListener('click', () => openPop('menu'));
 function syncMenu() {
-  const l = $('m-pin').dataset.layer || 'top';
-  $('mm-layer').querySelector('span').textContent = tr('Capa: {layer}', { layer: LAYERS[l].toLowerCase().replace(tr(' (sobre el escritorio)'), '') });
-  $('mm-size').querySelector('span').textContent = tr('Tamaño: {size}', { size: LAYOUTS[NEXT[document.body.dataset.layout] || 'bar'].toLowerCase() });
+  const top = (store.get('bakin.mini.layer', 'top')) === 'top';
+  $('mm-top').setAttribute('aria-checked', String(top));
+  $('mm-layout').querySelector('span').textContent = document.body.dataset.layout === 'card' ? tr('Ver como barra') : tr('Ver como tarjeta');
 }
-$('mm-layer').addEventListener('click', () => { $('m-pin').click(); syncMenu(); });
-$('mm-through').addEventListener('click', async () => { await closePop(); $('m-through').click(); });
-$('mm-size').addEventListener('click', async () => { await closePop(); $('m-size').click(); });
-$('mm-expand').addEventListener('click', () => tauri.core.invoke('mini_expand'));
-$('mm-close').addEventListener('click', () => tauri.window.getCurrentWindow().close());
+$('mm-top').addEventListener('click', () => { layer(store.get('bakin.mini.layer', 'top') === 'top' ? 'normal' : 'top'); syncMenu(); });
+$('mm-layout').addEventListener('click', async () => {
+  await closePop();
+  tauri.core.invoke('mini_layout', { layout: document.body.dataset.layout === 'card' ? 'bar' : 'card' });
+});
+$('mm-gaming').addEventListener('click', async () => {
+  if (store.get('bakin.mini.through-told', '') === '1') { await closePop(); tauri.core.invoke('mini_through', { on: true }); return; }
+  openPop('ask');  // the first time: how to get back, before the clicks start going through
+});
+$('m-ask-no').addEventListener('click', () => closePop());
+$('m-ask-yes').addEventListener('click', async () => {
+  store.set('bakin.mini.through-told', '1');
+  await closePop();
+  tauri.core.invoke('mini_through', { on: true });
+});
+$('mm-tray').addEventListener('click', () => tauri.window.getCurrentWindow().close());
 $('m-menu').addEventListener('keydown', (e) => {
   const items = [...$('m-menu').querySelectorAll('button')];
   const i = items.indexOf(document.activeElement);
@@ -164,7 +170,8 @@ $('m-menu').addEventListener('keydown', (e) => {
 });
 addEventListener('keydown', (e) => {
   if (e.key === ' ' && !e.target.closest('button')) { e.preventDefault(); pc({ cmd: 'toggle' }); }
-  else if (e.key === 'Escape') tauri.core.invoke('mini_expand');
+  else if (e.key === 'Escape' && !popping) expand();
+  else if (e.key === 'Escape') closePop();
 });
 addEventListener('contextmenu', (e) => e.preventDefault());
 // the browser's keys aren't Bakin's (find, print, reload…)
@@ -172,39 +179,25 @@ addEventListener('keydown', (e) => {
   if ((e.ctrlKey && !e.altKey && 'fgprsujhontel'.includes(e.key.toLowerCase()) && e.key.length === 1) || ['F3', 'F5', 'F7'].includes(e.key)) e.preventDefault();
 });
 
-// 📌 cycles the layer: above everything, a normal window, under everything (on the desktop)
-const LAYERS = { top: tr('Siempre encima'), normal: tr('Normal'), bottom: tr('Siempre debajo (sobre el escritorio)') };
+// on top of other windows, or a normal window (0.24: «under everything» is gone)
 const layer = (l) => {
-  if (!LAYERS[l]) l = 'top';
-  $('m-pin').dataset.layer = l;
-  $('m-pin').title = tr('{layer} · clic: cambiar', { layer: LAYERS[l] });
-  $('m-pin').setAttribute('aria-label', tr('Capa: {layer}', { layer: LAYERS[l].toLowerCase() }));
+  if (l !== 'normal') l = 'top';
   store.set('bakin.mini.layer', l);
   tauri.core.invoke('mini_layer', { layer: l });
 };
 layer(store.get('bakin.mini.layer', 'top'));
-$('m-pin').addEventListener('click', () => layer({ top: 'normal', normal: 'bottom', bottom: 'top' }[$('m-pin').dataset.layer]));
-// transparent to the mouse: a picture only; the tray menu (or the full window) brings the mouse back
-const through = (on) => {
-  document.body.classList.toggle('through', on);
-  $('m-through').setAttribute('aria-pressed', String(on));
-};
-$('m-through').addEventListener('click', () => {
-  if (store.get('bakin.mini.through-told', '') !== '1') {
-    store.set('bakin.mini.through-told', '1');
-    tauri.core.invoke('notify', { title: tr('Modo mínimo: transparente al mouse'),
-      body: tr('Los clics pasan a lo que está detrás. Para volver a usarlo: clic derecho en el ícono de Bakin en la bandeja › «Modo mínimo: usar el mouse».') }).catch(() => {});
-  }
-  tauri.core.invoke('mini_through', { on: true });
-});
+// the gaming mode: clicks go through, the song only; the shortcut or the tray brings the mouse back
+const through = (on) => document.body.classList.toggle('through', on);
 tauri.event.listen('mini', (e) => {
   if (e.payload?.layer) { layer(e.payload.layer); return; }  // the gaming shortcut: on top
   through(!!e.payload?.through);
   if (e.payload?.layout) showLayout(e.payload.layout);
 });
 tauri.core.invoke('mini_state').then((s) => { showLayout(s.layout); through(!!s.through); if (s.layer) layer(s.layer); }).catch(() => {});
-$('m-cover').addEventListener('click', () => tauri.core.invoke('mini_expand'));
-$('m-expand').addEventListener('click', () => tauri.core.invoke('mini_expand'));
-$('m-close').addEventListener('click', () => tauri.window.getCurrentWindow().close());
+// back to the full window: ⤢, a double click on the cover (or anywhere empty), Esc
+$('m-expand').addEventListener('click', expand);
+document.querySelector('.mini').addEventListener('dblclick', (e) => { if (!e.target.closest('button, .m-seek')) expand(); });
+// the card's size: its corner (a square, 160–400 px; the shell keeps it square and remembers it)
+$('m-grip').addEventListener('mousedown', (e) => { e.preventDefault(); tauri.window.getCurrentWindow().startResizeDragging('SouthEast'); });
 
 pc({ cmd: 'state' }).then((s) => s && draw(s));

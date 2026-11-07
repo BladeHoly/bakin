@@ -112,6 +112,23 @@ def test_forget_turns_the_vault_presets_off(svc, tmp_path):
     assert liked["cookies_mode"] == "off"
 
 
+def test_use_vault_moves_the_presets_stuck_on_a_locked_browser(svc, tmp_path):
+    # pulido D15: with cookies already saved, a preset on Brave still warned in orange
+    a = svc()
+    assert not a.cookies_use_vault()["ok"]  # nothing saved yet
+    src = cookies_file(tmp_path)
+    assert a.cookies_import(str(src))["ok"]
+    ms = mediadl.load_settings()
+    for p in ms["presets"]:
+        p.update(cookies_source="browser", cookies_browser="brave", cookies_mode="auto")
+    next(p for p in ms["presets"] if p["id"] == "bimusic").update(cookies_browser="firefox")
+    mediadl.save_settings(ms)
+    assert a.cookies_use_vault()["ok"]
+    by_id = {p["id"]: p for p in mediadl.load_settings()["presets"]}
+    assert by_id["biliked"]["cookies_source"] == "vault"
+    assert by_id["bimusic"]["cookies_source"] == "browser"
+
+
 def test_import_also_serves_presets_stuck_on_a_locked_browser(svc, tmp_path):
     # the user's presets used Brave, whose cookies yt-dlp can't read on Windows
     src = cookies_file(tmp_path)

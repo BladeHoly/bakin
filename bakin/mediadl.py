@@ -64,6 +64,13 @@ ACCOUNT_NEEDED = re.compile(r"confirm your age|age[- ]restricted|inappropriate f
 # YouTube pushing back on volume: stop asking (the queue pauses) instead of
 # failing every remaining item.
 BLOCKED_ERRORS = re.compile(r"not a bot|HTTP Error 429|too many requests|rate.limit", re.I)
+# what goes wrong most and yt-dlp says in English (PLAN 0.23.4)
+DISK_FULL_ERRORS = re.compile(r"No space left on device|Errno 28|not enough space on the disk|WinError 112", re.I)
+OFFLINE_ERRORS = re.compile(r"getaddrinfo failed|Failed to resolve|Name or service not known|name resolution|"
+                            r"Network is unreachable|WinError 1006[01]|WinError 11001|Connection refused|"
+                            r"Read timed out|timed out", re.I)
+GONE_ERRORS = re.compile(r"Private video|Video unavailable|video is not available|removed by the uploader|"
+                         r"account associated with this video has been terminated|This video has been removed", re.I)
 COOKIE_DB_ERRORS = re.compile(
     r"could not copy .*cookie database|failed to decrypt with dpapi|cookie database|"
     r"app.bound encryption|failed to load cookies", re.I)
@@ -487,7 +494,7 @@ def build_args(preset: dict, url: str, out_dir: Path, *, with_cookies: bool) -> 
             "--progress-template",
             "download:[bakin-p]%(progress.{status,downloaded_bytes,total_bytes,total_bytes_estimate,speed,eta,fragment_index,fragment_count})j",
             "--progress-template", "postprocess:[bakin-pp]%(progress.{status,postprocessor})j",
-            "-O", "before_dl:[bakin-s]%(.{id,title,uploader,duration,playlist_index,n_entries,extractor_key,webpage_url})j",
+            "-O", "before_dl:[bakin-s]%(.{id,title,uploader,duration,playlist_index,n_entries,playlist_title,extractor_key,webpage_url})j",
             "-O", "after_move:[bakin-d]%(.{id,title,filepath,extractor_key})j"]
     ffmpeg = tools.find("ffmpeg")
     if ffmpeg:
@@ -634,7 +641,8 @@ class Runner:
             if info.get("n_entries"):
                 seen["n_entries"] = info["n_entries"]
             self.emit({"kind": "media_item", **{k: info.get(k) for k in
-                       ("id", "title", "uploader", "duration", "playlist_index", "n_entries", "extractor_key")}})
+                       ("id", "title", "uploader", "duration", "playlist_index", "n_entries", "playlist_title",
+                        "extractor_key")}})
         elif line.startswith("[bakin-d]"):
             info = self._json(line, "[bakin-d]") or {}
             seen["done"].append(info)
@@ -716,12 +724,21 @@ def friendly_error(msg: str) -> str:
         return ("YouTube está frenando las descargas desde tu conexión («confirma que no eres un bot» o 429), "
                 "por la cantidad de pedidos. Se pasa solo en unas horas; no hace falta usar tu cuenta. "
                 f"({msg[:120]})")
+    # before «sign in»: a private video says both, and signing in won't fix it
+    if GONE_ERRORS.search(msg):
+        return f"El video es privado o ya no está disponible. ({msg[:160]})"
     if COOKIE_DB_ERRORS.search(msg):
         return ("No se pudieron leer las cookies del navegador. Si usas Brave u otro navegador "
                 "Chromium, ciérralo por completo y reintenta, o usa un archivo cookies.txt. "
                 f"({msg[:160]})")
     if AUTH_ERRORS.search(msg):
         return f"El sitio pide iniciar sesión para este contenido (usa cookies en el preset). ({msg[:200]})"
+    if DISK_FULL_ERRORS.search(msg):
+        return ("No queda espacio en el disco de la carpeta de descargas. Libera espacio o cambia la "
+                f"carpeta en Configuración › Descargas; lo terminado se conserva. ({msg[:120]})")
+    if OFFLINE_ERRORS.search(msg):
+        return ("No hay conexión a internet, o el sitio no responde. Lo terminado se conserva; "
+                f"reintenta en un rato. ({msg[:120]})")
     if "HTTP Error 403" in msg:
         return f"El sitio rechazó la descarga (403). Actualiza yt-dlp desde Herramientas y reintenta. ({msg[:160]})"
     return msg[:400]

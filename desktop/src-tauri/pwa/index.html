@@ -230,7 +230,7 @@
     go.addEventListener('click', async () => {
       const link = (input.value.match(/https?:\/\/\S+/) || [''])[0];
       if (!link) { out.textContent = 'Eso no parece un enlace.'; return; }
-      try { await api('bakinLink', { url: link }); out.textContent = 'Listo: ya está en Bakin.'; input.value = ''; }
+      try { await api('bakinLink', { url: link }); out.textContent = 'Llegó a Bakin: confírmalo en la PC para que se baje.'; input.value = ''; }
       catch (e) { out.textContent = `No se pudo: ${e.message}`; }
     });
     form.append(input, go);
@@ -252,7 +252,7 @@
   async function showOffline(q) {
     const all = (await tx('readonly', (st) => st.getAll())) || [];
     const list = all.map((x) => ({ ...x.song, _blob: x.blob })).filter((s) => match(s, q));
-    showSongs(list, 'Nada guardado todavía. En una lista, mantén apretado un tema… o usa «Guardar todo» en Favoritas.');
+    showSongs(list, 'Nada guardado en el teléfono todavía: usa el botón de arriba para guardar tus favoritas.');
     if (tab === 'offline' && !q) {
       const b = Object.assign(document.createElement('button'), { className: 'gm-chip gm-chip-plain', textContent: 'Guardar las favoritas en el teléfono' });
       b.addEventListener('click', async () => {

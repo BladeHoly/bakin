@@ -89,8 +89,8 @@ async function js(expression) {
   return r.result.result?.value;
 }
 async function check(name, fn) {
-  // SMOKE_ONLY=<text>: run only the checks whose name has it (to chase one failure)
-  if (process.env.SMOKE_ONLY && !name.includes(process.env.SMOKE_ONLY)) return;
+  // SMOKE_ONLY=<regex> (ui-smoke.ps1 -Only): run only the checks whose name matches, an area or one failure
+  if (process.env.SMOKE_ONLY && !new RegExp(process.env.SMOKE_ONLY, 'i').test(name)) return;
   try {
     const why = await fn();
     if (why) failures.push(`${name}: ${why}`);
@@ -223,7 +223,7 @@ await check('poner de fondo por monitor (C44)', async () => {
   await js(`(() => { const s = document.getElementById('view'); s.value = 'photos'; s.dispatchEvent(new CustomEvent('gm-change', { detail: { value: 'photos' } })); })()`);
   await sleep(1000);
   await js(`document.querySelector('#lib-grid > .lib-tile[data-kind="image"]').dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }))`);
-  const items = await js(`new Promise((res) => setTimeout(() => res([...document.querySelectorAll('#wallpaper-menu > button:not([value=lock]):not([value=frame])')].map((b) => b.textContent)), 600))`);
+  const items = await js(`new Promise((res) => setTimeout(() => res([...document.querySelectorAll('#wallpaper-menu > button:not([value=lock]):not([value=frame]):not([value=fav]):not([value=tag]):not([value=reveal]):not([value=delete])')].map((b) => b.textContent)), 600))`);
   // the lock screen item only where Windows allows it; in a test copy it never changes it
   const lock = await js(`window.__TAURI__.core.invoke('lockscreen_set', { path: ${JSON.stringify(`${seed}/foto-000.png`)} })`);
   if (lock.set) return 'la copia de prueba cambió la pantalla de bloqueo';
@@ -395,10 +395,17 @@ await check('cuenta de Wallhaven y seguir búsquedas (C47)', async () => {
     document.getElementById('download-hub').show?.();
     await new Promise((r) => setTimeout(r, 300));
     const out = { follow: !!document.getElementById('wh-follow'), items: document.querySelectorAll('#wh-follow-menu > button:not([value=all])').length, mine: document.getElementById('wh-mine').hidden };
+    document.getElementById('wh-follow-menu').dispatchEvent(new CustomEvent('gm-select', { detail: { value: 'follow' } }));
+    await new Promise((r) => setTimeout(r, 500));
+    out.dialog = document.getElementById('follow-dialog').hasAttribute('open') || !!document.querySelector('#follow-dialog dialog[open]');
+    out.channelOnly = !document.getElementById('fw-new-row').hidden || !document.getElementById('fw-preset-row').hidden;
+    document.getElementById('follow-dialog').close?.();
     document.getElementById('download-hub').close?.();
     return out;
   })()`);
-  if (!hub.follow || hub.items !== 3) return `«Seguir…» no está o le faltan opciones: ${JSON.stringify(hub)}`;
+  // one «Seguir esta búsqueda…» that opens the same «Seguir» dialog as a channel (pulido P2 #16)
+  if (!hub.follow || hub.items !== 1) return `«Seguir esta búsqueda…» no está: ${JSON.stringify(hub)}`;
+  if (!hub.dialog || hub.channelOnly) return `«Seguir esta búsqueda…» no abre el diálogo «Seguir» de Wallhaven: ${JSON.stringify(hub)}`;
   if (!hub.mine) return '«Mis colecciones» aparece sin clave';
   return '';
 });
@@ -448,6 +455,7 @@ await check('desplazamiento suave opcional y sin demora (C50)', async () => {
     await new Promise((r) => setTimeout(r, 300));
     out.done = Math.round(box.scrollTop);
     box.scrollTop = 0; await new Promise((r) => setTimeout(r, 300));
+    out.max = box.scrollHeight - box.clientHeight;  // room now: more tiles load later, as the list nears its end (16:9 pages are shorter)
     for (let i = 0; i < 5; i++) { wheel(); await new Promise((r) => setTimeout(r, 30)); }
     await new Promise((r) => setTimeout(r, 500));
     out.five = Math.round(box.scrollTop);
@@ -458,7 +466,7 @@ await check('desplazamiento suave opcional y sin demora (C50)', async () => {
   if (r.off) return 'con el desplazamiento suave apagado la página igual toma la rueda';
   if (r.at40 < 45) return `prendido, la muesca arranca con demora: ${JSON.stringify(r)}`;
   if (r.done < 95) return `prendido, la muesca no llega a su lugar: ${JSON.stringify(r)}`;
-  if (r.five < 400) return `prendido, muescas rápidas no suman distancia: ${JSON.stringify(r)}`;
+  if (r.five < Math.min(400, r.max - 5)) return `prendido, muescas rápidas no suman distancia: ${JSON.stringify(r)}`;
   return '';
 });
 
@@ -488,23 +496,22 @@ await check('un solo aviso que suma (C53)', async () => {
   return '';
 });
 
-await check('colas: cada una con su estado y su botón (C54)', async () => {
-  // 0.13 review: «having to resume the queue is weird». Music waits for tomorrow's limit on its own row;
-  // its button resumes only that lane; empty lanes don't show
+await check('colas: la pausa dice por qué y hasta cuándo, y sigue desde el aviso (C54)', async () => {
+  // 0.13 review: «having to resume the queue is weird». Music waits for tomorrow's limit: Descargas
+  // says which part waits, why and until when (the A3 banner); «Seguir ahora» resumes only that lane
   await js(`(() => { const s = document.getElementById('view'); s.value = 'downloads'; s.dispatchEvent(new CustomEvent('gm-change', { detail: { value: 'downloads' } })); })()`);
   await engine('pause_queue', { reason: 'Se llegó al límite diario (prueba).', until: Date.now() / 1000 + 3 * 3600, scope: 'media' });
   await sleep(800);
-  const r = await js(`(() => ({ card: !document.getElementById('queue-card').hidden,
-    rows: [...document.querySelectorAll('#lanes .lane')].map((l) => ({ lane: l.dataset.lane, text: l.textContent })) }))()`);
-  if (!r.card) { await engine('resume_queue'); return 'la tarjeta de colas no se ve con la música en pausa'; }
-  if (r.rows.length !== 1 || r.rows[0].lane !== 'media') { await engine('resume_queue'); return `filas: ${JSON.stringify(r.rows)}`; }
-  if (!/Espera hasta (hoy|mañana)/.test(r.rows[0].text) || !/límite diario/.test(r.rows[0].text)) { await engine('resume_queue'); return `la fila de música no dice hasta cuándo ni por qué: «${r.rows[0].text}»`; }
-  await js(`document.querySelector('#lanes .lane[data-lane=media] button').click()`);
+  const r = await js(`(() => { const b = document.getElementById('dl-banner'); return { shown: !b.hidden, text: b.textContent, go: !document.getElementById('dl-banner-go').hidden }; })()`);
+  if (!r.shown) { await engine('resume_queue'); return 'no hay aviso con la música en pausa'; }
+  if (!/Música y video en pausa/.test(r.text) || !/(hoy|mañana) a las/.test(r.text) || !/límite diario/.test(r.text)) { await engine('resume_queue'); return `el aviso no dice qué espera, hasta cuándo ni por qué: «${r.text}»`; }
+  if (!r.go) { await engine('resume_queue'); return 'el aviso no ofrece «Seguir ahora»'; }
+  await js(`document.getElementById('dl-banner-go').click()`);
   await sleep(800);
   const after = await engine('get_state');
-  const card = await js(`document.getElementById('queue-card').hidden`);
+  const hidden = await js(`document.getElementById('dl-banner').hidden`);
   if (after.queue.paused) { await engine('resume_queue'); return '«Seguir ahora» no reanudó la música'; }
-  if (!card) return 'la tarjeta de colas sigue a la vista sin nada en cola';
+  if (!hidden) return 'el aviso sigue a la vista sin nada en pausa';
   return '';
 });
 
@@ -579,64 +586,71 @@ await check('♥ desde la lista de música (C59)', async () => {
   return '';
 });
 
-await check('modo mínimo: tarjeta y opciones en «solo el tema» (C60, C61)', async () => {
-  // 0.13 review: in the card the title sat on the cover; the song-only layout hid the layer and «transparente»
+await check('modo mínimo: barra con todo a la vista, tarjeta, ⋯ con lo demás (C60, C61, C107)', async () => {
+  // 0.24 (the user's biggest complaint): a bar with the song in sight and only ⤢ ⋯ for the window;
+  // the card is the cover, square, its controls on hover, title and time apart; ⋯ opens a vertical
+  // menu under the song, «Cerrar y seguir en la bandeja» last; the wheel says the volume
   await js(`window.__TAURI__.core.invoke('mini_open')`);
   let ok = false;
   for (let i = 0; i < 20 && !ok; i++) { await sleep(400); ok = !!(await jsIn('mini.html', `document.body?.dataset.layout`).catch(() => '')); }
   if (!ok) return 'no se abrió la ventana chica';
+  await jsIn('mini.html', `window.__TAURI__.core.invoke('mini_layout', { layout: 'bar' })`);
+  await sleep(800);
+  const bar = await jsIn('mini.html', `(() => {
+    const vis = (el) => el && el.getBoundingClientRect().width > 0 && getComputedStyle(el).display !== 'none';
+    const windowButtons = [...document.querySelectorAll('.m-window button')].filter(vis).map((b) => b.id);
+    return { w: innerWidth, h: innerHeight, title: document.getElementById('m-title').getBoundingClientRect().width, windowButtons,
+      sub: vis(document.getElementById('m-artist')), time: getComputedStyle(document.getElementById('m-time')).display !== 'none' };
+  })()`);
   await jsIn('mini.html', `window.__TAURI__.core.invoke('mini_layout', { layout: 'card' })`);
   await sleep(800);
-  // the card is the cover (0.13 review: it took 248 × 384): a small square, the controls over it on hover
   const card = await jsIn('mini.html', `(async () => {
     const c = document.getElementById('m-cover').getBoundingClientRect();
-    const op = (id) => Number(getComputedStyle(id === 'm-play' ? document.getElementById(id).parentElement : document.getElementById(id)).opacity);  // the buttons fade as a group
+    const op = (el) => Number(getComputedStyle(el).opacity);
     document.body.classList.remove('hot'); await new Promise((r) => setTimeout(r, 300));
-    const rest = { play: op('m-play'), title: op('m-title') };
+    const rest = { play: op(document.querySelector('.m-buttons')), title: op(document.getElementById('m-title')) };
     document.body.classList.add('hot'); await new Promise((r) => setTimeout(r, 300));
-    const hot = { play: op('m-play'), title: op('m-title') };
+    const hot = { play: op(document.querySelector('.m-buttons')), title: op(document.getElementById('m-title')) };
+    const t = document.getElementById('m-title').getBoundingClientRect(), tm = document.getElementById('m-time').getBoundingClientRect();
+    const overlap = t.bottom > tm.top + 1 && t.top < tm.bottom - 1 && t.right > tm.left + 1;
     document.body.classList.remove('hot');
-    return { w: innerWidth, h: innerHeight, fills: c.width >= innerWidth - 1 && c.height >= innerHeight - 1, rest, hot };
+    return { w: innerWidth, h: innerHeight, fills: c.width >= innerWidth - 1 && c.height >= innerHeight - 1, rest, hot, overlap,
+      grip: getComputedStyle(document.getElementById('m-grip')).display !== 'none' };
   })()`);
-  await jsIn('mini.html', `window.__TAURI__.core.invoke('mini_layout', { layout: 'info' })`);
+  await jsIn('mini.html', `window.__TAURI__.core.invoke('mini_layout', { layout: 'bar' })`);
   await sleep(800);
-  // ⋯: a vertical menu in room the window makes, under the song (not over it); «Cerrar» last,
-  // far from ⋯; closing it gives the window its size back (0.13 review)
-  const info = await jsIn('mini.html', `(async () => {
+  const menu = await jsIn('mini.html', `(async () => {
     const h0 = innerHeight;
-    document.getElementById('m-more').click(); await new Promise((r) => setTimeout(r, 700));
+    document.getElementById('m-more').click(); await new Promise((r) => setTimeout(r, 800));
     const items = [...document.querySelectorAll('#m-menu button')];
     const song = document.querySelector('.mini').getBoundingClientRect();
-    const menu = document.getElementById('m-menu').getBoundingClientRect();
-    const more = document.getElementById('m-more').getBoundingClientRect();
-    const close = document.getElementById('mm-close').getBoundingClientRect();
-    const out = { grew: innerHeight - h0, // a column (top to bottom, or bottom to top when it opened upwards)
-      vertical: items.length >= 5 && new Set(items.map((b) => Math.round(b.getBoundingClientRect().top))).size === items.length
-        && new Set(items.map((b) => Math.round(b.getBoundingClientRect().left))).size === 1,
-      overSong: menu.top < song.bottom && menu.bottom > song.top, last: items.at(-1).id,
-      far: items.every((b) => b === items.at(-1) || Math.abs(b.getBoundingClientRect().top - more.top) < Math.abs(close.top - more.top)) };
-    document.getElementById('m-more').click(); await new Promise((r) => setTimeout(r, 700));
+    const m = document.getElementById('m-menu').getBoundingClientRect();
+    const out = { grew: innerHeight - h0, items: items.map((b) => b.id),
+      vertical: new Set(items.map((b) => Math.round(b.getBoundingClientRect().top))).size === items.length,
+      overSong: m.top < song.bottom - 1 && m.bottom > song.top + 1, fits: m.bottom <= innerHeight + 1 && m.top >= -1 };
+    document.getElementById('m-more').click(); await new Promise((r) => setTimeout(r, 800));
     out.back = innerHeight === h0;
+    // the wheel: the volume, said over the song
+    dispatchEvent(new WheelEvent('wheel', { deltaY: 100 }));
+    for (let i = 0; i < 10 && !out.volnote; i++) {
+      await new Promise((r) => setTimeout(r, 100));
+      out.volnote = !document.getElementById('m-volnote').hidden && /[0-9]+ %/.test(document.getElementById('m-volnote').textContent);
+    }
+    out.volText = document.getElementById('m-volnote').textContent;
     return out; })()`);
-  // 🔊 in the bar: a vertical slider below, not a row over the song
-  await jsIn('mini.html', `window.__TAURI__.core.invoke('mini_layout', { layout: 'bar' })`);
-  await sleep(700);
-  const vol = await jsIn('mini.html', `(async () => {
-    document.getElementById('m-vol').click(); await new Promise((r) => setTimeout(r, 700));
-    const i = document.getElementById('m-volume-v'); const r = i.getBoundingClientRect();
-    const out = { shown: r.height > 0, vertical: r.height > r.width * 2, title: getComputedStyle(document.getElementById('m-title')).display !== 'none' };
-    document.getElementById('m-vol').click(); await new Promise((r) => setTimeout(r, 600));
-    return out; })()`);
-  await jsIn('mini.html', `window.__TAURI__.core.invoke('mini_layout', { layout: 'bar' })`);
-  await sleep(400);
   jsIn('mini.html', `window.__TAURI__.core.invoke('mini_expand')`).catch(() => {});
   await sleep(1500);
-  if (card.w > 240 || Math.abs(card.w - card.h) > 2 || !card.fills) return `la tarjeta no es la portada en un cuadrado chico: ${JSON.stringify(card)}`;
+  if (bar.w > 440 || bar.h > 70) return `la barra mide ${bar.w}×${bar.h} (420×64)`;
+  if (bar.windowButtons.join() !== 'm-expand,m-more') return `la barra muestra botones de ventana de más: ${bar.windowButtons}`;
+  if (bar.title < 120 || !bar.sub || !bar.time) return `en la barra el tema no se ve entero: ${JSON.stringify(bar)}`;
+  if (Math.abs(card.w - card.h) > 2 || !card.fills) return `la tarjeta no es la portada en un cuadrado: ${JSON.stringify(card)}`;
   if (card.rest.play > 0.05 || card.rest.title > 0.05 || card.hot.play < 0.95 || card.hot.title < 0.95) return `los controles de la tarjeta no aparecen solo al pasar el mouse: ${JSON.stringify(card)}`;
-  if (info.grew < 100 || !info.vertical || info.overSong) return `«solo el tema»: ⋯ no abre un menú vertical debajo del tema: ${JSON.stringify(info)}`;
-  if (info.last !== 'mm-close' || !info.far) return `«Cerrar» no queda último y lejos del ⋯: ${JSON.stringify(info)}`;
-  if (!info.back) return 'al cerrar el menú la ventana no volvió a su tamaño';
-  if (!vol.shown || !vol.vertical || !vol.title) return `el volumen de la barra no es un deslizador vertical: ${JSON.stringify(vol)}`;
+  if (card.overlap) return 'en la tarjeta el título se pisa con el tiempo';
+  if (!card.grip) return 'la tarjeta no tiene la esquina para cambiar el tamaño';
+  if (menu.grew < 100 || !menu.vertical || menu.overSong || !menu.fits) return `⋯ no abre un menú vertical debajo del tema: ${JSON.stringify(menu)}`;
+  if (menu.items.join() !== 'mm-top,mm-layout,mm-gaming,mm-tray') return `el menú ⋯ no es el esperado: ${menu.items}`;
+  if (!menu.back) return 'al cerrar el menú la ventana no volvió a su tamaño';
+  if (!menu.volnote) return `la rueda no muestra el volumen: «${menu.volText}»`;
   return '';
 });
 
@@ -707,7 +721,7 @@ await check('atajos de teclado y modo gaming (C63)', async () => {
   await js(`window.__TAURI__.core.invoke('hotkeys_run', { action: 'gaming' })`);
   let st = null;
   for (let i = 0; i < 20; i++) { await sleep(400); st = await jsIn('mini.html', `window.__TAURI__.core.invoke('mini_state')`).catch(() => null); if (st?.through) break; }
-  const pin = await jsIn('mini.html', `document.getElementById('m-pin').dataset.layer`).catch(() => '');
+  const pin = await jsIn('mini.html', `localStorage.getItem('bakin.mini.layer')`).catch(() => '');
   await js(`window.__TAURI__.core.invoke('hotkeys_run', { action: 'gaming' })`);
   await sleep(800);
   const back = await jsIn('mini.html', `window.__TAURI__.core.invoke('mini_state')`).catch(() => null);
@@ -738,11 +752,13 @@ await check('rueda rápida sin ir y volver (C65)', async () => {
   return '';
 });
 
-await check('la portada de un tema que se baja no es una foto (C66)', async () => {
+await check('la portada de un tema que se baja, o que quedó sola, no es una foto (C66, R34)', async () => {
   // 0.13 review: while a song downloaded, its cover showed in Fotos until it finished
   await engine('library_overview', { refresh: true });
   const names = (await engine('library_items', { filters: { kinds: ['image'] }, offset: 0, limit: 2000 })).items.map((i) => i.name);
   if (names.includes('Tema que baja.webp')) return 'la portada del tema que se está bajando aparece en Fotos';
+  // 2026-11-07, the user: a cover left behind (its song renamed or cancelled) stayed in Imágenes for good
+  if (names.includes('Portada huerfana [dQw4w9WgXcQ].webp')) return 'una portada que quedó sola en la carpeta de música aparece en Imágenes';
   return '';
 });
 
@@ -908,25 +924,26 @@ await check('Configuración por categorías (C79)', async () => {
       const open = [...document.querySelectorAll('#settings-dialog section[data-sec]')].filter((x) => !x.hidden).map((x) => x.dataset.sec);
       if (open.join() !== sec) shows.push(sec + '→' + open.join('+'));
     }
-    // the tab switches in Apariencia follow the «+» and the other way round
+    // the extra tabs live in one place, the «+» (pulido P2 #24): no switches in Apariencia
     const before = localStorage.getItem('bakin.tabs');
     localStorage.removeItem('bakin.tabs');
-    document.querySelector('#settings-nav [data-sec=appearance]').click(); await wait(150);
-    const t = document.querySelector('.tab-toggle[value=convert]');
-    t.checked = true; t.dispatchEvent(new Event('change'));
+    const toggles = document.querySelectorAll('.tab-toggle').length;
+    const pick = () => document.getElementById('view-menu').dispatchEvent(new CustomEvent('gm-select', { detail: { value: 'convert' }, cancelable: true }));
+    pick();
     const shown = !document.querySelector('#view > button[value=convert]').hidden;
     const menu = document.querySelector('#view-menu button[value=convert]').getAttribute('aria-checked');
-    t.checked = false; t.dispatchEvent(new Event('change'));
+    pick();
     if (before !== null) localStorage.setItem('bakin.tabs', before); else localStorage.removeItem('bakin.tabs');
     document.getElementById('settings-dialog').close();
-    return { where, navs, sections, shows, shown, menu };
+    return { where, navs, sections, shows, shown, menu, toggles };
   })()`);
-  const want = { hotkeys: 'keys', 'bg-tint': 'appearance', 'smooth-scroll': 'appearance', 'mini-remember': 'music', 'wh-key': 'accounts', 'bg-keep': 'general', 'out-dir': 'downloads', 'po-fade': 'music', 'perf-hourly': 'perf', 'perf-covers': 'perf' };
+  const want = { hotkeys: 'keys', 'bg-tint': 'appearance', 'smooth-scroll': 'appearance', 'mini-remember': 'music', 'wh-key': 'accounts', 'bg-keep': 'general', 'out-dir': 'downloads', 'po-fade': 'music', 'perf-hourly': 'downloads', 'perf-covers': 'downloads' };
   const wrong = Object.entries(want).filter(([id, sec]) => r.where[id] !== sec).map(([id]) => `${id} en ${r.where[id]}`);
   if (wrong.length) return `ajustes fuera de su categoría: ${wrong.join(', ')}`;
   if (r.navs.join() !== r.sections.join()) return `el menú y las secciones no coinciden: ${r.navs.join()} / ${r.sections.join()}`;
   if (r.shows.length) return `secciones que no se muestran solas: ${r.shows.join(', ')}`;
-  if (!r.shown || r.menu !== 'true') return `el interruptor de pestañas no sigue al «+»: ${JSON.stringify(r)}`;
+  if (r.toggles) return 'las pestañas se eligen en dos lugares (Apariencia y el «+»)';
+  if (!r.shown || r.menu !== 'true') return `el «+» no muestra la pestaña: ${JSON.stringify(r)}`;
   return '';
 });
 
@@ -995,11 +1012,16 @@ await check('buscar algo que no tengo ofrece YouTube Music (C82)', async () => {
     q.value = 'qwzx artista inexistente'; q.dispatchEvent(new Event('input', { bubbles: true })); await wait(1500);
     const b = document.getElementById('lib-empty-web');
     const out = { shown: !b.hidden, text: b.textContent, title: document.getElementById('lib-empty-title').textContent };
+    // pulido P1 #2: it opens Bakin's own search (Descargar › Buscar música) with the same words
+    b.click(); await wait(600);
+    out.hub = { catalog: !document.querySelector('#download-hub section[data-sec=catalog]').hidden, q: document.getElementById('cat-q').value };
+    document.getElementById('download-hub').close?.(); await wait(300);
     q.value = ''; q.dispatchEvent(new Event('input', { bubbles: true })); await wait(1200);
     out.gone = b.hidden || document.getElementById('lib-empty').hidden;
     return out;
   })()`);
-  if (!r.shown || !/YouTube Music/.test(r.text) || !/qwzx/.test(r.title)) return `sin la oferta de buscar en YouTube Music: ${JSON.stringify(r)}`;
+  if (!r.shown || !/bajar/.test(r.text) || !/qwzx/.test(r.title)) return `sin la oferta de buscarlo para bajar: ${JSON.stringify(r)}`;
+  if (!r.hub.catalog || !/qwzx/.test(r.hub.q)) return `no abre la búsqueda de música de Bakin con esas palabras: ${JSON.stringify(r.hub)}`;
   if (!r.gone) return 'la oferta queda al borrar la búsqueda';
   return '';
 });
@@ -1204,7 +1226,7 @@ await check('sonido: volumen parejo, ecualizador, salida, letras, A–B (C94)', 
     document.getElementById('settings-dialog').close();
     // the long song, with its lyrics
     const items = (await call('library_items', { filters: { kinds: ['audio'], q: 'larga' }, offset: 0, limit: 5 })).items;
-    await pc({ cmd: 'load', tracks: items.map((i) => ({ id: i.id, path: i.path, name: i.name, title: i.title || i.name })), start: 0, play: true });
+    await pc({ cmd: 'load', tracks: items.map((i) => ({ id: i.id, path: i.path, name: i.name, title: i.title || i.name, duration: i.duration })), start: 0, play: true });
     await wait(800);
     document.getElementById('pl-lyrics').click(); await wait(1500);
     out.lines = [...document.querySelectorAll('#ly-lines p')].map((p) => p.textContent);
@@ -1214,6 +1236,16 @@ await check('sonido: volumen parejo, ecualizador, salida, letras, A–B (C94)', 
     await pc({ cmd: 'set', ab: [1, 2] }); await wait(1600);
     const ab = await pc({ cmd: 'state' });
     out.ab = ab.ab && ab.time < 2.6;
+    // and it's set from the progress bar's right click (pulido P2 #13), shown on the bar
+    const seekBox = document.getElementById('pl-seek').getBoundingClientRect();
+    document.getElementById('pl-seek').dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: seekBox.left + seekBox.width / 2, clientY: seekBox.top + 2 }));
+    await wait(400);
+    out.abMenu = [...document.querySelectorAll('#ab-menu button')].map((b) => b.value).join();
+    out.abBand = !document.getElementById('pl-ab').hidden;
+    // its title is a menu label: lined up with the items, not stuck in the corner (user, 2026-11-07)
+    const abHead = document.querySelector('#ab-menu > small');
+    out.abHead = abHead && abHead.classList.contains('gm-menu-label') && getComputedStyle(abHead).display === 'block' && getComputedStyle(abHead).paddingLeft === getComputedStyle(document.querySelector('#ab-menu button')).paddingLeft;
+    document.getElementById('ab-menu')?.close?.();
     await pc({ cmd: 'set', ab: null });
     await pc({ cmd: 'pause' });
     document.getElementById('pl-lyrics').click();
@@ -1225,6 +1257,9 @@ await check('sonido: volumen parejo, ecualizador, salida, letras, A–B (C94)', 
   if (r.mode !== 'track' || !r.eq) return `volumen parejo o ecualizador: ${JSON.stringify(r)}`;
   if (r.lines.join('|') !== 'primera línea|segunda línea|la última' || r.now !== 'segunda línea') return `letra: ${JSON.stringify(r)}`;
   if (!r.ab) return `A–B no repite: ${JSON.stringify(r)}`;
+  if (!/^a(,|$)/.test(r.abMenu || '') || !/off/.test(r.abMenu)) return `el clic derecho en la barra no ofrece A–B: «${r.abMenu}»`;
+  if (!r.abBand) return 'el tramo A–B no se ve en la barra';
+  if (!r.abHead) return 'el título «Repetir un tramo» no está alineado como título de menú';
   return '';
 });
 
@@ -1355,6 +1390,184 @@ await check('accesibilidad: axe sin fallas graves (C103)', async () => {
   }
   await js(`document.getElementById('download-hub').close?.()`);
   return bad.join(' · ');
+});
+
+await check('anchos: nada se sale, se corta ni queda chico para clickear (C105, R32)', async () => {
+  // PLAN 0.23.2 (docs/DESIGN.md): every view and Configuración section at 1280, 980 and 720 px:
+  // no sideways scroll, no button cutting its text, nothing to click under 24 px; the EQ's
+  // bands inside their panel (they ran over the whole dialog until 0.23)
+  const view = (v) => `(() => { const s = document.getElementById('view'); s.value = '${v}'; s.dispatchEvent(new CustomEvent('gm-change', { detail: { value: '${v}' } })); })()`;
+  const secs = await js(`[...document.querySelectorAll('#settings-nav [data-sec]')].map((b) => b.dataset.sec)`);
+  const scenes = [['Fotos', view('photos')], ['Música', view('music')], ['Configuración', `document.getElementById('btn-settings').click()`],
+    ...secs.map((sec) => [`Configuración › ${sec}`, `document.querySelector('#settings-nav [data-sec=${sec}]').click()`]),
+    ['Descargar', `document.getElementById('settings-dialog').close(); document.getElementById('download-hub').show()`]];
+  const probe = `(() => {
+    const vis = (el) => { const r = el.getBoundingClientRect(); const cs = getComputedStyle(el); return r.width > 0 && r.height > 0 && cs.visibility !== 'hidden' && r.bottom > 0 && r.right > 0 && r.top < innerHeight && r.left < innerWidth; };
+    const name = (el) => (el.id ? '#' + el.id : el.tagName.toLowerCase() + '.' + String(el.className).trim().split(/\s+/)[0]) + ' «' + (el.getAttribute('aria-label') || el.title || el.textContent || '').trim().slice(0, 20) + '»';
+    const open = [...document.querySelectorAll('gm-dialog')].find((d) => d.hasAttribute('open') || d.shadowRoot?.querySelector('dialog[open]'));
+    const els = [...(open || document).querySelectorAll('button, a[href], [role=button], input[type=checkbox], input[type=range], select')].filter(vis);
+    // a checkbox inside a <label> is clicked through the whole label: measure that
+    const box = (el) => (el.closest('label') || el).getBoundingClientRect();
+    const small = els.filter((el) => { const r = box(el); return Math.min(r.width, r.height) < 23.5; }).map((el) => { const r = box(el); return name(el) + ' ' + Math.round(r.width) + '×' + Math.round(r.height); });
+    const clipped = els.filter((el) => el.tagName === 'BUTTON' && el.scrollWidth > el.clientWidth + 2 && getComputedStyle(el).textOverflow !== 'ellipsis' && getComputedStyle(el).overflow !== 'visible').map(name);
+    const eq = document.getElementById('eq'); const band = eq?.querySelector('.eq-band');
+    const eqOver = eq && band && eq.offsetParent && band.getBoundingClientRect().height > eq.getBoundingClientRect().height + 1;
+    return { overflowX: document.documentElement.scrollWidth > innerWidth + 1, small, clipped, eqOver };
+  })()`;
+  const bad = [];
+  try {
+    for (const w of [1280, 980, 720]) {
+      await send('Emulation.setDeviceMetricsOverride', { width: w, height: 820, deviceScaleFactor: 1, mobile: false });
+      await sleep(500);
+      for (const [name, action] of scenes) {
+        await js(action);
+        await sleep(600);
+        const r = await js(probe);
+        if (r.overflowX) bad.push(`${w} ${name}: se desplaza a lo ancho`);
+        if (r.small.length) bad.push(`${w} ${name}: chico para clickear ${r.small.slice(0, 3).join(', ')}`);
+        if (r.clipped.length) bad.push(`${w} ${name}: texto cortado ${r.clipped.slice(0, 3).join(', ')}`);
+        if (r.eqOver) bad.push(`${w} ${name}: el ecualizador se sale de su panel`);
+      }
+      await js(`document.getElementById('download-hub').close?.()`);
+    }
+  } finally {
+    await send('Emulation.clearDeviceMetricsOverride', {});
+  }
+  return bad.slice(0, 6).join(' · ');
+});
+
+await check('el motor se cae y vuelve solo (C106)', async () => {
+  // PLAN 0.23.4: the engine dies mid-session (killed here): the window says so and the next
+  // action starts it again, with nothing lost from the queue
+  const before = await engine('get_state');
+  const killed = ps(`${tree}
+    $n = 0; foreach ($id in $ids) { $p = Get-CimInstance Win32_Process -Filter "ProcessId=$id"; if ($p -and ($p.Name -eq 'bakin-engine.exe' -or ($p.Name -eq 'python.exe' -and $p.CommandLine -like '*bakin*'))) { Stop-Process -Id $id -Force; $n++ } }
+    $n`);
+  if (Number(killed) < 1) return 'no encontré el motor para cerrarlo';
+  await sleep(1500);
+  const said = await js(`[...document.querySelectorAll('#log li')].some((l) => /motor/i.test(l.textContent))`).catch(() => null);
+  let st = null;
+  for (let i = 0; i < 30 && !st; i++) { st = await engine('get_state').catch(() => null); if (!st) await sleep(1000); }
+  if (!st) return 'el motor no volvió con la próxima acción';
+  if ((st.queue?.total ?? 0) !== (before.queue?.total ?? 0)) return `la cola cambió al volver el motor (${before.queue?.total} → ${st.queue?.total})`;
+  if (said === false) return 'la ventana no avisó que el motor se detuvo';
+  return '';
+});
+
+await check('seleccionar desde la lista: el tilde de cada fila y el de la cabecera (C110)', async () => {
+  // the user (2026-11-07): selecting several should live in the list, not a button up top
+  const r = await js(`(async () => {
+    const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+    const s = document.getElementById('view'); s.value = 'music'; s.dispatchEvent(new CustomEvent('gm-change', { detail: { value: 'music' } })); await wait(600);
+    document.querySelector('#music-views [data-mview=songs]').click(); await wait(1500);
+    const rows = document.querySelectorAll('#lib-grid .lib-row:not(.lib-row-head)');
+    const tick = rows[1]?.querySelector('.sel-mark');
+    const head = document.getElementById('sel-head');
+    const out = { tick: !!tick, head: !!head, hiddenAtRest: tick && getComputedStyle(tick).visibility === 'hidden' };
+    tick.click(); await wait(300);
+    out.selecting = document.body.classList.contains('selecting');
+    out.one = document.getElementById('sel-count').textContent;
+    out.mixed = head.indeterminate;
+    head.click(); await wait(300);
+    out.all = document.querySelectorAll('#lib-grid .lib-row[aria-pressed=true]').length === rows.length;
+    head.click(); await wait(300);
+    out.none = document.querySelectorAll('#lib-grid .lib-row[aria-pressed=true]').length;
+    document.getElementById('sel-done').click(); await wait(300);
+    return out;
+  })()`);
+  if (!r.tick || !r.head) return 'faltan los tildes de fila o de cabecera';
+  if (!r.hiddenAtRest) return 'el tilde de la fila se ve sin pasar el puntero';
+  if (!r.selecting || !/^1 /.test(r.one)) return `tildar una fila no empieza a seleccionar: ${r.one}`;
+  if (!r.mixed) return 'la cabecera no queda a medias con una sola tildada';
+  if (!r.all || r.none) return `la cabecera no tilda o destilda todas (todas: ${r.all}, quedan: ${r.none})`;
+  return '';
+});
+
+await check('pulido: diálogos a la misma altura, aleatorio ⌄, menús propios (C111)', async () => {
+  // the 2026-11-07 review: «Limpiar» opened high and «Duplicados» low; the kind of shuffle hid on a
+  // right click; the smart playlist used Windows' menus
+  const r = await js(`(async () => {
+    const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+    const top = async (button) => {
+      document.getElementById(button).click(); await wait(700);
+      const d = [...document.querySelectorAll('dialog[open]')].at(-1);
+      const t = d ? Math.round(d.getBoundingClientRect().top) : null;
+      document.querySelectorAll('gm-dialog').forEach((g) => g.open && g.close()); await wait(300);
+      return t;
+    };
+    const tops = [await top('btn-tools'), await top('btn-extension'), await top('btn-settings')];
+    const s = document.getElementById('view'); s.value = 'music'; s.dispatchEvent(new CustomEvent('gm-change', { detail: { value: 'music' } })); await wait(600);
+    document.querySelector('#music-views [data-mview=songs]').click(); await wait(800);
+    const kinds = [...document.querySelectorAll('#mus-shuffle-menu > button')].map((b) => b.value).join();
+    const split = !document.getElementById('mus-shuffle-split').hidden;
+    const nativeSelects = document.querySelectorAll('#playlist-dialog select:not(.gm-select-native)').length;
+    return { tops, kinds, split, nativeSelects };
+  })()`);
+  if (r.tops.some((t) => t === null)) return `algún diálogo no abrió: ${JSON.stringify(r.tops)}`;
+  if (Math.max(...r.tops) - Math.min(...r.tops) > 2) return `los diálogos abren a distintas alturas: ${JSON.stringify(r.tops)}`;
+  if (!r.split || r.kinds !== 'random,smart,album,artist') return `«Aleatorio ⌄» no ofrece los cuatro tipos: ${r.kinds}`;
+  if (r.nativeSelects) return `la playlist inteligente usa ${r.nativeSelects} menú(s) de Windows`;
+  return '';
+});
+
+await check('vacíos que dicen la verdad, sin botones sueltos (C112)', async () => {
+  // the design pass of 2026-11-07: a lone ⌄ over an empty list, «Nada coincide con el filtro»
+  // with no filter, «No results» in English under the empty link field
+  const r = await js(`(async () => {
+    const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+    const view = (v) => { const s = document.getElementById('view'); s.value = v; s.dispatchEvent(new CustomEvent('gm-change', { detail: { value: v } })); };
+    const out = {};
+    view('music'); await wait(600);
+    document.querySelector('#music-views [data-mview=favorites]').click(); await wait(1200);
+    out.musicEmpty = document.body.classList.contains('list-empty');
+    out.loneSplit = out.musicEmpty && getComputedStyle(document.getElementById('mus-shuffle-split')).display !== 'none';
+    view('photos'); await wait(800);
+    document.querySelector('[data-scope=favorites]').click(); await wait(1200);
+    out.photoEmpty = !document.getElementById('lib-empty').hidden;
+    out.photoTitle = document.getElementById('lib-empty-title').textContent;
+    document.querySelector('[data-scope=all]').click(); await wait(600);
+    document.getElementById('btn-download').click(); await wait(500);
+    document.querySelector('#hub-nav [data-sec=link]').click(); await wait(300);
+    const input = document.querySelector('#go input'); input.value = ''; input.focus(); await wait(500);
+    const box = document.querySelector('#go .gm-search-results');
+    out.noResults = !!box && !box.hidden && getComputedStyle(box).display !== 'none' && /No results/.test(box.textContent);
+    input.blur();
+    document.getElementById('download-hub').close();
+    view('music'); await wait(300);
+    document.querySelector('#music-views [data-mview=songs]').click(); await wait(600);
+    return out;
+  })()`);
+  if (r.loneSplit) return 'sobre una lista vacía queda la ⌄ de «Aleatorio» sola';
+  if (r.photoEmpty && /filtro/.test(r.photoTitle)) return `Imágenes › Favoritas vacía habla de un filtro: «${r.photoTitle}»`;
+  if (r.noResults) return '«No results» bajo el campo de enlace vacío';
+  return '';
+});
+
+await check('ordenar como Spotify: agregada, las dos direcciones, compacta (C109)', async () => {
+  // a friend (2026-11-07): «quiero ordenar por fecha de añadido, las últimas o las primeras»
+  const r = await js(`(async () => {
+    const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+    const s = document.getElementById('view'); s.value = 'music'; s.dispatchEvent(new CustomEvent('gm-change', { detail: { value: 'music' } })); await wait(600);
+    document.querySelector('#music-views [data-mview=songs]').click(); await wait(1500);
+    const head = (c) => document.querySelector('#lib-grid .lib-row-head .' + c);
+    const out = { added: !!head('c-added'), start: head('c-added')?.textContent, cell: !!document.querySelector('#lib-grid .lib-row:not(.lib-row-head) .c-added') };
+    head('c-added').click(); await wait(1200);
+    out.flip = head('c-added').textContent;
+    head('c-title').click(); await wait(1200);
+    out.title = head('c-title').textContent;
+    head('c-title').click(); await wait(1200);
+    out.titleBack = head('c-title').textContent;
+    head('c-added').click(); await wait(1200);  // back to newest first for the checks after this
+    document.querySelector('#mus-menu [value=compact]').click(); await wait(300);
+    out.compact = document.body.classList.contains('compact');
+    document.querySelector('#mus-menu [value=compact]').click(); await wait(300);
+    return out;
+  })()`);
+  if (!r.added || !r.cell) return 'falta la columna «Agregada»';
+  if (!/▼/.test(r.start) || !/▲/.test(r.flip)) return `«Agregada» no ordena en las dos direcciones: ${r.start} → ${r.flip}`;
+  if (!/▲/.test(r.title) || !/▼/.test(r.titleBack)) return `«Título» no ordena en las dos direcciones: ${r.title} → ${r.titleBack}`;
+  if (!r.compact) return 'la vista compacta no se prende';
+  return '';
 });
 
 await check('cabecera de la lista de música prolija (C73)', async () => {
@@ -1489,7 +1702,9 @@ await check('modo mínimo (C36, C41)', async () => {
     await jsIn('mini.html', `window.__TAURI__.core.invoke('mini_layout', { layout: 'card' })`);
     await sleep(600);
     steps.card = await jsIn('mini.html', look);
-    await jsIn('mini.html', `(() => { const v = document.getElementById('m-volume'); v.value = '30'; v.dispatchEvent(new Event('input')); return 1; })()`);
+    // the wheel sets the volume (0.24: no slider): 10 notches down, 5 % each, from where it was
+    steps.volBefore = await js(`window.__TAURI__.core.invoke('player_call', { cmd: { cmd: 'state' } }).then((s) => s.volume)`);
+    await jsIn('mini.html', `(() => { for (let i = 0; i < 10; i++) dispatchEvent(new WheelEvent('wheel', { deltaY: 100 })); return 1; })()`);
     await sleep(500);
     steps.volume = await js(`window.__TAURI__.core.invoke('player_call', { cmd: { cmd: 'state' } }).then((s) => s.volume)`);
     await jsIn('mini.html', `window.__TAURI__.core.invoke('mini_through', { on: true })`);
@@ -1509,10 +1724,10 @@ await check('modo mínimo (C36, C41)', async () => {
   await js(`window.__TAURI__.core.invoke('player_call', { cmd: { cmd: 'set', volume: 0.8 } })`);
   if (!mini) return 'no se abrió la ventana chica';
   if (mini.title !== title) return `la ventana chica muestra «${mini.title}» y el reproductor «${title}»`;
-  if (mini.layout !== 'bar' || mini.w > 540 || mini.h > 100) return `al abrir: ${JSON.stringify(mini)}`;
+  if (mini.layout !== 'bar' || mini.w > 440 || mini.h > 70) return `al abrir: ${JSON.stringify(mini)}`;
   if (!hidden) return 'la ventana grande siguió a la vista';
-  if (steps.card?.layout !== 'card' || steps.card.w > 240 || Math.abs(steps.card.w - steps.card.h) > 2) return `tarjeta: ${JSON.stringify(steps.card)}`;
-  if (Math.abs((steps.volume ?? 0) - 0.3) > 0.02) return `el volumen de la barrita no llegó al reproductor: ${steps.volume}`;
+  if (steps.card?.layout !== 'card' || steps.card.w > 410 || Math.abs(steps.card.w - steps.card.h) > 2) return `tarjeta: ${JSON.stringify(steps.card)}`;
+  if (Math.abs((steps.volume ?? 0) - Math.max(0, (steps.volBefore ?? 0.8) - 0.5)) > 0.02) return `la rueda no bajó el volumen del reproductor: ${steps.volBefore} → ${steps.volume}`;
   if (!steps.through?.through || steps.through.layout !== 'info') return `transparente: ${JSON.stringify(steps.through)}`;
   if (steps.back?.through || steps.back?.layout !== 'card') return `al volver de transparente: ${JSON.stringify(steps.back)}`;
   if (again?.layout !== 'card') return `no recordó el tamaño: ${JSON.stringify(again)}`;
@@ -1755,6 +1970,115 @@ await check('presupuesto: arranque con 3500 fotos', async () => {
   const ms = await startupMs();
   console.log(`     arranque (3800 fotos): ${ms} ms`);
   return budget('startup_3500_ms', ms, 'ms');
+});
+
+// C108 feeds the page fake engine events: it runs last, so no other check sees their state
+// (before the tray check it left the next ones failing, 2026-11-07)
+await check('descargas como lista: bajando, siguiente, con problemas, listas (C108)', async () => {
+  // PLAN pulido A3 (the user: «poco intuitiva, parece un prototipo»; a friend: «como Spotify»): one list
+  // fed by the engine's events, emitted here into the page: what downloads now with its progress and
+  // its list, what's next, what failed (until «Quitar»), what's done today (▶ Reproducir), the empty
+  // state, and the banner when the queue waits
+  const real = (await engine('get_state')).queue;
+  const lanes = (held = null) => [{ id: 'media', name: 'Música y video', count: 2, running: true, held }, { id: 'wallhaven', name: 'Fondos de Wallhaven', count: 1, running: false, held },
+    { id: 'convert', name: 'Conversiones', count: 0, running: false, held }];
+  const busy = { kind: 'queue', items: [{ id: 901, title: 'Mi playlist · Música (OPUS)', mode: 'download', status: 'running', kind: 'media', lane: 'media' },
+    { id: 902, title: 'Otro tema · Música (OPUS)', mode: 'download', status: 'pending', kind: 'media', lane: 'media' },
+    { id: 903, title: 'Wallhaven: paisajes', mode: 'download', status: 'pending', kind: 'wallhaven', lane: 'wallhaven' }],
+  lanes: lanes(), paused: false, total: 3, paused_until: null, reason: '', scope: null, daily_limit: 0, downloads_today: 0 };
+  const r = await js(`(async () => {
+    const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+    const emit = async (ev) => { await window.__TAURI__.event.emit('engine', ev); await wait(200); };
+    const $ = (id) => document.getElementById(id);
+    const shown = (id) => !$(id).hidden;
+    const rows = (id) => [...$(id).querySelectorAll('.dl-row')].map((li) => ({ text: li.textContent, buttons: [...li.querySelectorAll('button')].map((b) => b.getAttribute('aria-label') || b.textContent.trim()) }));
+    const s = $('view'); s.value = 'downloads'; s.dispatchEvent(new CustomEvent('gm-change', { detail: { value: 'downloads' } })); await wait(300);
+    if (shown('dl-clear')) $('dl-clear').click();
+    const out = {};
+    out.empty = { shown: shown('dl-empty'), text: $('dl-empty').textContent, go: !!$('dl-empty-go'), sections: ['dl-now', 'dl-next', 'dl-err', 'dl-done'].filter(shown) };
+    await emit({ kind: 'start', mode: 'media', target_kind: 'media', title: 'Mi playlist · Música (OPUS)', message: 'Descargando https://www.youtube.com/playlist?list=PLprueba con «Música»' });
+    await emit(${JSON.stringify(busy)});
+    await emit({ kind: 'media_url', url: 'https://www.youtube.com/playlist?list=PLprueba', index: 1, count: 1 });
+    await emit({ kind: 'media_item', id: 'aaaaaaaaaaa', title: 'Tema uno', uploader: 'Artista', duration: 215, playlist_index: 4, n_entries: 14, extractor_key: 'Youtube' });
+    await emit({ kind: 'media_progress', status: 'downloading', downloaded: 680, total: 1000, speed: 2202009, eta: 12 });
+    out.now = { shown: shown('dl-now'), title: $('dl-now-title').textContent, sub: $('dl-now-sub').textContent, status: $('status').textContent,
+      meter: $('meter').getAttribute('aria-valuenow'), cancel: $('btn-cancel').getAttribute('aria-label'), ring: !$('tb-progress').hidden };
+    out.next = { shown: shown('dl-next'), n: $('dl-next-n').textContent, rows: rows('dl-next-list') };
+    await emit({ kind: 'media_post', step: 'ExtractAudio' });
+    out.step = $('status').textContent;
+    await emit({ kind: 'media_file', id: 'aaaaaaaaaaa', title: 'Tema uno', path: ${JSON.stringify(`${seed}\\Tema uno.opus`)} });
+    await emit({ kind: 'media_item', id: 'bbbbbbbbbbb', title: 'Tema dos', uploader: 'Artista', duration: 190, playlist_index: 5, n_entries: 14, extractor_key: 'Youtube' });
+    await emit({ kind: 'error', message: 'El video es privado o ya no está disponible. ([youtube] bbbbbbbbbbb: Private video)' });
+    out.done = { shown: shown('dl-done'), rows: rows('dl-done-list') };
+    out.err = { shown: shown('dl-err'), rows: rows('dl-err-list') };
+    out.emptyWhileBusy = shown('dl-empty');
+    return out;
+  })()`);
+  const bad = [];
+  if (!r.empty.shown || !/Nada descargándose/.test(r.empty.text) || !r.empty.go || r.empty.sections.length) bad.push(`vacío: ${JSON.stringify(r.empty)}`);
+  if (!r.now.shown || !/Tema uno · Artista/.test(r.now.title) || !/\(4 de 14\)/.test(r.now.sub)) bad.push(`bajando ahora: ${JSON.stringify(r.now)}`);
+  if (!/68 %/.test(r.now.status) || !/MB\/s/.test(r.now.status) || !/0:12/.test(r.now.status) || r.now.meter !== '68') bad.push(`progreso: ${JSON.stringify(r.now)}`);
+  if (!r.now.ring) bad.push('el anillo de arriba no se ve mientras baja');
+  if (!r.now.cancel) bad.push('la fila que baja no tiene ✕');
+  if (!r.next.shown || r.next.rows.length !== 3 || !/10 temas más en esta lista/.test(r.next.rows[0]?.text) || !/Otro tema/.test(r.next.rows[1]?.text) || !/En cola/.test(r.next.rows[1]?.text)
+    || !r.next.rows[1]?.buttons.some((b) => /Quitar .* de la cola/.test(b)) || r.next.n !== '(12)') bad.push(`siguiente: ${JSON.stringify(r.next)}`);
+  if (r.step !== 'Convirtiendo el audio…') bad.push(`el paso: «${r.step}»`);
+  if (!r.done.shown || !/Tema uno · Artista/.test(r.done.rows[0]?.text) || !/3:35 · OPUS/.test(r.done.rows[0]?.text) || !r.done.rows[0]?.buttons.some((b) => /Reproducir/.test(b))) bad.push(`listas: ${JSON.stringify(r.done)}`);
+  const er = r.err.rows[0];
+  if (!r.err.shown || !/Tema dos/.test(er?.text) || !/privado/.test(er?.text) || /Private video/.test(er?.text) || !er?.buttons.some((b) => /^Quitar/.test(b)) || !er?.buttons.some((b) => /^Reintentar/.test(b))) bad.push(`con problemas: ${JSON.stringify(r.err)}`);
+  if (r.emptyWhileBusy) bad.push('el vacío se ve con cosas en la lista');
+  // the widths of docs/DESIGN.md, with every section full
+  try {
+    for (const w of [1280, 980, 720]) {
+      await send('Emulation.setDeviceMetricsOverride', { width: w, height: 820, deviceScaleFactor: 1, mobile: false });
+      await sleep(500);
+      const p = await js(`(() => {
+        const v = document.getElementById('view-downloads');
+        const els = [...v.querySelectorAll('button')].filter((el) => { const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0; });
+        const small = els.filter((el) => { const r = el.getBoundingClientRect(); return Math.min(r.width, r.height) < 23.5; }).map((el) => (el.getAttribute('aria-label') || el.textContent).trim().slice(0, 20));
+        const clipped = els.filter((el) => el.scrollWidth > el.clientWidth + 2 && getComputedStyle(el).textOverflow !== 'ellipsis' && getComputedStyle(el).overflow !== 'visible').map((el) => el.textContent.trim().slice(0, 20));
+        const out = [...v.querySelectorAll('.dl-row')].filter((el) => el.getBoundingClientRect().right > v.getBoundingClientRect().right + 1).length;
+        return { overflowX: document.documentElement.scrollWidth > innerWidth + 1 || v.scrollWidth > v.clientWidth + 1, small, clipped, out };
+      })()`);
+      if (p.overflowX || p.out) bad.push(`${w}: se sale a lo ancho`);
+      if (p.small.length) bad.push(`${w}: chico para clickear ${p.small.slice(0, 3).join(', ')}`);
+      if (p.clipped.length) bad.push(`${w}: texto cortado ${p.clipped.slice(0, 3).join(', ')}`);
+    }
+  } finally {
+    await send('Emulation.clearDeviceMetricsOverride', {});
+  }
+  const r2 = await js(`(async () => {
+    const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+    const emit = async (ev) => { await window.__TAURI__.event.emit('engine', ev); await wait(200); };
+    const $ = (id) => document.getElementById(id);
+    const out = {};
+    // errors stay until «Quitar»
+    await wait(600);
+    out.errStays = !$('dl-err').hidden;
+    [...$('dl-err-list').querySelectorAll('button')].find((b) => /^Quitar/.test(b.getAttribute('aria-label') || ''))?.click(); await wait(200);
+    out.errGone = $('dl-err').hidden;
+    // paused by the user (here or the tray): the banner, and the one button says «Reanudar»
+    await emit({ ...${JSON.stringify(busy)}, lanes: ${JSON.stringify(lanes({ until: null, reason: 'Pausada por ti.' }))}, paused: true, reason: 'Pausada por ti.', scope: 'all',
+      items: ${JSON.stringify(busy.items)}.map((i) => (i.status === 'pending' ? { ...i, status: 'paused' } : i)) });
+    out.banner = { shown: !$('dl-banner').hidden, text: $('dl-banner').textContent.trim().replace(/\\s+/g, ' '), pause: $('dl-pause').textContent.trim(),
+      paused: [...$('dl-next-list').querySelectorAll('.dl-row')].filter((li) => /En pausa/.test(li.textContent)).length };
+    await emit({ kind: 'finished', mode: 'media', outcome: 'cancelled', message: 'Cancelado.' });
+    out.nowGone = $('dl-now').hidden;
+    $('dl-clear').click(); await wait(200);
+    // back to the engine's real queue (paused first, so the page doesn't announce «Bakin terminó»)
+    await emit({ ...${JSON.stringify(real)}, kind: 'queue', paused: true, reason: '', total: 0 });
+    await emit({ ...${JSON.stringify(real)}, kind: 'queue' });
+    out.emptyAgain = !$('dl-empty').hidden && $('dl-banner').hidden;
+    // back to Música, as the checks after this one expect (the tray check searched a hidden list)
+    const v = $('view'); v.value = 'music'; v.dispatchEvent(new CustomEvent('gm-change', { detail: { value: 'music' } })); await wait(500);
+    return out;
+  })()`);
+  if (!r2.errStays) bad.push('el error se fue solo');
+  if (!r2.errGone) bad.push('«Quitar» no saca el error');
+  if (!r2.banner.shown || !/Descargas en pausa: las pausaste tú/.test(r2.banner.text) || r2.banner.pause !== 'Reanudar' || r2.banner.paused !== 2) bad.push(`pausa: ${JSON.stringify(r2.banner)}`);
+  if (!r2.nowGone) bad.push('«Bajando ahora» queda al terminar');
+  if (!r2.emptyAgain) bad.push('limpiar las listas no vuelve al vacío');
+  return bad.join(' · ');
 });
 
 await check('sin errores de JavaScript', async () => (problems.length ? problems.slice(0, 5).join(' | ') : ''));

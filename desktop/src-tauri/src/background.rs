@@ -31,7 +31,11 @@ pub const BACKGROUND_ARG: &str = "--background";
 pub struct KeepAlive(pub AtomicBool);
 
 pub fn started_in_background() -> bool {
-    std::env::args().any(|a| a == BACKGROUND_ARG)
+    has_background_arg(std::env::args())
+}
+
+fn has_background_arg(mut args: impl Iterator<Item = String>) -> bool {
+    args.any(|a| a == BACKGROUND_ARG)
 }
 
 /// Whether Windows notifications are wanted (the page's «Avisos de Windows»).
@@ -112,6 +116,27 @@ pub fn show_main(app: &AppHandle) -> bool {
 #[derive(Default)]
 pub struct QueueSeen(Mutex<Option<(i64, bool, String)>>);
 
+/// What a queue event is worth telling while the window is away.
+#[derive(Debug, PartialEq)]
+enum QueueNotice {
+    /// it had work and now it's empty
+    Finished,
+    /// it paused, for a reason not told yet
+    Paused(String),
+}
+
+/// Compares a queue event with the previous one; nothing on the first event seen.
+fn queue_notice(prev: Option<&(i64, bool, String)>, total: i64, paused: bool, reason: &str) -> Option<QueueNotice> {
+    let (prev_total, _, prev_reason) = prev?;
+    if *prev_total > 0 && total == 0 && !paused {
+        Some(QueueNotice::Finished)
+    } else if paused && !reason.is_empty() && reason != prev_reason.as_str() {
+        Some(QueueNotice::Paused(reason.to_string()))
+    } else {
+        None
+    }
+}
+
 pub fn engine_event(app: &AppHandle, event: &serde_json::Value) {
     let kind = event.get("kind").and_then(|k| k.as_str()).unwrap_or("");
     let away = app.get_webview_window("main").is_none() && app.state::<Notify>().0.load(Ordering::Relaxed);
@@ -126,12 +151,10 @@ pub fn engine_event(app: &AppHandle, event: &serde_json::Value) {
             let state = app.state::<QueueSeen>();
             let mut seen = state.0.lock().unwrap();
             if away {
-                if let Some((prev_total, _, prev_reason)) = seen.as_ref() {
-                    if *prev_total > 0 && total == 0 && !paused {
-                        say(tr("Bakin terminó"), tr("La cola quedó vacía: todo lo pendiente ya se procesó."));
-                    } else if paused && !reason.is_empty() && reason != *prev_reason {
-                        say(tr("Bakin pausó la cola"), &reason);
-                    }
+                match queue_notice(seen.as_ref(), total, paused, &reason) {
+                    Some(QueueNotice::Finished) => say(tr("Bakin terminó"), tr("La cola quedó vacía: todo lo pendiente ya se procesó.")),
+                    Some(QueueNotice::Paused(why)) => say(tr("Bakin pausó la cola"), &why),
+                    None => {}
                 }
             }
             *seen = Some((total, paused, reason));
@@ -168,7 +191,7 @@ pub fn build_tray(app: &AppHandle) -> tauri::Result<()> {
     let pause = MenuItemBuilder::with_id("pause", tr("Pausar descargas")).build(app)?;
     let resume = MenuItemBuilder::with_id("resume", tr("Reanudar descargas")).build(app)?;
     let mini = MenuItemBuilder::with_id("mini", tr("Modo mínimo")).build(app)?;
-    let mouse = MenuItemBuilder::with_id("mini_mouse", tr("Modo mínimo: usar el mouse")).enabled(false).build(app)?;
+    let mouse = MenuItemBuilder::with_id("mini_mouse", tr("Salir del modo gaming")).enabled(false).build(app)?;
     let wp_next = MenuItemBuilder::with_id("wp_next", tr("Siguiente fondo")).build(app)?;
     let wp_pause = MenuItemBuilder::with_id("wp_pause", tr("Pausar la rotación de fondos")).build(app)?;
     let quit = MenuItemBuilder::with_id("quit", tr("Salir de Bakin")).build(app)?;
@@ -223,6 +246,9 @@ pub fn build_tray(app: &AppHandle) -> tauri::Result<()> {
 /// Closing the window while there is work hides it to the tray instead; the
 /// small window remembers where it was moved to.
 pub fn on_window_event(window: &tauri::Window, event: &WindowEvent) {
+    if let WindowEvent::Resized(_) = event {
+        crate::mini::on_resized(window);
+    }
     if let WindowEvent::Moved(_) = event {
         crate::mini::on_moved(window);
     }
@@ -243,9 +269,13 @@ pub fn set_keep_alive(state: tauri::State<'_, KeepAlive>, value: bool) {
 /// A Windows notification (queue finished, paused until tomorrow, ...).
 #[tauri::command]
 pub fn notify(app: AppHandle, title: String, body: String) -> Result<(), String> {
-    let title: String = title.chars().take(80).collect();
-    let body: String = body.chars().take(300).collect();
+    let (title, body) = (clip(&title, 80), clip(&body, 300));
     app.notification().builder().title(title).body(body).show().map_err(|e| e.to_string())
+}
+
+/// The first `max` characters (not bytes: a cut never splits one).
+fn clip(text: &str, max: usize) -> String {
+    text.chars().take(max).collect()
 }
 
 #[tauri::command]
@@ -258,4 +288,51 @@ pub fn autostart_set(app: AppHandle, enabled: bool) -> Result<bool, String> {
     let a = app.autolaunch();
     if enabled { a.enable() } else { a.disable() }.map_err(|e| e.to_string())?;
     Ok(a.is_enabled().unwrap_or(false))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn seen(total: i64, paused: bool, reason: &str) -> (i64, bool, String) {
+        (total, paused, reason.to_string())
+    }
+
+    #[test]
+    fn the_first_queue_event_is_only_remembered() {
+        assert_eq!(queue_notice(None, 0, false, ""), None);
+        assert_eq!(queue_notice(None, 0, true, "Sin conexión"), None);
+    }
+
+    #[test]
+    fn an_emptied_queue_is_told_once() {
+        assert_eq!(queue_notice(Some(&seen(3, false, "")), 0, false, ""), Some(QueueNotice::Finished));
+        assert_eq!(queue_notice(Some(&seen(0, false, "")), 0, false, ""), None); // it was already empty
+        assert_eq!(queue_notice(Some(&seen(3, false, "")), 2, false, ""), None); // still working
+        assert_eq!(queue_notice(Some(&seen(3, false, "")), 0, true, ""), None); // paused with nothing left: no reason
+    }
+
+    #[test]
+    fn a_pause_is_told_once_per_reason() {
+        let why = "YouTube pidió esperar";
+        assert_eq!(queue_notice(Some(&seen(3, false, "")), 3, true, why), Some(QueueNotice::Paused(why.into())));
+        assert_eq!(queue_notice(Some(&seen(3, true, why)), 3, true, why), None);
+        assert_eq!(queue_notice(Some(&seen(3, true, why)), 3, true, "Disco lleno"), Some(QueueNotice::Paused("Disco lleno".into())));
+        assert_eq!(queue_notice(Some(&seen(3, false, "")), 3, true, ""), None); // paused by the user
+    }
+
+    #[test]
+    fn the_background_argument() {
+        let args = |a: &[&str]| a.iter().map(|s| s.to_string()).collect::<Vec<_>>().into_iter();
+        assert!(has_background_arg(args(&["bakin.exe", "--background"])));
+        assert!(!has_background_arg(args(&["bakin.exe", "bakin://download?url=x"])));
+        assert!(!has_background_arg(args(&["bakin.exe", "--background=1"])));
+    }
+
+    #[test]
+    fn notifications_are_cut_by_characters() {
+        assert_eq!(clip("canción", 6), "canció");
+        assert_eq!(clip("ñ".repeat(100).as_str(), 80).chars().count(), 80);
+        assert_eq!(clip("corto", 80), "corto");
+    }
 }

@@ -110,3 +110,93 @@ def test_settings_only_take_known_keys(svc):
     assert svc.settings_set({"loudness_mode": "loud", "loudness_preamp": 9})["settings"]["loudness_mode"] == "off"
     assert svc.settings_set({"loudness_preamp": 9})["settings"]["loudness_preamp"] == 6.0
     assert service.load_settings()["out_dir"] != "C:/hack"
+
+
+class PagesYT:
+    """An artist's and a playlist's pages, and a client that breaks in an unknown way."""
+
+    def __init__(self):
+        self.calls = 0
+
+    def get_artist(self, browse_id):
+        self.calls += 1
+        return {"name": "Anuel AA", "subscribers": "10 M", "thumbnails": [{"url": "https://lh3.googleusercontent.com/a"}],
+                "songs": {"browseId": "VLsongs", "results": [{"videoId": "ccccccccccc", "title": "Uno", "artists": "Anuel AA"}]},
+                "albums": {"results": [{"browseId": "MPREb_a", "title": "Disco"}, {"title": "sin id"}]},
+                "singles": {"results": [{"browseId": "MPREb_s", "title": "Single", "type": "Single"}]}}
+
+    def get_playlist(self, playlist_id, limit):
+        self.calls += 1
+        if playlist_id == "roto":
+            raise Exception("KeyError: 'contents'")
+        return {"title": "Lista", "author": [{"name": "Alguien"}], "thumbnails": [],
+                "tracks": [{"videoId": "ddddddddddd", "title": "Dos", "isAvailable": False}, {"title": "sin id"}]}
+
+
+@pytest.fixture
+def pages(monkeypatch):
+    ytmusic.reset()
+    fake = PagesYT()
+    monkeypatch.setattr(ytmusic, "_client", fake)
+    yield fake
+    ytmusic.reset()
+
+
+def test_artist_page(pages):
+    a = ytmusic.artist("UC_x")
+    assert a["title"] == "Anuel AA" and a["subscribers"] == "10 M" and a["songs_list"] == "VLsongs"
+    assert [s["id"] for s in a["songs"]] == ["ccccccccccc"] and a["songs"][0]["artist"] == "Anuel AA"
+    assert [x["id"] for x in a["albums"]] == ["MPREb_a", "MPREb_s"] and a["albums"][0]["type"] == "Álbum"
+
+
+def test_playlist_page_and_link(pages):
+    p = ytmusic.playlist("PL_x")
+    assert p["title"] == "Lista" and p["artist"] == "Alguien" and p["count"] == 1
+    assert p["tracks"][0]["available"] is False
+    assert ytmusic.link({"kind": "playlist", "id": "PL_x"}) == "https://music.youtube.com/playlist?list=PL_x"
+    assert ytmusic.link({"kind": "artist", "id": "UC_x"}) == ""
+
+
+def test_an_unknown_failure_is_not_a_pause(pages):
+    with pytest.raises(ytmusic.CatalogError) as e:
+        ytmusic.playlist("roto")
+    assert not isinstance(e.value, ytmusic.Busy)
+    assert ytmusic.playlist("PL_x")["title"] == "Lista"  # the catalogue keeps working
+
+
+@pytest.mark.parametrize("r,kind,want", [
+    ({"resultType": "artist", "browseId": "UC_a", "artist": "Nombre"}, None, {"kind": "artist", "id": "UC_a", "title": "Nombre", "thumb": ""}),
+    ({"resultType": "playlist", "browseId": "VLPL_a", "title": "L", "author": "Yo", "itemCount": "12"}, None,
+     {"kind": "playlist", "id": "PL_a", "title": "L", "artist": "Yo", "count": "12", "thumb": ""}),
+    ({"resultType": "episode", "videoId": "x"}, None, None),
+    ({"resultType": "artist"}, None, None),  # no id: nothing to open
+])
+def test_cards_of_every_kind(r, kind, want):
+    assert ytmusic.card(r, kind) == want
+
+
+def test_search_edge_cases(yt):
+    assert ytmusic.search("   ", "songs") == [] and yt.calls == 0
+    assert ytmusic.search("anuel", "nonsense")[0]["kind"] == "song"  # an unknown kind: songs
+
+
+def test_the_cache_forgets_the_oldest(yt):
+    for n in range(201):
+        ytmusic.search(f"q{n}", "videos", hourly=0)
+    assert len(ytmusic._cache) == 151
+    assert ("search", "q0", "songs") not in ytmusic._cache and ("search", "q200", "songs") in ytmusic._cache
+
+
+def test_the_test_copy_reads_a_saved_catalogue(monkeypatch, tmp_path):
+    import json
+    f = tmp_path / "catalog.json"
+    f.write_text(json.dumps({"search": {"songs": [{"videoId": "eeeeeeeeeee", "title": "Grabado"}]},
+                             "album": {"title": "A"}, "artist": {"name": "B"}}), encoding="utf-8")
+    monkeypatch.setenv("BAKIN_FAKE_YTMUSIC", str(f))
+    ytmusic.reset()
+    try:
+        assert ytmusic.search("x", "songs")[0]["title"] == "Grabado"
+        assert ytmusic.album("MPREb_y")["title"] == "A" and ytmusic.artist("UC_y")["title"] == "B"
+        assert ytmusic.playlist("PL_y")["tracks"] == []
+    finally:
+        ytmusic.reset()

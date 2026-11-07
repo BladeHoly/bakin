@@ -85,3 +85,77 @@ def test_csv_reader_only_reads_csv(tmp_path):
     g = tmp_path / "x.csv"
     g.write_text("Track Name,Artist Name(s)\nA,B\n", encoding="utf-8")
     assert service.Service.read_text_file(str(g))["text"].startswith("Track Name")
+
+
+def _page(entity) -> str:
+    import json
+    data = {"props": {"pageProps": {"state": {"data": {"entity": entity}}}}}
+    return f'<script id="__NEXT_DATA__" type="application/json">{json.dumps(data)}</script>'
+
+
+def test_page_of_one_track_and_of_a_changed_page():
+    d = spotify.from_page(_page({"type": "track", "name": "Solo", "artists": [{"name": "A"}, {"name": " "}],
+                                 "duration": 0, "isExplicit": False}))
+    assert d == {"kind": "track", "name": "Solo",
+                 "tracks": [{"title": "Solo", "artists": ["A"], "duration": None, "explicit": False, "album": ""}]}
+    pl = spotify.from_page(_page({"name": "Lista", "trackList": [{"title": "T", "subtitle": "X"}, {"title": ""}]}))
+    assert pl["kind"] == "playlist" and [t["title"] for t in pl["tracks"]] == ["T"] and pl["tracks"][0]["album"] == ""
+    with pytest.raises(spotify.SpotifyError, match="cambió"):  # the data moved inside the page
+        spotify.from_page('<script id="__NEXT_DATA__" type="application/json">{"props": {}}</script>')
+
+
+class FakeSession:
+    def __init__(self, status=200, text="", exc=None):
+        self.status, self.text, self.exc, self.urls = status, text, exc, []
+
+    def get(self, url, timeout, headers):
+        self.urls.append(url)
+        if self.exc:
+            raise self.exc
+        return type("R", (), {"status_code": self.status, "text": self.text})()
+
+
+def test_fetch_asks_the_embed_page_once(monkeypatch):
+    monkeypatch.delenv("BAKIN_FAKE_SPOTIFY", raising=False)
+    s = FakeSession(text=PAGE)
+    d = spotify.fetch("https://open.spotify.com/album/4aawyAB9vmqN3uQ7FjRGTy", session=s)
+    assert s.urls == ["https://open.spotify.com/embed/album/4aawyAB9vmqN3uQ7FjRGTy"]
+    assert d["kind"] == "album" and d["limited"] is False
+    hundred = _page({"type": "playlist", "name": "L", "trackList": [{"title": f"T{i}", "subtitle": "A"} for i in range(100)]})
+    assert spotify.fetch("spotify:playlist:37i9dQZF1DXcBWIGoYBM5M", session=FakeSession(text=hundred))["limited"] is True
+
+
+@pytest.mark.parametrize("status,why", [(404, "privado"), (429, "esperar"), (503, "esperar"), (500, "500")])
+def test_fetch_says_why_it_failed(monkeypatch, status, why):
+    monkeypatch.delenv("BAKIN_FAKE_SPOTIFY", raising=False)
+    with pytest.raises(spotify.SpotifyError, match=why):
+        spotify.fetch("spotify:track:6OmhkSOpvYBokMKQxpIGx2", session=FakeSession(status=status))
+
+
+def test_fetch_offline_and_not_a_link(monkeypatch):
+    import requests
+    monkeypatch.delenv("BAKIN_FAKE_SPOTIFY", raising=False)
+    with pytest.raises(spotify.SpotifyError, match="conectar"):
+        spotify.fetch("spotify:track:6OmhkSOpvYBokMKQxpIGx2", session=FakeSession(exc=requests.ConnectionError()))
+    s = FakeSession()
+    with pytest.raises(spotify.SpotifyError, match="no es un enlace"):
+        spotify.fetch("https://example.com/x", session=s)
+    assert s.urls == []
+
+
+def test_fetch_reads_the_saved_page_in_a_test_copy(monkeypatch, tmp_path):
+    f = tmp_path / "page.html"
+    f.write_text(PAGE, encoding="utf-8")
+    monkeypatch.setenv("BAKIN_FAKE_SPOTIFY", str(f))
+    s = FakeSession(status=500)
+    assert spotify.fetch("spotify:album:4aawyAB9vmqN3uQ7FjRGTy", session=s)["name"] == "Disco de prueba"
+    assert s.urls == []  # never the network
+
+
+def test_csv_edge_cases():
+    with pytest.raises(spotify.SpotifyError, match="no tiene temas"):
+        spotify.from_csv("Track Name,Artist Name(s)\n")
+    with pytest.raises(spotify.SpotifyError, match="columnas"):
+        spotify.from_csv("Song,Who\nA,B\n")
+    d = spotify.from_csv("title,artists\nTema,A; B\n")  # other names for the columns; no length, no album
+    assert d["tracks"] == [{"title": "Tema", "artists": ["A", "B"], "duration": None, "explicit": False, "album": ""}]

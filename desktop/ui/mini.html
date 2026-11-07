@@ -6,24 +6,22 @@
   <title>Bakin</title>
   <script type="importmap">{"imports":{"@glass-midas/core":"./vendor/glass-midas/core/index.js"}}</script>
   <link rel="stylesheet" href="vendor/glass-midas/components/styles.css">
+  <link rel="stylesheet" href="tokens.css">
   <link rel="stylesheet" href="mini.css">
   <script type="module" src="mini.js"></script>
 </head>
 <body data-layout="bar">
-  <!-- «Modo mínimo»: only the music bar. Drag it by any empty spot. -->
+  <!-- «Modo mínimo» (0.24): a bar or the cover as a card. Drag it by any empty spot or the cover;
+       double click or Esc: back to the full window; the wheel: volume; ⋯: the rest. -->
   <main class="mini" data-tauri-drag-region>
-    <button class="m-cover" id="m-cover" title="Volver a la ventana completa" aria-label="Volver a la ventana completa">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
-    </button>
+    <div class="m-cover" id="m-cover" data-tauri-drag-region title="Doble clic: volver a la ventana completa">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-tauri-drag-region><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+    </div>
     <div class="m-meta" data-tauri-drag-region>
       <strong id="m-title" data-tauri-drag-region>Nada sonando</strong>
-      <small id="m-artist" data-tauri-drag-region></small>
+      <div class="m-sub" data-tauri-drag-region><small id="m-artist" data-tauri-drag-region></small><span class="m-time" id="m-time" data-tauri-drag-region></span></div>
       <div class="m-seek" id="m-seek" title="Ir a ese momento"><i id="m-fill"></i></div>
-      <span class="m-time" id="m-time" data-tauri-drag-region></span>
-      <label class="m-vol-row" title="Volumen (también con la rueda del mouse)">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H2v6h4l5 4zM15.5 8.5a5 5 0 0 1 0 7"/></svg>
-        <gm-slider class="m-slider"><input type="range" id="m-volume" min="0" max="100" step="1" value="80" aria-label="Volumen"></gm-slider>
-      </label>
+      <span class="m-volnote" id="m-volnote" aria-live="polite" hidden></span>
     </div>
     <div class="m-buttons">
       <button class="gm-chip gm-chip-plain gm-chip-round" id="m-prev" aria-label="Atrasar; clic derecho: tema anterior">
@@ -33,36 +31,27 @@
         <svg class="i-pause" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4.5" width="4" height="15" rx="1"/><rect x="14" y="4.5" width="4" height="15" rx="1"/></svg></button>
       <button class="gm-chip gm-chip-plain gm-chip-round" id="m-next" aria-label="Adelantar; clic derecho: tema siguiente">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 4 10 8-10 8zM19 5v14"/></svg></button>
-      <button class="gm-chip gm-chip-plain gm-chip-round" id="m-vol" aria-pressed="false" title="Volumen" aria-label="Volumen">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4zM15.5 8.5a5 5 0 0 1 0 7M19 5a10 10 0 0 1 0 14"/></svg></button>
     </div>
     <div class="m-window">
+      <button class="gm-chip gm-chip-plain gm-chip-round" id="m-expand" title="Volver a la ventana completa (Esc)" aria-label="Volver a la ventana completa">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg></button>
       <button class="gm-chip gm-chip-plain gm-chip-round m-more" id="m-more" aria-expanded="false" title="Más opciones" aria-label="Más opciones">
         <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg></button>
-      <button class="gm-chip gm-chip-plain gm-chip-round" id="m-pin" data-layer="top" title="Siempre encima" aria-label="Capa: siempre encima">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5M5 17h14l-2-4V5H7v8z"/></svg></button>
-      <button class="gm-chip gm-chip-plain gm-chip-round" id="m-through" aria-pressed="false" title="Transparente al mouse: los clics pasan a lo que está detrás (para volver: menú de Bakin en la bandeja)" aria-label="Transparente al mouse">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 3l6.5 17 2.4-7.1L20 10.5z"/><path d="M3 21 21 3" opacity="0.55"/></svg></button>
-      <button class="gm-chip gm-chip-plain gm-chip-round" id="m-size" title="Tamaño" aria-label="Cambiar el tamaño">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2.5"/><path d="M3 12h18"/></svg></button>
-      <button class="gm-chip gm-chip-plain gm-chip-round" id="m-expand" title="Ventana completa" aria-label="Ventana completa">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg></button>
-      <button class="gm-chip gm-chip-plain gm-chip-round m-close" id="m-close" title="Cerrar (la música sigue en la bandeja si así lo configuraste)" aria-label="Cerrar">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m7 7 10 10M17 7 7 17"/></svg></button>
     </div>
+    <div class="m-grip" id="m-grip" title="Arrastrar para cambiar el tamaño" aria-hidden="true"></div>
   </main>
-  <!-- what opens from ⋯ (the song only) and from 🔊 (the bar), in room the window makes for it -->
+  <!-- ⋯: in room the window makes for it (down, or up near the screen's bottom edge) -->
   <div class="m-pop" id="m-pop" hidden>
     <div class="m-menu" id="m-menu" role="menu" aria-label="Opciones">
-      <button role="menuitem" id="mm-layer"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5M5 17h14l-2-4V5H7v8z"/></svg><span>Siempre encima</span></button>
-      <button role="menuitem" id="mm-through"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 3l6.5 17 2.4-7.1L20 10.5z"/></svg><span>Transparente al mouse</span></button>
-      <button role="menuitem" id="mm-size"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2.5"/><path d="M3 12h18"/></svg><span>Tamaño</span></button>
-      <button role="menuitem" id="mm-expand"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg><span>Ventana completa</span></button>
+      <button role="menuitemcheckbox" id="mm-top" aria-checked="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5M5 17h14l-2-4V5H7v8z"/></svg><span>Siempre encima</span><i class="mm-check" aria-hidden="true">✓</i></button>
+      <button role="menuitem" id="mm-layout"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="3"/></svg><span>Ver como tarjeta</span></button>
+      <button role="menuitem" id="mm-gaming"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 3l6.5 17 2.4-7.1L20 10.5z"/></svg><span>Modo gaming</span></button>
       <hr>
-      <button role="menuitem" id="mm-close" class="danger"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m7 7 10 10M17 7 7 17"/></svg><span>Cerrar</span></button>
+      <button role="menuitem" id="mm-tray"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m7 7 10 10M17 7 7 17"/></svg><span>Cerrar y seguir en la bandeja</span></button>
     </div>
-    <div class="m-volpop" id="m-volpop">
-      <gm-slider class="m-slider m-slider-v"><input type="range" id="m-volume-v" min="0" max="100" step="1" value="80" aria-label="Volumen"></gm-slider>
+    <div class="m-ask" id="m-ask" hidden>
+      <p><strong>Modo gaming</strong> Los clics van a pasar a lo que está detrás. Para volver: Ctrl+Shift+G o el ícono de Bakin en la bandeja.</p>
+      <div class="m-ask-actions"><button class="gm-chip gm-chip-plain" id="m-ask-no">Cancelar</button><button class="gm-chip gm-chip-primary" id="m-ask-yes">Activar</button></div>
     </div>
   </div>
 </body>

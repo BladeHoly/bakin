@@ -87,16 +87,12 @@ fn clipboard_loop(app: AppHandle) {
             continue;
         }
         if let Some(text) = clipboard_text() {
-            let t = text.trim();
-            let one_link = (t.starts_with("http://") || t.starts_with("https://"))
-                && t.len() < 2048
-                && !t.chars().any(char::is_whitespace);
-            if one_link {
+            if let Some(t) = single_link(&text) {
                 if app.get_webview_window("main").is_some() {
                     let _ = app.emit("clipboard-link", json!({ "url": t }));
                 } else {
                     // no window (closed in the tray): offer it when Bakin is opened
-                    let link = format!("bakin://download?url={}", percent_encode(t));
+                    let link = inbox_link(t);
                     app.state::<Inbox>().0.lock().unwrap().push(link);
                     if app.state::<crate::background::Notify>().0.load(Ordering::Relaxed) {
                         use tauri_plugin_notification::NotificationExt;
@@ -106,6 +102,18 @@ fn clipboard_loop(app: AppHandle) {
             }
         }
     }
+}
+
+/// The copied text when it is one http(s) link and nothing else (trimmed).
+fn single_link(text: &str) -> Option<&str> {
+    let t = text.trim();
+    let one_link = (t.starts_with("http://") || t.starts_with("https://")) && t.len() < 2048 && !t.chars().any(char::is_whitespace);
+    one_link.then_some(t)
+}
+
+/// A copied link kept for when the window opens: it goes through the download dialog.
+fn inbox_link(url: &str) -> String {
+    format!("bakin://download?url={}", percent_encode(url))
 }
 
 /// Encodes a URL to travel inside a bakin:// link's query.
@@ -163,4 +171,31 @@ fn clipboard_text() -> Option<String> {
 #[cfg(not(windows))]
 fn clipboard_text() -> Option<String> {
     None
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn only_a_lone_web_link_counts() {
+        assert_eq!(single_link("  https://youtu.be/abc?t=1 \r\n"), Some("https://youtu.be/abc?t=1"));
+        assert_eq!(single_link("http://example.com"), Some("http://example.com"));
+        assert_eq!(single_link("mira esto https://youtu.be/abc"), None);
+        assert_eq!(single_link("https://a.com https://b.com"), None);
+        assert_eq!(single_link("ftp://example.com/x"), None);
+        assert_eq!(single_link("file:///C:/Bakin/x"), None);
+        assert_eq!(single_link("HTTPS://EXAMPLE.COM"), None);
+        assert_eq!(single_link(""), None);
+        let long = format!("https://example.com/{}", "a".repeat(2048));
+        assert_eq!(single_link(&long), None);
+    }
+
+    #[test]
+    fn links_travel_encoded() {
+        assert_eq!(percent_encode("AZaz09-_.~"), "AZaz09-_.~");
+        assert_eq!(percent_encode("https://x.com/a?b=1&c=d e"), "https%3A%2F%2Fx.com%2Fa%3Fb%3D1%26c%3Dd%20e");
+        assert_eq!(percent_encode("ñ"), "%C3%B1"); // UTF-8 bytes
+        assert_eq!(inbox_link("https://youtu.be/x"), "bakin://download?url=https%3A%2F%2Fyoutu.be%2Fx");
+    }
 }

@@ -23,7 +23,26 @@ def _isolate(tmp_path, monkeypatch):
     from bakin import audiotags, music
     music.reset_memory_cache()
     audiotags.reset_memory_cache()
+    # every Service a test makes is wound down when it ends: its scheduler, timers and worker read
+    # BAKIN_HOME when they act, and one left running wrote into the next test's data folder
+    # (test_follow_only_new_marks_existing_as_seen failed now and then)
+    from bakin import service
+    made = []
+    real_init = service.Service.__init__
+
+    def tracked(self, *a, **kw):
+        real_init(self, *a, **kw)
+        made.append(self)
+    monkeypatch.setattr(service.Service, "__init__", tracked)
     yield
+    for s in made:
+        s._closing = True
+        s._cancel.set()
+        for t in list(getattr(s, "_mirror_timers", {}).values()):
+            t.cancel()
+        w = getattr(s, "_worker", None)
+        if w is not None and w.is_alive():
+            w.join(timeout=5)
     wallhaven.forget_key_cache()
     redact.clear_secrets()
 

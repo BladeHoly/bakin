@@ -656,6 +656,21 @@ class Service:
         log.info("cookies imported into the vault (%d presets)", len(switched))
         return {"ok": True, "presets": switched, "file": str(src), "status": self._vault_cookies_status()}
 
+    def cookies_use_vault(self) -> dict:
+        """The presets stuck on a browser Windows won't let yt-dlp read (Brave, Chrome, Edge…)
+        use the cookies saved in Bakin instead."""
+        from . import mediadl, vault
+        if not vault.has(mediadl.VAULT_COOKIES):
+            return {"ok": False, "error": "No hay cookies guardadas en Bakin."}
+        ms = mediadl.load_settings()
+        switched = []
+        for p in ms["presets"]:
+            if p["cookies_source"] == "browser" and p["cookies_browser"] in mediadl.LOCKED_BROWSERS:
+                p["cookies_source"], p["cookies_file"] = "vault", ""
+                switched.append(p["name"])
+        mediadl.save_settings(ms)
+        return {"ok": True, "presets": switched}
+
     def cookies_delete_original(self) -> dict:
         """Deletes the plain cookies.txt that was imported (overwritten first; not to the Recycle
         Bin, where it would stay readable). Only that file, and only once it's in the vault."""
@@ -1164,6 +1179,17 @@ class Service:
         if allow_remove and not pl["mirror"].get("remove_ok"):
             music.playlist_mirror(playlist_id, {**pl["mirror"], "remove_ok": True})
         self._mirror_soon(playlist_id, 0.0)
+        return {"ok": True}
+
+    @staticmethod
+    def music_mirror_open(playlist_id: str) -> dict:
+        """«Espejo ✓» › «Abrir la carpeta»: the playlist's own mirror folder, nothing else."""
+        from . import music
+        pl = music.playlist(playlist_id)
+        folder = Path(((pl or {}).get("mirror") or {}).get("folder", ""))
+        if not pl or not folder.is_absolute() or not folder.is_dir():
+            return {"ok": False, "error": "La carpeta espejo no está (¿un pendrive o el celular desconectado?)."}
+        os.startfile(folder)  # noqa: S606
         return {"ok": True}
 
     def _mirror_soon(self, playlist_id: str, delay: float | None = None) -> None:
@@ -1883,10 +1909,20 @@ class Service:
         """Send to the Windows Recycle Bin."""
         from . import library
         done, failed = 0, []
+        idx = self._lib_index()
+        yt = {it["id"]: it.get("yt_id") for items in idx["items"].values() for it in items if it.get("yt_id")}
         for col, rels in self._lib_split(ids).items():
             ok, bad = library.delete_items(col, rels)
             done += len(ok)
             failed += [{"name": f["rel"], "reason": f["reason"]} for f in bad]
+            # the song's YouTube ID stays with its entry: Eliminadas can bring it back (pulido P3 #26)
+            keep = {rel: yt[f"{col.id}|{rel}"] for rel in ok if f"{col.id}|{rel}" in yt}
+            if keep:
+                meta = library.Meta(col)
+                for rel, vid in keep.items():
+                    if rel in meta.deleted:
+                        meta.deleted[rel]["yt_id"] = vid
+                meta.save()
         self._lib_invalidate()
         msg = f"{done} enviado{'s' if done != 1 else ''} a la Papelera de Windows."
         if failed:
@@ -1907,7 +1943,7 @@ class Service:
                     bins[drive] = library.recycle_bin_index(library.bin_root_of(original)) if drive else {}
                 out.append({"id": f"{cid}|{rel}", "col": cid, "collection": col.name, "rel": rel,
                             "name": Path(rel).name, "kind": library.kind_of(Path(rel).suffix[1:]),
-                            "size": rec.get("size"), "deleted_at": rec.get("at"),
+                            "size": rec.get("size"), "deleted_at": rec.get("at"), "yt_id": rec.get("yt_id") or "",
                             "in_recycle_bin": str(original).lower() in bins[drive]})
         out.sort(key=lambda r: r["deleted_at"] or "", reverse=True)
         return {"items": out}
@@ -1938,6 +1974,46 @@ class Service:
         if failed:
             msg += f" {len(failed)} no: {failed[0]['reason']}."
         return {"ok": not failed, "restored": done, "failed": failed, "message": msg}
+
+    def library_redownload(self, ids: list) -> dict:
+        """Eliminadas: download again, from YouTube, the deleted songs that kept their ID, into
+        their folder and under their name, with the default preset; they leave the list."""
+        from . import library, mediadl, tools
+        missing = tools.missing()
+        if missing:
+            return {"ok": False, "field": "tools", "missing": missing,
+                    "error": "Hace falta " + ", ".join(missing) + ": instálalas desde «Herramientas»."}
+        ms = mediadl.load_settings()
+        base = next(p for p in ms["presets"] if p["id"] == ms["default_preset"])
+        queued, refused, no_id = 0, [], []
+        with self._lock:
+            for col, rels in self._lib_split(ids).items():
+                meta = library.Meta(col)
+                done = set()
+                for rel in rels:
+                    rec = meta.deleted.get(rel)
+                    if rec is None:
+                        continue
+                    if not rec.get("yt_id"):
+                        no_id.append(Path(rel).name)
+                        continue
+                    old = Path(rec.get("path") or col.root / rel)
+                    preset = mediadl.clean_preset({**base,
+                                                   "folder": str(old.parent), "template": old.stem.replace("%", "%%") + ".%(ext)s",
+                                                   "archive": False, "playlist_items": ""})
+                    r = self._start_media(f"https://www.youtube.com/watch?v={rec['yt_id']}", {}, preset_obj=preset,
+                                          retry_on_partial=True, title=f"Volver a bajar: {old.name}")
+                    if r.get("ok"):
+                        queued += 1
+                        done.add(rel)
+                    else:
+                        refused.append(f"{old.name}: {r.get('error')}")
+                for rel in done:
+                    meta.deleted.pop(rel)
+                if done:
+                    meta.save()
+        self._push_queue()
+        return {"ok": True, "queued": queued, "refused": refused, "no_id": no_id}
 
     def library_forget(self, ids: list, redownload: bool = False) -> dict:
         """Drop deleted entries from the list."""
@@ -2221,6 +2297,15 @@ class Service:
             self._cancel.set()
         self._push_queue()
 
+    def cancel_current(self) -> dict:
+        """The ✕ of what downloads now (0.24): stop only that job; the queue goes on with the next."""
+        with self._lock:
+            running = self._current is not None
+            if running:
+                self._cancel.set()
+        self._push_queue()
+        return {"ok": running}
+
     def remove_queued(self, item_id: int) -> dict:
         with self._lock:
             before = len(self._queue)
@@ -2406,7 +2491,9 @@ class Service:
     def _run_media(self, item: dict) -> str:
         from . import mediadl
         preset, url = item["preset"], item["url"]
+        # url and preset_id: the Descargas list retries a failed song with them (0.24)
         self._push({"kind": "start", "mode": "media", "target_kind": "media", "title": item["title"],
+                    "url": url, "preset_id": preset.get("id", ""),
                     "message": f"Descargando {url} con «{preset['name']}»"})
         ms = mediadl.load_settings()
         out_dir = mediadl.destination(preset, item["root"])

@@ -46,7 +46,7 @@ MAX_TOTAL = 512 * 1024 * 1024        # uncompressed bytes: a zip bomb stops here
 MAX_FILE = 256 * 1024 * 1024
 
 # Plain files copied from app_dir() as they are (after the checks below).
-_FIXED = ("ui-settings.json", "media.json", "library-folders.json", "follows.json", "queue.json",
+_FIXED = ("ui-settings.json", "hotkeys.json", "mini.json", "media.json", "library-folders.json", "follows.json", "queue.json",
           "wallpapers.json", "music/plays.json", "music/plays-log.jsonl", "music/skips.json",
           "music/playlists.json", "music/loudness.json")
 _LYRIC = re.compile(r"music/lyrics/[A-Za-z0-9_-]{1,80}\.lrc")
@@ -186,7 +186,7 @@ def export(dest: Path, download_root: Path | None = None) -> dict:
                 raw = _dumps(_clean_media(data))
             elif name == "library-folders.json" and isinstance(data, dict):
                 raw = _dumps({"folders": [f for f in data.get("folders") or [] if isinstance(f, str)]})
-            elif name in ("ui-settings.json", "follows.json", "queue.json", "wallpapers.json"):
+            elif name in ("ui-settings.json", "hotkeys.json", "mini.json", "follows.json", "queue.json", "wallpapers.json"):
                 raw = _dumps(_scrub(data))
         entries[name] = raw
     lyr = base / "music" / "lyrics"
@@ -494,9 +494,13 @@ def _merge_music(b: _Backup, out: dict, count_plays: bool) -> None:
 
 def _merge_settings(b: _Backup, out: dict) -> None:
     base = app_dir()
-    new = _scrub(b.dict("ui-settings.json"))
-    if new:
-        cur = _read_json(base / "ui-settings.json", {})
+    # the shortcuts and the mini's layout ride along (pulido P2 #21); like the rest, what this
+    # Bakin already set stays: only what it never chose comes from the copy
+    for name in ("ui-settings.json", "hotkeys.json", "mini.json"):
+        new = _scrub(b.dict(name))
+        if not new:
+            continue
+        cur = _read_json(base / name, {})
         cur = cur if isinstance(cur, dict) else {}
         add = {}
         for k, v in new.items():
@@ -506,7 +510,7 @@ def _merge_settings(b: _Backup, out: dict) -> None:
                 continue  # a folder of the other PC
             add[k] = v
         if add:
-            _atomic_json(base / "ui-settings.json", {**cur, **add})
+            _atomic_json(base / name, {**cur, **add})
             out["settings"] += len(add)
 
     media = b.dict("media.json")

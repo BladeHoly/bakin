@@ -47,44 +47,102 @@ fn private_ws(pid: u32) -> Option<u64> {
     }
 }
 
-#[tauri::command]
-pub fn usage() -> Value {
-    let me = std::process::id();
-    let all = processes();
-    // Bakin and everything below it
+/// `me` and every process below it, from (pid, parent pid, exe name) of all of them.
+fn descendants(me: u32, all: &[(u32, u32, String)]) -> Vec<(u32, String)> {
     let mut ours = vec![(me, "bakin-desktop.exe".to_string())];
     let mut i = 0;
     while i < ours.len() {
         let parent = ours[i].0;
-        for (pid, ppid, name) in &all {
+        for (pid, ppid, name) in all {
             if *ppid == parent && !ours.iter().any(|(p, _)| p == pid) {
                 ours.push((*pid, name.clone()));
             }
         }
         i += 1;
     }
+    ours
+}
+
+/// Which of `usage`'s groups a process counts in; None for the console host (not Bakin's).
+fn group_of(pid: u32, me: u32, name: &str) -> Option<usize> {
+    let n = name.to_lowercase();
+    if n == "conhost.exe" {
+        None
+    } else if pid == me {
+        Some(0)
+    } else if n.starts_with("bakin-engine") || n.starts_with("python") {
+        Some(1)
+    } else if n.starts_with("msedgewebview2") {
+        Some(2)
+    } else {
+        Some(3)
+    }
+}
+
+/// Bytes as MB with one decimal.
+fn mb(b: u64) -> f64 {
+    (b as f64 / 1_048_576.0 * 10.0).round() / 10.0
+}
+
+#[tauri::command]
+pub fn usage() -> Value {
+    let me = std::process::id();
+    // Bakin and everything below it
+    let ours = descendants(me, &processes());
     let mut groups: Vec<(&str, u64)> = vec![("Bakin y el reproductor", 0), ("Motor de descargas", 0), ("Ventana", 0), ("Herramientas", 0)];
     for (pid, name) in &ours {
-        let n = name.to_lowercase();
-        if n == "conhost.exe" {
-            continue;
-        }
+        let Some(g) = group_of(*pid, me, name) else { continue };
         let Some(bytes) = private_ws(*pid) else { continue };
-        let g = if *pid == me {
-            0
-        } else if n.starts_with("bakin-engine") || n.starts_with("python") {
-            1
-        } else if n.starts_with("msedgewebview2") {
-            2
-        } else {
-            3
-        };
         groups[g].1 += bytes;
     }
-    let mb = |b: u64| (b as f64 / 1_048_576.0 * 10.0).round() / 10.0;
     let total: u64 = groups.iter().map(|g| g.1).sum();
     json!({
         "total_mb": mb(total),
         "groups": groups.iter().map(|(name, b)| json!({ "name": name, "mb": mb(*b) })).collect::<Vec<_>>(),
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn p(pid: u32, ppid: u32, name: &str) -> (u32, u32, String) {
+        (pid, ppid, name.to_string())
+    }
+
+    #[test]
+    fn bakin_and_everything_below_it() {
+        let all = vec![
+            p(1, 0, "explorer.exe"),
+            p(10, 1, "bakin-desktop.exe"),
+            p(11, 10, "bakin-engine.exe"),
+            p(12, 11, "yt-dlp.exe"),
+            p(13, 12, "yt-dlp.exe"), // yt-dlp runs as two processes
+            p(14, 10, "msedgewebview2.exe"),
+            p(20, 1, "chrome.exe"),
+            p(21, 20, "msedgewebview2.exe"), // another app's WebView2
+        ];
+        let ours: Vec<u32> = descendants(10, &all).iter().map(|(pid, _)| *pid).collect();
+        assert_eq!(ours, vec![10, 11, 14, 12, 13]);
+        assert_eq!(descendants(99, &all).len(), 1); // nothing below: just itself
+    }
+
+    #[test]
+    fn processes_by_group() {
+        assert_eq!(group_of(10, 10, "bakin-desktop.exe"), Some(0));
+        assert_eq!(group_of(11, 10, "Bakin-Engine.exe"), Some(1));
+        assert_eq!(group_of(11, 10, "python.exe"), Some(1)); // the engine from the .venv
+        assert_eq!(group_of(14, 10, "msedgewebview2.exe"), Some(2));
+        assert_eq!(group_of(12, 10, "ffmpeg.exe"), Some(3));
+        assert_eq!(group_of(15, 10, "conhost.exe"), None);
+    }
+
+    #[test]
+    fn megabytes_with_one_decimal() {
+        assert_eq!(mb(0), 0.0);
+        assert_eq!(mb(1_048_576), 1.0);
+        assert_eq!(mb(157_286_400 + 10_000), 150.0);
+        assert_eq!(mb(157_286_400 + 60_000), 150.1);
+        assert_eq!(mb(1_572_864), 1.5);
+    }
 }

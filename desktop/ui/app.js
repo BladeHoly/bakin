@@ -24,8 +24,6 @@ const store = {
 
 let running = false;
 let queue = [];          // jobs waiting behind the running one (from the engine)
-let jobKind = '';
-let total = null;
 
 // ------------------------------------------------------------ window chrome
 async function syncMax() {
@@ -100,18 +98,11 @@ function applySettings(s) {
 }
 
 // ------------------------------------------------------------------- jobs
+// The ring on top follows the job (the row in Descargas draws its own bar, dlRenderNow)
 function setMeter(done, max) {
-  const m = $('meter');
   ringDone = max ? Math.max(0, Math.min(1, done / max)) : null;
   syncProgressRing();
-  if (!max) { m.setAttribute('aria-busy', 'true'); m.removeAttribute('aria-valuenow'); return; }
-  m.removeAttribute('aria-busy');
-  const v = Math.max(0, Math.min(1, done / max));
-  m.style.setProperty('--value', v.toFixed(4));
-  m.setAttribute('aria-valuenow', Math.round(v * 100));
 }
-
-let queueMore = null;
 
 // ------------------------------------------------------------ background
 // With work pending, closing the window keeps Bakin in the tray (the shell
@@ -291,7 +282,6 @@ async function wireBackground() {
       toast(e.target.checked ? tr('Bakin va a arrancar con Windows, oculto en la bandeja.') : tr('Bakin ya no arranca con Windows.'));
     } catch (err) { toast(tr(String(err))); e.target.checked = !e.target.checked; }
   });
-  $('btn-queue-pause').addEventListener('click', () => call('pause_queue').catch((e) => toast(tr(String(e)))));
   $('media-limit').addEventListener('change', async (e) => {
     const n = Math.max(0, Number(e.target.value) || 0);
     await call('media_set_option', { key: 'daily_limit', value: n });
@@ -301,7 +291,6 @@ async function wireBackground() {
 
 function setBusy(on) {
   running = on;
-  $('btn-cancel').hidden = !on;
   $('btn-cancel').disabled = false;
   $('busy-dot').hidden = !on;
   syncKeepAlive();
@@ -334,56 +323,389 @@ async function notifyIfAway(title, body) {
   } catch { /* notifications unavailable */ }
 }
 
-let queueLane = null;  // the lane whose jobs the list shows
-const LANE_ICON = {
+// ------------------------------------------------------------ Descargas
+// One list (PLAN pulido A3): a banner when the queue waits, «Bajando ahora»,
+// «Siguiente» (the rest of the list, then the queue), «Con problemas» and
+// «Listas · hoy». Errors and finished files live only in memory, for this
+// session; errors stay until «Reintentar», «Quitar» or «Limpiar las listas».
+const DL = { job: null, errors: [], done: [] };
+const DL_KEEP = 300;   // finished files remembered (newest first)
+const DL_SHOW = 100;   // rows drawn per section
+const USER_PAUSE = 'Pausada por ti.';  // the engine's reason for «Pausar» (here or the tray)
+const BLOCKED_RE = /\b429\b|\bbot\b|despacio|fren[óo]/i;  // the site asked to slow down: no «Seguir ahora», no «Reintentar»
+const HOURS_RE = /^Fuera del horario/;  // waits for the download hours: resuming wouldn't skip them
+const IMAGE_EXT = /\.(jpe?g|png|webp|gif|bmp|avif|heic)$/i;
+const AUDIO_EXT = /\.(opus|m4a|mp3|flac|wav|ogg|oga|aac|alac|wma)$/i;
+const DL_ICON = {
   media: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>',
   wallhaven: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="14" rx="3"/><path d="m3 15 5-5 5 5 3-3 5 5"/></svg>',
   convert: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h13l-3-3M20 17H7l3 3"/></svg>',
+  video: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="m10 9 5 3-5 3z"/></svg>',
+  error: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 2 20h20z"/><path d="M12 10v4M12 17h.01"/></svg>',
+  list: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h10"/></svg>',
+  x: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>',
+  play: '<svg viewBox="0 0 24 24" fill="currentColor" stroke="none" aria-hidden="true"><path d="M8 5.5v13l11-6.5z"/></svg>',
 };
+DL_ICON.audio = DL_ICON.media;
+DL_ICON.image = DL_ICON.wallhaven;
 
-function laneRow(l, st) {
-  const row = document.createElement('div');
-  row.className = 'lane';
-  row.dataset.lane = l.id;
-  row.setAttribute('role', 'tab');
-  row.tabIndex = 0;
-  row.setAttribute('aria-selected', String(l.id === queueLane));
-  const icon = document.createElement('span');
-  icon.className = 'lane-icon';
-  icon.innerHTML = LANE_ICON[l.id] || '';
-  const text = document.createElement('span');
-  text.className = 'lane-text';
-  const name = document.createElement('strong');
-  name.textContent = `${l.name} · ${l.count}`;
-  const state = document.createElement('small');
-  const when = l.held?.until ? new Date(l.held.until * 1000) : null;
-  const fmt = (d) => {
-    const today = new Date();
-    const tomorrow = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
-    const day = d.toDateString() === today.toDateString() ? tr('hoy') : d.toDateString() === tomorrow.toDateString() ? tr('mañana') : d.toLocaleDateString(LOCALE, { weekday: 'long' });
-    return `${day} ${d.toLocaleTimeString(LOCALE, { hour: '2-digit', minute: '2-digit' })}`;
-  };
-  // «Sigue sola mañana» / «Se reintenta solo en…»: the time already says it
-  const why = (l.held?.reason || '').replace(/\s*(Sigue sola|Se reintenta solo)[^.]*\.?\s*$/, '');
-  state.textContent = l.running ? tr('Bajando ahora') : l.held
-    ? `${when ? tr('Espera hasta {when}', { when: fmt(when) }) : tr('En pausa')}${why && why !== 'Pausada por ti.' ? ` · ${tr(why)}` : ''}`
-    : tr('En espera');
-  if (l.id === 'media' && st.daily_limit) state.textContent += tr(' · hoy {today} de {limit}', { today: st.downloads_today, limit: st.daily_limit });
-  if (l.held) row.dataset.tone = 'warning';
-  text.append(name, state);
-  const act = document.createElement('button');
-  act.type = 'button';
-  act.className = 'gm-chip gm-chip-plain';
-  act.textContent = l.held ? (when ? tr('Seguir ahora') : tr('Reanudar')) : tr('Pausar');
-  act.addEventListener('click', (e) => {
-    e.stopPropagation();
-    call(l.held ? 'queue_resume' : 'queue_pause', { lane: l.id }).catch((err) => toast(tr(String(err))));
-  });
-  row.append(icon, text, act);
-  const pick = () => { queueLane = l.id; renderQueue(queueState); };
-  row.addEventListener('click', pick);
-  row.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pick(); } });
-  return row;
+const dlNum = (v, digits = 1) => new Intl.NumberFormat(LOCALE, { maximumFractionDigits: digits }).format(v);
+const dlRate = (b) => (b >= 1048576 ? `${dlNum(b / 1048576)} MB/s` : `${dlNum(b / 1024, 0)} KB/s`);
+const dlBase = (p) => String(p || '').split(/[\\/]/).pop();
+const dlKindOf = (p) => (IMAGE_EXT.test(p) ? 'image' : AUDIO_EXT.test(p) ? 'audio' : 'video');
+const dlClock = (s) => `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, '0')}`;
+// «hoy a las 18:00», «mañana a las 00:05», «jueves a las 01:00»
+function dlWhen(ts) {
+  const d = new Date(ts * 1000);
+  const today = new Date();
+  const tomorrow = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
+  const day = d.toDateString() === today.toDateString() ? tr('hoy') : d.toDateString() === tomorrow.toDateString() ? tr('mañana') : d.toLocaleDateString(LOCALE, { weekday: 'long' });
+  return tr('{day} a las {time}', { day, time: d.toLocaleTimeString(LOCALE, { hour: '2-digit', minute: '2-digit' }) });
+}
+// The friendly part of an engine error, without yt-dlp's own words in parentheses (those go in `title`)
+function dlReason(msg) {
+  const s = tr(String(msg || '')).split('\n')[0];
+  const cut = s.indexOf('. (');
+  return cut > 0 && s.endsWith(')') ? s.slice(0, cut + 1) : s;
+}
+// The preset of a media job, from its start message («Descargando <url> con «Música»»)
+function dlPresetFrom(message) {
+  const m = /con «(.+)»\s*$/.exec(String(message || ''));
+  return (m && MEDIA?.presets.find((p) => p.name === m[1])?.id) || '';
+}
+
+function dlButton(label, onClick, { icon = '', round = false, aria = '' } = {}) {
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.className = `gm-chip gm-chip-plain${round ? ' gm-chip-round' : ''}`;
+  if (round) {
+    b.innerHTML = icon;
+    b.title = label;
+    b.setAttribute('aria-label', aria || label);
+  } else {
+    if (icon) b.insertAdjacentHTML('afterbegin', icon);
+    b.append(label);
+    if (aria) b.setAttribute('aria-label', aria);
+  }
+  b.addEventListener('click', onClick);
+  return b;
+}
+
+// A row: icon · title (and its second line) · state · actions
+function dlRow({ icon, title, sub = '', state = '', stateFull = '', tone = '', actions = [] }) {
+  const li = document.createElement('li');
+  li.className = 'dl-row';
+  if (tone) li.dataset.tone = tone;
+  const art = document.createElement('span');
+  art.className = 'dl-art';
+  art.setAttribute('aria-hidden', 'true');
+  art.innerHTML = icon || '';
+  const body = document.createElement('span');
+  body.className = 'dl-body';
+  const t = document.createElement('strong');
+  t.textContent = title;
+  t.title = title;
+  body.append(t);
+  if (sub) {
+    const s = document.createElement('small');
+    s.textContent = sub;
+    s.title = sub;
+    body.append(s);
+  }
+  const st = document.createElement('span');
+  st.className = 'dl-state';
+  const small = document.createElement('small');
+  small.textContent = state;
+  if (stateFull || state) small.title = stateFull || state;
+  st.append(small);
+  const act = document.createElement('span');
+  act.className = 'dl-actions';
+  act.append(...actions);
+  li.append(art, body, st, act);
+  return li;
+}
+
+function renderDownloads() {
+  dlRenderHead();
+  dlRenderBanner();
+  dlRenderNow();
+  dlRenderNext();
+  dlRenderErrors();
+  dlRenderDone();
+  $('dl-empty').hidden = !$('dl-now').hidden || !$('dl-next').hidden || !$('dl-err').hidden || !$('dl-done').hidden;
+}
+
+// The lanes «Pausar» put on hold (here or from the tray)
+function dlPauseState() {
+  const lanes = queueState.lanes || [];
+  return { lanes, mine: lanes.filter((l) => l.held && l.held.reason === USER_PAUSE) };
+}
+
+function dlRenderHead() {
+  const st = queueState;
+  $('dl-today').textContent = st.daily_limit ? tr('Hoy: {today} de {limit}', { today: st.downloads_today || 0, limit: st.daily_limit }) : '';
+  const held = dlPauseState().mine.length;
+  $('dl-pause').textContent = held ? tr('Reanudar') : tr('Pausar');
+  $('dl-pause').hidden = !held && !running && !queue.length;  // nothing to pause: no button
+  $('dl-clear').hidden = !DL.errors.length && !DL.done.length;
+}
+
+function dlRenderBanner() {
+  const lanes = queueState.lanes || [];
+  const held = lanes.filter((l) => l.held);
+  const box = $('dl-banner');
+  box.hidden = !held.length;
+  if (!held.length) return;
+  // the reason that says most: a limit or the site over «you paused it»
+  const h = (held.find((l) => l.held.reason && l.held.reason !== USER_PAUSE) || held[0]).held;
+  const mine = !h.reason || h.reason === USER_PAUSE;
+  $('dl-banner-head').textContent = held.length === lanes.length ? tr('Descargas en pausa:')
+    : tr('{lanes} en pausa:', { lanes: held.map((l) => tr(l.name)).join(', ') });
+  // «Sigue sola mañana» / «Se reintenta solo en…»: the time after it already says it
+  const why = mine ? tr('las pausaste tú.') : tr(h.reason.replace(/\s*(Sigue sola|Se reintenta solo|Empieza sola)[^.]*\.?\s*$/, ''));
+  $('dl-banner-why').textContent = h.until ? `${why} ${tr('Siguen {when}.', { when: dlWhen(h.until) })}` : why;
+  box.dataset.tone = mine ? 'info' : 'warning';
+  $('dl-banner-go').hidden = !held.some((l) => !BLOCKED_RE.test(l.held.reason || '') && !HOURS_RE.test(l.held.reason || ''));
+}
+
+function dlRenderNow() {
+  const run = (queueState.items || []).find((i) => i.status === 'running');
+  // a job that started before this page (a reload): its title from the queue, no details yet
+  const j = DL.job || (running && run ? { title: run.title, mode: run.lane === 'wallhaven' ? 'wallhaven' : run.lane === 'convert' ? 'convert' : 'media', status: tr('Descargando…'), pct: null } : null);
+  $('dl-now').hidden = !j;
+  if (!j) return;
+  const e = j.entry;
+  const wh = j.mode === 'wallhaven';
+  const art = $('dl-now-art');
+  const icon = j.mode === 'convert' ? 'convert' : wh ? 'wallhaven' : 'media';
+  if (art.dataset.icon !== icon) { art.innerHTML = DL_ICON[icon]; art.dataset.icon = icon; }
+  const title = (!wh && e?.title) || j.title || tr('Descargando…');
+  const name = !wh && e?.uploader ? `${title} · ${e.uploader}` : title;
+  $('dl-now-title').textContent = name;
+  $('dl-now-title').title = name;
+  // the job it belongs to: «After Hours (4 de 14)», or how far a Wallhaven job is
+  const sub = wh ? (j.wh ? tr('Fondos de Wallhaven: {index} de {count}', { index: j.wh.index, count: j.wh.count }) : tr('Fondos de Wallhaven'))
+    : e?.count ? tr('{job} ({index} de {count})', { job: j.title, index: e.index || '?', count: e.count })
+      : e && e.title !== j.title ? j.title : '';
+  $('dl-now-sub').textContent = sub;
+  $('dl-now-sub').title = sub;
+  $('dl-now-sub').hidden = !sub;
+  $('status').textContent = j.status || '';
+  $('status').title = j.status || '';
+  const m = $('meter');
+  if (j.pct == null) {
+    m.setAttribute('aria-busy', 'true');
+    m.removeAttribute('aria-valuenow');
+    m.style.setProperty('--value', '0');
+  } else {
+    m.removeAttribute('aria-busy');
+    m.style.setProperty('--value', Math.max(0, Math.min(1, j.pct)).toFixed(4));
+    m.setAttribute('aria-valuenow', String(Math.round(j.pct * 100)));
+  }
+  const c = $('btn-cancel');
+  const label = queue.length ? tr('Cancelar esta descarga (la cola sigue)') : tr('Cancelar');
+  if (c.title !== label) { c.title = label; c.setAttribute('aria-label', label); }
+}
+
+function dlRenderNext() {
+  const st = queueState;
+  const items = (st.items || []).filter((i) => i.status !== 'running');
+  const ul = $('dl-next-list');
+  ul.replaceChildren();
+  // yt-dlp tells each entry of a list only as it starts: the rest is a count
+  const e = DL.job?.entry;
+  const more = e?.count && Number(e.index) ? Math.max(0, e.count - e.index) : 0;
+  if (more) {
+    ul.append(dlRow({ icon: DL_ICON.list, title: tn('{n} tema más en esta lista', '{n} temas más en esta lista', more), sub: DL.job.title, state: tr('En cola') }));
+  }
+  const laneName = (id) => tr((st.lanes || []).find((l) => l.id === id)?.name || '');
+  for (const it of items.slice(0, DL_SHOW)) {
+    const paused = it.status === 'paused';
+    ul.append(dlRow({
+      icon: DL_ICON[it.lane] || DL_ICON.media,
+      title: it.title,
+      sub: it.mode === 'analyze' ? tr('Analizar') : laneName(it.lane || 'media'),
+      state: paused ? tr('En pausa') : tr('En cola'),
+      tone: paused ? 'warning' : '',
+      actions: [dlButton(tr('Quitar de la cola'), () => call('remove_queued', { item_id: it.id }).catch((err) => toast(tr(String(err)))),
+        { icon: DL_ICON.x, round: true, aria: tr('Quitar {title} de la cola', { title: it.title }) })],
+    }));
+  }
+  const waiting = Math.max(0, (st.total || 0) - ((st.items || []).some((i) => i.status === 'running') ? 1 : 0));
+  const hidden = waiting - Math.min(items.length, DL_SHOW);
+  if (hidden > 0) {
+    const li = document.createElement('li');
+    li.className = 'dl-more hint';
+    li.textContent = tr('… y {x} más', { x: hidden });
+    ul.append(li);
+  }
+  const n = waiting + more;
+  $('dl-next').hidden = !n;
+  $('dl-next-n').textContent = n ? `(${n})` : '';
+}
+
+function dlRenderErrors() {
+  $('dl-err-list').replaceChildren(...DL.errors.map((x) => {
+    const actions = [];
+    if (x.url) actions.push(dlButton(tr('Reintentar'), () => dlRetry(x), { aria: tr('Reintentar {title}', { title: x.title }) }));
+    if (x.action) actions.push(dlButton(x.action.label, x.action.run));
+    actions.push(dlButton(tr('Quitar'), () => { DL.errors = DL.errors.filter((y) => y !== x); renderDownloads(); },
+      { aria: tr('Quitar {title} de la lista', { title: x.title }) }));
+    return dlRow({ icon: DL_ICON.error, title: x.title, sub: x.job, state: dlReason(x.reason), stateFull: tr(String(x.reason || '')), tone: 'danger', actions });
+  }));
+  $('dl-err').hidden = !DL.errors.length;
+  $('dl-err-n').textContent = DL.errors.length ? `(${DL.errors.length})` : '';
+}
+
+function dlRenderDone() {
+  const ul = $('dl-done-list');
+  ul.replaceChildren(...DL.done.slice(0, DL_SHOW).map((d) => {
+    const ext = (/\.([^.\\/]+)$/.exec(d.path || '')?.[1] || '').toUpperCase();
+    const reveal = dlButton(tr('Mostrar en carpeta'), () => dlReveal(d), { aria: tr('Mostrar {title} en la carpeta', { title: d.title }) });
+    const actions = d.kind === 'audio'
+      ? [dlButton(tr('Reproducir'), () => dlPlay(d), { icon: DL_ICON.play, aria: tr('Reproducir {title}', { title: d.title }) }), reveal]
+      : [dlButton(d.kind === 'image' ? tr('Ver') : tr('Abrir'), () => dlOpen(d), { aria: tr('Abrir {title}', { title: d.title }) }), reveal];
+    return dlRow({ icon: DL_ICON[d.kind], title: d.artist ? `${d.title} · ${d.artist}` : d.title, sub: d.job,
+      state: [d.duration ? dlClock(d.duration) : '', ext].filter(Boolean).join(' · '), stateFull: d.path, actions });
+  }));
+  if (DL.done.length > DL_SHOW) {
+    const li = document.createElement('li');
+    li.className = 'dl-more hint';
+    li.textContent = tr('… y {x} más', { x: DL.done.length - DL_SHOW });
+    ul.append(li);
+  }
+  $('dl-done').hidden = !DL.done.length;
+  $('dl-done-n').textContent = DL.done.length ? `(${DL.done.length})` : '';
+}
+
+// The engine's events, into the list (the log and the toasts stay in onEngineEvent).
+// Progress only redraws «Bajando ahora»: the buttons of the other rows stay put under the mouse.
+const DL_LIVE = new Set(['media_url', 'media_progress', 'media_post', 'phase', 'wait', 'wallhaven_progress']);
+function dlOn(ev) {
+  const j = DL.job;
+  switch (ev.kind) {
+    case 'start':
+      DL.job = { title: ev.title || '', mode: ev.mode, url: ev.url || '', preset: ev.preset_id || dlPresetFrom(ev.message), entry: null, wh: null, failed: 0, pct: null,
+        status: { media: tr('Preparando yt-dlp…'), convert: tr('Convirtiendo…'), wallhaven: tr('Buscando en Wallhaven…') }[ev.mode] || tr('Empezando…') };
+      break;
+    case 'media_url':
+      if (!j) return;
+      j.url = ev.url || j.url;
+      j.status = ev.count > 1 ? tr('Analizando el enlace {index} de {count}…', { index: ev.index, count: ev.count }) : tr('Analizando el enlace …');
+      j.pct = null;
+      break;
+    case 'media_item':
+      if (!j || j.mode === 'wallhaven') return;  // a wallpaper: the job's count says it
+      j.entry = { id: ev.id, title: ev.title, uploader: ev.uploader, duration: ev.duration, index: ev.playlist_index, count: ev.n_entries };
+      if (ev.playlist_title) j.title = ev.playlist_title;  // «Noches de neón» rather than the link
+      j.status = tr('Descargando…');
+      j.pct = null;
+      break;
+    case 'media_progress':
+      if (!j) return;
+      if (ev.status === 'finished') {
+        j.status = tr('Descarga terminada, procesando…');
+        j.pct = 1;
+        break;
+      }
+      j.pct = ev.total ? (ev.downloaded || 0) / ev.total : null;
+      j.status = [ev.total ? `${Math.round(100 * j.pct)} %` : fmtSize(ev.downloaded || 0), ev.speed ? dlRate(ev.speed) : '',
+        ev.eta != null && ev.status === 'downloading' ? dlClock(ev.eta) : ''].filter(Boolean).join(' · ');
+      break;
+    case 'media_post': {
+      if (!j) return;
+      const steps = { ExtractAudio: tr('Convirtiendo el audio'), Merger: tr('Uniendo video y audio'), EmbedThumbnail: tr('Agregando la portada'),
+        Metadata: tr('Escribiendo metadatos'), SponsorBlock: tr('Buscando segmentos de SponsorBlock'), ModifyChapters: tr('Cortando segmentos'), MoveFiles: tr('Guardando') };
+      j.status = `${steps[ev.step] || ev.step}…`;
+      break;
+    }
+    case 'phase':
+      if (!j) return;
+      j.status = tr(ev.message);
+      break;
+    case 'wait':
+      if (!j) return;
+      j.status = tr('Esperando {seconds} s ({message})…', { seconds: Math.round(ev.seconds), message: tr(ev.message) });
+      break;
+    case 'wallhaven_progress':
+      if (!j) return;
+      j.wh = { index: ev.index, count: ev.count };
+      j.pct = ev.count ? (ev.index - 1) / ev.count : null;
+      j.status = j.pct == null ? '' : `${Math.round(100 * j.pct)} %`;
+      break;
+    case 'media_file': {
+      const e = j?.entry && ev.id && j.entry.id === ev.id ? j.entry : null;
+      if (e) e.done = true;
+      const title = ev.title || dlBase(ev.path);
+      DL.done.unshift({ title, artist: e?.uploader || '', duration: e?.duration || 0, path: ev.path || '',
+        kind: j?.mode === 'wallhaven' ? 'image' : dlKindOf(ev.path || ''), job: j && j.title !== title ? j.title : '', id: '' });
+      DL.done.length = Math.min(DL.done.length, DL_KEEP);
+      break;
+    }
+    case 'error':
+      dlAddError(ev.message);
+      break;
+    case 'finished':
+      // a job that failed as a whole, when no per-entry error told it already
+      if (ev.mode !== 'convert' && !j?.failed && (['error', 'stopped'].includes(ev.outcome) || (ev.outcome === 'ok' && / con error/.test(ev.message || '')))) {
+        dlAddError(ev.message, { whole: true, noRetry: ev.outcome === 'stopped' });
+      }
+      DL.job = null;
+      break;
+    default:
+      return;
+  }
+  if (DL_LIVE.has(ev.kind)) dlRenderNow(); else renderDownloads();
+}
+
+function dlAddError(message, { whole = false, noRetry = false } = {}) {
+  const j = DL.job;
+  const raw = String(message || '');
+  const m = /\[(\w+)\]\s+([\w-]{6,}):/.exec(raw);  // «[youtube] dQw4w9WgXcQ: Video unavailable»
+  const e = !whole && j?.entry && !j.entry.done && (!m || m[2] === j.entry.id) ? j.entry : null;
+  const yt = m && /youtube/i.test(m[1]) && /^[\w-]{11}$/.test(m[2]);
+  // «Reintentar» queues the same link with the same preset; never after a «slow down»,
+  // never for a «Mejorar» (its own preset) or a conversion
+  const url = noRetry || BLOCKED_RE.test(raw) || !j || j.mode !== 'media' || /^Mejorar: /.test(j.title || '') ? ''
+    : yt ? `https://www.youtube.com/watch?v=${m[2]}` : j.url;
+  DL.errors.unshift({ title: e?.title || j?.title || tr('Una descarga'), job: e && j.title !== e.title ? j.title : '', reason: raw, url, preset: j?.preset || '' });
+  DL.errors.length = Math.min(DL.errors.length, DL_SHOW);
+  if (j) j.failed += 1;
+}
+
+async function dlRetry(x) {
+  if (await startJob('download', x.url, x.preset ? { preset: x.preset } : {})) {
+    DL.errors = DL.errors.filter((y) => y !== x);
+    renderDownloads();
+  }
+}
+
+// A finished file's library item, found by its path the first time it's asked for
+async function dlItemId(d) {
+  if (d.id) return d.id;
+  const norm = (p) => String(p).replace(/\//g, '\\').toLowerCase();
+  const q = dlBase(d.path).replace(/\.[^.]+$/, '');
+  const res = await call('library_items', { filters: { q, sort: 'new' }, offset: 0, limit: 48 }).catch(() => null);
+  const it = res?.items.find((x) => norm(x.path) === norm(d.path));
+  if (!it) {
+    toast(tr('Todavía no está en la biblioteca: prueba en un momento.'));
+    return '';
+  }
+  d.id = it.id;
+  return it.id;
+}
+
+async function dlPlay(d) {
+  const id = await dlItemId(d);
+  if (id) plSetQueue(await tracksFor([id]), 0, tr('Descargas'));
+}
+async function dlReveal(d) {
+  const id = await dlItemId(d);
+  if (id) call('library_reveal', { item_id: id });
+}
+async function dlOpen(d) {
+  const id = await dlItemId(d);
+  if (id) call('library_open', { item_id: id });
 }
 
 function renderQueue(st) {
@@ -394,54 +716,48 @@ function renderQueue(st) {
   } else if (st.paused && st.reason && st.reason !== prev.reason && prev.total !== undefined) {
     notifyIfAway(tr('Bakin pausó la cola'), tr(st.reason));
   }
-  const allWaiting = st.items.filter((i) => i.status !== 'running');
-  queue = allWaiting;
+  queue = (st.items || []).filter((i) => i.status !== 'running');
   queueState = st;
-  const left = Math.max(0, (st.total ?? allWaiting.length) - (st.items.length - allWaiting.length));
-  // Colas (0.13 review): a row per lane with its count and state; each pauses on its own
-  const lanes = (st.lanes || []).filter((l) => l.count || l.held);
-  $('queue-card').hidden = !lanes.length;
-  $('queue-count').textContent = left ? tn('{n} trabajo en total', '{n} trabajos en total', left) : '';
-  const anyHeld = lanes.some((l) => l.held);
-  $('btn-queue-resume').hidden = !anyHeld;
-  $('btn-queue-pause').hidden = !lanes.some((l) => !l.held && l.count);
-  if (!lanes.some((l) => l.id === queueLane)) queueLane = (lanes.find((l) => l.running) || lanes.find((l) => !l.held) || lanes[0])?.id;
-  $('lanes').replaceChildren(...lanes.map((l) => laneRow(l, st)));
   syncKeepAlive();
-  $('btn-cancel').textContent = allWaiting.length ? tr('Cancelar todo') : tr('Cancelar');
-  const waiting = allWaiting.filter((i) => (i.lane || 'media') === queueLane);
-  const laneLeft = (lanes.find((l) => l.id === queueLane)?.count || 0) - (st.items.some((i) => i.status === 'running' && i.lane === queueLane) ? 1 : 0);
-  const ol = $('queue');
-  ol.replaceChildren();
-  if (laneLeft > waiting.length) {
-    const more = document.createElement('li');
-    more.className = 'queue-more hint';
-    more.textContent = tr('… y {x} más', { x: laneLeft - waiting.length });
-    queueMore = more;
-  } else queueMore = null;
-  waiting.forEach((item, n) => {
-    const li = document.createElement('li');
-    li.className = 'queue-item';
-    const pos = document.createElement('span');
-    pos.className = 'queue-pos';
-    pos.textContent = String(n + 1);
-    const name = document.createElement('strong');
-    name.textContent = item.title;
-    const what = document.createElement('span');
-    what.className = 'gm-badge';
-    what.dataset.tone = item.status === 'paused' ? 'warning' : 'info';
-    what.textContent = `${item.mode === 'analyze' ? tr('Analizar') : tr('Descargar')}${item.status === 'paused' ? tr(' · en pausa') : ''}`;
-    const rm = document.createElement('button');
-    rm.type = 'button';
-    rm.className = 'gm-chip gm-chip-plain gm-chip-round';
-    rm.title = tr('Quitar de la cola');
-    rm.setAttribute('aria-label', tr('Quitar {title} de la cola', { title: item.title }));
-    rm.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>';
-    rm.addEventListener('click', () => call('remove_queued', { item_id: item.id }).catch((e) => toast(tr(String(e)))));
-    li.append(pos, name, what, rm);
-    ol.append(li);
+  renderDownloads();
+}
+
+function wireDownloads() {
+  const go = (method, lane = '') => call(method, { lane }).catch((e) => toast(tr(String(e))));
+  // one pause for the whole queue (the tray's too); a lane the site asked to wait keeps waiting
+  $('dl-pause').addEventListener('click', async () => {
+    const { lanes, mine } = dlPauseState();
+    if (mine.length) {
+      if (mine.length === lanes.length) await go('queue_resume');
+      else for (const l of mine) await go('queue_resume', l.id);
+      return;
+    }
+    const free = lanes.filter((l) => !l.held);
+    if (free.length === lanes.length) await go('queue_pause');
+    else for (const l of free) await go('queue_pause', l.id);
   });
-  if (queueMore) ol.append(queueMore);
+  $('dl-banner-go').addEventListener('click', async () => {
+    for (const l of (queueState.lanes || []).filter((x) => x.held && !BLOCKED_RE.test(x.held.reason || '') && !HOURS_RE.test(x.held.reason || ''))) {
+      await go('queue_resume', l.id);
+    }
+  });
+  $('dl-clear').addEventListener('click', () => {
+    DL.errors = [];
+    DL.done = [];
+    renderDownloads();
+  });
+  $('dl-empty-go').addEventListener('click', () => $('btn-download').click());
+  $('btn-cancel').addEventListener('click', async () => {
+    // only what downloads now (cancel_current, 0.24): the queue goes on with the next
+    $('btn-cancel').disabled = true;
+    if (DL.job) {
+      DL.job.status = tr('Cancelando… (lo descargado se conserva)');
+      dlRenderNow();
+    }
+    await call('cancel_current').catch(() => {});
+  });
+  $('btn-open').addEventListener('click', () => call('open_dir'));
+  renderDownloads();
 }
 
 function log(tone, text) {
@@ -476,20 +792,23 @@ function onEngineEvent(ev) {
       break;
     case 'loud_progress':
       $('ld-status').textContent = tr('Midiendo el volumen: {done} de {total}…', { done: ev.done, total: ev.total });
+      $('ld-stop').hidden = ev.done >= ev.total;  // a long job can be stopped (pulido P2 #27)
       break;
     case 'loud_done':
+      $('ld-stop').hidden = true;
       $('ld-status').textContent = ev.measured || ev.failed ? tn('Listo: {n} tema medido', 'Listo: {n} temas medidos', ev.measured) + (ev.failed ? tr(', {failed} no se pudo', { failed: ev.failed }) : '') + '.' : tr('Todos los temas están medidos.');
       pushGains();
       break;
     case 'wallhaven_progress':  // one wallpaper of the job
       setMeter(ev.index - 1, ev.count);
-      $('status').textContent = tr('Fondo {index} de {count}…', { index: ev.index, count: ev.count });
       break;
     case 'media_leftovers':
       onLeftovers(ev);
       break;
     case 'cookies_bad':
-      toast(tr('Las cookies de «{preset}» dejaron de servir: los temas que piden tu cuenta (+18) van a fallar hasta que exportes un cookies.txt nuevo.', { preset: ev.preset }), { duration: 12000 });
+      // with the way to fix it (pulido P1 #7): Configuración › Cuentas, where a new cookies.txt goes
+      toast(tr('Las cookies de «{preset}» dejaron de servir: los temas que piden tu cuenta (+18) van a fallar hasta que importes un cookies.txt nuevo.', { preset: ev.preset }),
+        { duration: 12000, action: { label: tr('Arreglar'), onClick: () => openSettings('accounts') } });
       notifyIfAway(tr('Bakin: cookies vencidas'), tr('Exporta un cookies.txt nuevo para los temas que piden tu cuenta.'));
       renderCookiesHealth();
       break;
@@ -505,22 +824,14 @@ function onEngineEvent(ev) {
       break;
     case 'start':
       setBusy(true);
-      jobKind = ev.target_kind;
-      total = null;
-      $('job-title').textContent = ev.title;
-      $('job-badge').hidden = true;
-      $('stop-note').hidden = true;
-      $('status').textContent = { media: tr('Preparando yt-dlp…'), convert: tr('Convirtiendo…'), wallhaven: tr('Buscando en Wallhaven…') }[ev.mode] || tr('Empezando…');
       $('btn-open').disabled = true;
       setMeter(0, null);
       log('info', tr(ev.message));
       break;
     case 'phase':
-      $('status').textContent = tr(ev.message);
       log('muted', tr(ev.message));
       break;
     case 'wait':
-      $('status').textContent = tr('Esperando {seconds} s ({message})…', { seconds: Math.round(ev.seconds), message: tr(ev.message) });
       break;
     case 'finished': {
       setBusy(false);
@@ -529,20 +840,14 @@ function onEngineEvent(ev) {
       if (ev.dir) $('btn-open').disabled = false;
       if (ev.outcome === 'ok') {
         setMeter(1, 1);
-        $('status').textContent = tr(ev.message);
         if (ev.lane) doneToast(ev);
         else toast(tr(ev.message), ev.dir ? { action: { label: tr('Abrir carpeta'), onClick: () => call('open_dir') }, duration: 7000 } : {});
         log('success', tr(ev.message));
       } else if (ev.outcome === 'cancelled') {
-        $('status').textContent = tr(ev.message);
         toast(tr(ev.message));
         log('muted', tr(ev.message));
       } else {
-        $('status').textContent = ev.outcome === 'stopped' ? tr('El sitio pidió parar. Lo bajado se conserva.') : 'Error.';
-        const note = $('stop-note');
-        note.hidden = false;
-        note.textContent = tr(ev.message);
-        // the reason, not just «Ocurrió un error» (0.9.2: a song of the queue failed and nobody knew which)
+        // the reason (it stays in Descargas › Con problemas, dlOn), not just «Ocurrió un error» (0.9.2: a song of the queue failed and nobody knew which)
         const why = tr(String(ev.message || '')).split('\n')[0];
         toast(ev.outcome === 'stopped' ? tr('El sitio pidió parar') : why ? `Error: ${why.length > 220 ? `${why.slice(0, 220)}…` : why}` : tr('Ocurrió un error'),
           { duration: 9000, action: { label: tr('Ver'), onClick: () => setView('downloads') } });
@@ -553,6 +858,7 @@ function onEngineEvent(ev) {
     default:
       log(KIND_TONE[ev.kind] ?? 'muted', tr(ev.message));
   }
+  dlOn(ev);  // after: `running` is already up to date
 }
 
 // One «done» toast per lane, adding up (0.13 review: a dozen small Wallhaven jobs
@@ -570,7 +876,10 @@ function doneToast(ev) {
   if (d.skipped) text += tn(' · {n} ya estaba', ' · {n} ya estaban', d.skipped);
   if (!d.count && !d.skipped) text = tr(ev.message);
   // the same toast while it's on screen (glass-midas' `key`)
-  toast(text, { key: `done-${ev.lane}`, duration: 7000, ...(ev.dir ? { action: { label: tr('Abrir carpeta'), onClick: () => call('open_dir') } } : {}) });
+  // new wallpapers: «Ver» shows them in Imágenes (pulido P2 #17); the rest, their folder
+  const action = ev.lane === 'wallhaven' && d.count ? { label: tr('Ver'), onClick: () => setView('photos') }
+    : ev.dir ? { label: tr('Abrir carpeta'), onClick: () => call('open_dir') } : null;
+  toast(text, { key: `done-${ev.lane}`, duration: 7000, ...(action ? { action } : {}) });
 }
 
 // Returns true when the job was accepted (started or queued). `quiet` leaves the
@@ -602,18 +911,7 @@ async function startMany(mode, jobs) {
     ok += r ? 1 : 0;
   }
   const skipped = jobs.length - ok;
-  toast(skipped ? tr('{ok} en cola · {skipped} omitidos (ver Actividad).', { ok, skipped }) : tr('{ok} en cola.', { ok }), { duration: 5000 });
-}
-
-function wireJobs() {
-  $('btn-queue-resume').addEventListener('click', () => call('resume_queue').catch((e) => toast(tr(String(e)))));
-  $('btn-cancel').addEventListener('click', async () => {
-    $('btn-cancel').disabled = true;
-    $('status').textContent = queue.length ? tr('Cancelando y vaciando la cola… (lo descargado se conserva)')
-      : tr('Cancelando… (lo descargado se conserva)');
-    await call('cancel').catch(() => {});
-  });
-  $('btn-open').addEventListener('click', () => call('open_dir'));
+  toast(skipped ? tr('{ok} en cola · {skipped} omitidos (ver el registro en Descargas).', { ok, skipped }) : tr('{ok} en cola.', { ok }), { duration: 5000 });
 }
 
 // ---------------------------------------------------------- views
@@ -624,6 +922,7 @@ function setView(v) {
   if ($('view').value !== v) $('view').value = v;
   syncTabs(v);
   const lib = v === 'photos' || v === 'music';
+  if (!lib && $('lib-q').value) { $('lib-q').value = ''; L.q = ''; }  // the box searches the library only
   for (const name of ['library', 'downloads', 'convert']) {
     const on = name === 'library' ? lib : name === v;
     $(`side-${name}`).hidden = !on;
@@ -685,7 +984,6 @@ function syncTabs(current = $('view').value) {
     b.setAttribute('role', 'menuitemcheckbox');  // gm-menu calls them menuitem
     b.setAttribute('aria-checked', String(shown.has(b.value)));
   }
-  for (const t of document.querySelectorAll('.tab-toggle')) t.checked = shown.has(t.value);  // Configuración › Apariencia
 }
 function wireViews() {
   $('view').addEventListener('gm-change', (e) => setView(e.detail.value));
@@ -700,7 +998,6 @@ function wireViews() {
     e.preventDefault();  // stay open: tick several
     showTab(e.detail.value, !shownTabs().has(e.detail.value));
   });
-  for (const t of document.querySelectorAll('.tab-toggle')) t.addEventListener('change', () => showTab(t.value, t.checked));
   customElements.whenDefined('gm-menu').then(() => syncTabs());
 }
 
@@ -791,7 +1088,7 @@ function renderCollections(all) {
   const cols = all.filter((c) => !!c.music === music);  // each space shows its own collections
   $('collections-title').textContent = music ? tr('Carpetas') : tr('Colecciones');
   $('collections-empty').textContent = music
-    ? tr('Las carpetas con música aparecen acá. Agrega otra con el +.')
+    ? tr('Las carpetas con música aparecen aquí. Agrega otra con el +.')
     : tr('Baja fondos de Wallhaven o agrega una carpeta tuya con el botón +.');
   const ul = $('collections');
   ul.replaceChildren();
@@ -896,6 +1193,7 @@ function syncScopes() {
 
 function libTitle() {
   if (L.scope === 'deleted') return tr('Eliminadas');
+  if (L.q) return tr('Resultados de «{q}»', { q: L.q });
   if (L.mview) return L.mview.name || MVIEWS[L.mview.view];
   const col = L.overview?.collections.find((c) => c.id === L.collection);
   const parts = [col ? col.name : (L.scope === 'favorites' ? tr('Favoritas') : tr('Todo'))];
@@ -950,7 +1248,7 @@ function syncMusicHeader() {
   const queue = v === 'queue';
   $('queue-clear').hidden = !queue;
   $('mus-play').hidden = queue;
-  $('mus-shuffle').hidden = queue;
+  $('mus-shuffle-split').hidden = queue;
   $('lib-sort').closest('gm-select').hidden = groupView() || orderedView();
   $('btn-select').hidden = groupView() || L.scope === 'deleted';
 }
@@ -988,19 +1286,39 @@ function showListState() {
   showCount(musicMode() ? tn('{n} tema', '{n} temas', L.total) : tn('{n} archivo', '{n} archivos', L.total));
   const empty = L.total === 0;
   $('lib-empty').hidden = !empty;
-  const why = empty && !L.q && MUSIC_EMPTY[L.mview?.view];
+  document.body.classList.toggle('list-empty', empty);  // app.css: no play buttons nor column heads over nothing
+  // «Ya escuchaste todo» only with songs in the library; with none, the usual «no music yet»
+  const why = empty && !L.q && (L.mview?.view !== 'never' || MUSIC?.songs) && MUSIC_EMPTY[L.mview?.view];
   if (why) {
     [$('lib-empty-title').textContent, $('lib-empty-text').textContent] = why;
   } else if (empty && L.kind === 'audio' && !L.q && !L.tags.size && !L.lowq && L.scope !== 'favorites' && !L.collection) {
-    const music = MEDIA && presetById(MEDIA.default_preset)?.folder;
     $('lib-empty-title').textContent = tr('Todavía no hay música en la biblioteca');
-    $('lib-empty-text').textContent = tr('Copia tu música a {music} (con su archive.txt, si lo tienes), ', { music: music || tr('la carpeta de tu preset de música') })
-      + tr('agrega otra carpeta con el + de Colecciones, o pega un enlace arriba.');
+    $('lib-empty-text').textContent = tr('Busca música para bajar, o agrega la carpeta donde ya tienes tu música: Bakin no la mueve ni la cambia.');
+  } else if (empty && L.scope === 'favorites' && !L.kind && !L.q && !L.tags.size && !L.collection) {
+    $('lib-empty-title').textContent = tr('Todavía no tienes favoritas');
+    $('lib-empty-text').textContent = tr('Abre una imagen y toca el ♥, o selecciona varias y usa «♥ Favorita».');
   } else if (empty) {
-    const filtered = L.kind || L.q || L.tags.size || L.scope === 'favorites' || L.collection;
+    const filtered = L.kind || L.q || L.tags.size || L.collection;
     $('lib-empty-title').textContent = filtered ? tr('Nada coincide con el filtro') : tr('Tu biblioteca está vacía');
     $('lib-empty-text').textContent = filtered ? tr('Prueba quitando algún filtro.')
-      : tr('Baja fondos de Wallhaven («Descargar» arriba) o agrega una carpeta tuya con el + de Colecciones.');
+      : tr('Baja fondos de Wallhaven o agrega una carpeta tuya con fotos: Bakin no la mueve ni la cambia.');
+  }
+  // the empty library offers what fills it: download (music or wallpapers) or add a folder
+  const acts = $('lib-empty-actions');
+  const bare = empty && !L.q && !L.tags.size && !L.lowq && !L.collection && L.scope === 'all' && (!L.mview || L.mview.view === 'songs');
+  acts.replaceChildren();
+  acts.hidden = !bare;
+  if (bare) {
+    const chip = (label, primary, onClick) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = primary ? 'gm-chip gm-chip-primary' : 'gm-chip gm-chip-plain';
+      b.textContent = label;
+      b.addEventListener('click', onClick);
+      return b;
+    };
+    acts.append(musicMode() ? chip(tr('Buscar música para bajar'), true, () => openHub('catalog'))
+      : chip(tr('Bajar fondos de Wallhaven'), true, () => openHub('wallhaven')), chip(tr('Agregar una carpeta…'), false, () => addFolder()));
   }
   // words that aren't in the library: the search in Bakin is of what you have (2026-11-06: a
   // friend typed an artist to find new music and saw an empty list); offer the web
@@ -1008,8 +1326,8 @@ function showListState() {
   web.hidden = !(empty && L.q && musicMode());
   if (!web.hidden) {
     $('lib-empty-title').textContent = tr('No tienes nada de «{q}»', { q: L.q });
-    $('lib-empty-text').textContent = tr('Esta búsqueda es de tu biblioteca. Para bajar música nueva, búscala en YouTube Music y pega el enlace en «Descargar».');
-    web.textContent = tr('Buscar «{q}» en YouTube Music', { q: L.q });
+    $('lib-empty-text').textContent = tr('Esta búsqueda es de tu biblioteca. ¿Lo bajas? Bakin lo busca en YouTube Music y eliges qué temas.');
+    web.textContent = tr('Buscar «{q}» para bajar', { q: L.q });
   }
 }
 
@@ -1228,7 +1546,7 @@ function tileFor(it, index) {
   tile.setAttribute('aria-pressed', String(L.selecting && L.selected.has(it.id)));
 
   tile.addEventListener('click', (e) => {
-    if (L.selecting || e.ctrlKey || e.shiftKey) {
+    if (L.selecting || e.ctrlKey || e.shiftKey || e.target === check) {
       if (!L.selecting) enterSelecting();
       toggleSelect(index, e.shiftKey);
     } else if (it.kind === 'audio') {
@@ -1238,7 +1556,7 @@ function tileFor(it, index) {
     }
   });
   if (it.kind === 'image') {
-    tile.addEventListener('contextmenu', (e) => { e.preventDefault(); openWallpaperMenu(it, tile); });
+    tile.addEventListener('contextmenu', (e) => { e.preventDefault(); openWallpaperMenu(it, pointerAnchor(e)); });
     markWallpaperTile(tile);
   }
   return tile;
@@ -1256,8 +1574,12 @@ async function openWallpaperMenu(it, anchor) {
   $('wallpaper-menu')?.remove();
   const menu = document.createElement('gm-menu');
   menu.id = 'wallpaper-menu';
+  // the photo's own actions (the same names as the selection bar), then where to put it as wallpaper
+  const own = (value, label) => { const b = document.createElement('button'); b.type = 'button'; b.value = value; b.textContent = label; return b; };
+  menu.append(own('fav', it.fav ? tr('Quitar ♥') : tr('♥ Favorita')), own('tag', tr('Etiquetar…')), own('reveal', tr('Mostrar en la carpeta')),
+    own('delete', tr('Eliminar')), document.createElement('hr'));
   const head = document.createElement('small');
-  head.className = 'menu-head';
+  head.className = 'menu-head gm-menu-label';
   head.textContent = tr('Poner de fondo en');
   menu.append(head);
   for (const m of r.monitors) {
@@ -1293,6 +1615,9 @@ async function openWallpaperMenu(it, anchor) {
   if (!anchor.id) anchor.id = `wp-anchor-${++wallpaperSeq}`;
   menu.setAttribute('anchor', anchor.id);
   menu.addEventListener('gm-select', async (e) => {
+    const own = { fav: () => setFavorite([it.id], !it.fav), tag: () => openTagDialog([it.id]),
+      reveal: () => call('library_reveal', { item_id: it.id }), delete: () => deleteItems([it.id]) }[e.detail.value];
+    if (own) { own(); return; }
     if (e.detail.value === 'frame') { openFrame(it, r.monitors); return; }
     if (e.detail.value === 'lock') {
       const res = await tauri.core.invoke('lockscreen_set', { path: it.path }).catch((err) => ({ error: String(err) }));
@@ -1370,6 +1695,11 @@ function updateSelbar() {
   const n = L.selected.size;
   $('sel-count').textContent = tn('{n} seleccionada', '{n} seleccionadas', n);
   for (const id of ['sel-fav', 'sel-unfav', 'sel-tag', 'sel-delete', 'sel-convert']) $(id).disabled = n === 0;
+  const all = $('sel-head');
+  if (all) {
+    all.checked = n > 0 && L.items.every((i) => L.selected.has(i.id));
+    all.indeterminate = n > 0 && !all.checked;
+  }
   $('sel-all').textContent = L.items.length < L.total ? tr('Seleccionar las {items} cargadas', { items: L.items.length }) : tr('Seleccionar todo');
 }
 
@@ -1538,6 +1868,16 @@ async function loadTrash(seq = L.seq) {
       chips.append(b);
     };
     mk(tr('Restaurar'), '', () => restoreItems([d.id]), tr('La devuelve a su lugar desde la Papelera de Windows'), !d.in_recycle_bin);
+    // a song that came from YouTube can come back from there, even with the Recycle Bin emptied
+    if (d.kind === 'audio' && d.yt_id) {
+      mk(tr('Volver a bajar'), d.in_recycle_bin ? 'gm-chip-plain' : '', async () => {
+        const r = await call('library_redownload', { ids: [d.id] }).catch((e) => ({ ok: false, error: String(e) }));
+        if (!r.ok) { toast(tr(r.error), { duration: 6000 }); if (r.field === 'tools') openTools(); return; }
+        if (r.refused.length) toast(tr(r.refused[0]), { duration: 7000 });
+        else toast(tr('En cola para bajar de nuevo.'), { duration: 6000, action: { label: tr('Ver cola'), onClick: () => setView('downloads') } });
+        refreshLibrary();
+      }, tr('La baja de nuevo de YouTube, a su carpeta y con su nombre'));
+    }
     mk(tr('Quitar de la lista'), 'gm-chip-plain', async () => {
       await call('library_forget', { ids: [d.id], redownload: false });
       refreshLibrary();
@@ -1713,8 +2053,14 @@ function wireLibraryView() {
   });
   $('lib-sort').addEventListener('change', (e) => { L.sort = e.target.value; reloadItems(); });
   $('btn-lib-refresh').addEventListener('click', () => refreshLibrary(true));
-  $('lib-empty-web').addEventListener('click', () => call('music_search_open', { q: L.q })
-    .then((r) => { if (!r.ok) toast(tr(r.error)); }).catch((e) => toast(tr(String(e)))));
+  // not in the library: Bakin's own YouTube Music search with the same words (pulido P1 #2),
+  // not the browser: «I don't have it → I download it» in two clicks
+  $('lib-empty-web').addEventListener('click', () => {
+    const q = L.q;
+    openHub('catalog');
+    $('cat-q').value = q;
+    catalogSearch();
+  });
   $('btn-lib-more').addEventListener('click', () => loadMoreItems());
   autoMore.observe($('btn-lib-more'));
   $('view-library').addEventListener('scroll', () => scheduleWindow(), { passive: true });
@@ -2002,21 +2348,20 @@ const formatLabel = (p) => (p.mode === 'video'
 const setSel = (sel, v) => { sel.value = String(v); sel.closest('gm-select')?.sync?.(); };
 const TOOL_LABEL = { 'yt-dlp': 'yt-dlp', ffmpeg: 'ffmpeg + ffprobe', deno: tr('Deno (resuelve los desafíos de YouTube)') };
 
+// Chromium browsers encrypt their cookies for themselves on Windows (app-bound): yt-dlp can't read them.
+const LOCKED = ['brave', 'chrome', 'chromium', 'edge', 'opera', 'vivaldi', 'whale'];
+
 // Whether the presets' cookies still log in (Descargas > Música y video).
 async function renderCookiesHealth() {
   const el = $('cookies-health');
   let res;
   try { res = await call('cookies_status'); } catch { el.hidden = true; return; }
   const name = (f) => f.split(/[\\/]/).pop();
-  const lines = res.cookies.map((c) => {
+  // the presets on a browser Windows locks go in one line with its way out, not one each
+  const locked = res.cookies.filter((c) => c.browser && LOCKED.includes(c.browser));
+  const lines = res.cookies.filter((c) => !locked.includes(c)).map((c) => {
     const who = c.presets.join(', ');
-    if (c.browser) {
-      // Chromium browsers encrypt their cookies for themselves on Windows (app-bound): yt-dlp can't read them.
-      const locked = ['brave', 'chrome', 'chromium', 'edge', 'opera', 'vivaldi', 'whale'].includes(c.browser);
-      return locked
-        ? { warn: true, who, text: tr('{who}: usan cookies de {x}, que Windows no deja leer. Si un video pide tu cuenta va a fallar: cambia el preset a cookies.txt.', { who, x: c.browser[0].toUpperCase() + c.browser.slice(1) }) }
-        : { warn: false, who, text: tr('Cookies de {browser}.', { browser: c.browser }) };
-    }
+    if (c.browser) return { warn: false, who, text: tr('Cookies de {browser}.', { browser: c.browser }) };
     if (c.vault) {
       if (!c.exists) return { warn: true, who, text: tr('{who}: no hay cookies guardadas en Bakin. Impórtalas en Configuración › Cuentas.', { who }) };
       if (c.bad || c.expired) return { warn: true, who, text: tr('Las cookies guardadas en Bakin dejaron de servir: exporta un cookies.txt nuevo e impórtalo en Configuración › Cuentas.') };
@@ -2030,14 +2375,36 @@ async function renderCookiesHealth() {
     const until = c.expires ? tr(', válidas hasta el {x}', { x: new Date(c.expires * 1000).toLocaleDateString(LOCALE) }) : '';
     return { warn: false, who, text: tr('Cookies de YouTube: {file}{until}.', { file: name(c.file), until }) };
   });
-  el.hidden = !lines.length;
-  el.replaceChildren(...lines.map((l) => {
+  const out = lines.map((l) => {
     const line = document.createElement('span');
     line.className = l.warn ? 'warn' : '';
     line.textContent = l.text;
     line.title = tr('Lo usan: {who}', { who: l.who });
     return line;
-  }));
+  });
+  if (locked.length) {
+    const who = locked.flatMap((c) => c.presets);
+    const browsers = [...new Set(locked.map((c) => c.browser[0].toUpperCase() + c.browser.slice(1)))].join(', ');
+    const saved = await call('cookies_vault').then((v) => v.vault.exists && !v.vault.expired).catch(() => false);
+    const line = document.createElement('span');
+    line.className = 'warn cookies-fix';
+    line.title = tr('Lo usan: {who}', { who: who.join(', ') });
+    const text = document.createElement('span');
+    text.textContent = tn('Un preset usa cookies de {x}, que Windows no deja leer.', '{n} presets usan cookies de {x}, que Windows no deja leer.', who.length, { x: browsers });
+    const go = document.createElement('button');
+    go.type = 'button';
+    go.className = 'gm-chip';
+    go.textContent = saved ? tr('Usar las guardadas en Bakin') : tr('Importar cookies…');
+    go.addEventListener('click', async () => {
+      if (!saved) { openSettings('accounts'); return; }
+      try { await call('cookies_use_vault'); } catch (e) { toast(tr(String(e))); return; }
+      renderCookiesHealth();
+    });
+    line.append(text, go);
+    out.unshift(line);
+  }
+  el.hidden = !out.length;
+  el.replaceChildren(...out);
 }
 
 // Configuración › Cuentas › YouTube (2026-11-07): the cookies.txt into Bakin's vault, encrypted
@@ -2133,7 +2500,7 @@ let mdMode, mdFormat, mdQuality, mdHeight;
 // The settings load at start-up; if a dialog is opened before they arrive, wait for them.
 async function ensureMedia() {
   if (!MEDIA) await loadMedia();
-  if (!MEDIA) toast(tr('No se pudo cargar la configuración de música y video (ver Actividad).'), { duration: 6000 });
+  if (!MEDIA) toast(tr('No se pudo cargar la configuración de música y video (ver el registro en Descargas).'), { duration: 6000 });
   return !!MEDIA;
 }
 
@@ -2547,7 +2914,7 @@ async function openTools() {
   try {
     await loadMedia();
   } finally { btn.removeAttribute('aria-busy'); }
-  if (!MEDIA) { toast(tr('No se pudo cargar el estado de las herramientas (ver Actividad).'), { duration: 6000 }); return; }
+  if (!MEDIA) { toast(tr('No se pudo cargar el estado de las herramientas (ver el registro en Descargas).'), { duration: 6000 }); return; }
   renderTools();
   $('tools-dialog').show();
 }
@@ -2599,6 +2966,12 @@ let leftovers = null;
 
 function onLeftovers(ev) {
   leftovers = ev;
+  // it stays in Descargas › Con problemas until it's dealt with (pulido P1 #6), not only in a toast
+  DL.errors = DL.errors.filter((x) => !x.leftovers);
+  DL.errors.unshift({ leftovers: true, title: tn('{n} video quedó en MP4 en vez de audio', '{n} videos quedaron en MP4 en vez de audio', ev.count),
+    job: ev.folder || '', reason: tr('yt-dlp no encontró el audio solo: quedaron como video.'),
+    action: { label: tr('Ver y arreglar'), run: openLeftovers } });
+  renderDownloads();
   toast(tn('{n} video quedó en MP4 en vez de audio.', '{n} videos quedaron en MP4 en vez de audio.', ev.count), {
     duration: 10000, action: { label: tr('Ver'), onClick: openLeftovers },
   });
@@ -2620,41 +2993,22 @@ function wireLeftovers() {
   });
 }
 
-// ------------------------------------------------------ job card (media)
-let mediaCount = 0;
-
+// ------------------------------------------------- media events (log, ring)
+// What they mean for the list is in dlOn.
 function onMediaEvent(ev) {
   switch (ev.kind) {
     case 'media_url':
-      $('status').textContent = (ev.count > 1 ? tr('Analizando el enlace {index} de {count}…', { index: ev.index, count: ev.count }) : tr('Analizando el enlace …'));
       setMeter(0, null);
       break;
     case 'media_item': {
       const pos = ev.n_entries ? tr(' ({index} de {count})', { index: ev.playlist_index || '?', count: ev.n_entries }) : '';
-      $('job-title').textContent = ev.title || tr('Descargando…');
-      $('job-badge').hidden = false;
-      $('job-badge').dataset.tone = 'info';
-      $('job-badge').textContent = `${ev.extractor_key || 'Media'}${ev.uploader ? ' · ' + ev.uploader : ''}`;
-      $('status').textContent = tr('Descargando{pos}…', { pos });
       log('', `${ev.title}${pos}`);
       break;
     }
-    case 'media_progress': {
+    case 'media_progress':
       if (ev.total) setMeter(ev.downloaded || 0, ev.total); else setMeter(0, null);
-      const pct = ev.total ? `${Math.round((100 * (ev.downloaded || 0)) / ev.total)} %` : fmtSize(ev.downloaded || 0);
-      const speed = ev.speed ? ` · ${fmtSize(ev.speed)}/s` : '';
-      const eta = ev.eta != null && ev.status === 'downloading' ? tr(' · faltan {eta} s', { eta: ev.eta }) : '';
-      $('status').textContent = ev.status === 'finished' ? tr('Descarga terminada, procesando…') : `${pct}${speed}${eta}`;
       break;
-    }
-    case 'media_post': {
-      const steps = { ExtractAudio: tr('Convirtiendo el audio'), Merger: tr('Uniendo video y audio'), EmbedThumbnail: tr('Incrustando la miniatura'),
-        Metadata: tr('Escribiendo metadatos'), SponsorBlock: tr('Buscando segmentos de SponsorBlock'), ModifyChapters: tr('Cortando segmentos'), MoveFiles: tr('Guardando') };
-      $('status').textContent = `${steps[ev.step] || ev.step}…`;
-      break;
-    }
     case 'media_file':
-      mediaCount += 1;
       log('success', `Guardado: ${ev.path}`);
       libraryChanged();  // the song shows in the library now, not when the whole list ends
       break;
@@ -2690,26 +3044,61 @@ function wireMedia() {
 // With the "Audio" filter the library is a sortable list with the songs' tags.
 const fmtDur = (s) => (s == null ? '' : `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, '0')}`);
 const MUSIC_COLS = [
-  ['title', tr('Título')], ['artist', tr('Artista')], ['album', tr('Álbum')], ['duration', tr('Duración')], ['bitrate', tr('Formato')],
+  ['title', tr('Título')], ['artist', tr('Artista')], ['album', tr('Álbum')], ['added', tr('Agregada')], ['duration', tr('Duración')], ['bitrate', tr('Formato')],
 ];
+// each column's two orders (like Spotify): the first click, then the other way (a friend, 2026-11-07)
+const COL_SORTS = {
+  title: ['title', 'title_desc'], artist: ['artist', 'artist_desc'], album: ['album', 'album_desc'],
+  added: ['new', 'old'], duration: ['duration_asc', 'duration'], bitrate: ['bitrate', 'bitrate_asc'],
+};
+// ▲ when it goes up (A→Z, shortest, oldest, lowest), ▼ when it comes down
+const SORT_UP = new Set(['title', 'artist', 'album', 'old', 'duration_asc', 'bitrate_asc']);
 const musicMode = () => L.kind === 'audio' && L.scope !== 'deleted';
+
+// «Agregada»: today, a few days ago, or the date
+function fmtAdded(at) {
+  if (!at) return '';
+  const days = Math.floor((Date.now() / 1000 - at) / 86400);
+  if (days < 1) return tr('hoy');
+  if (days < 2) return tr('ayer');
+  if (days < 7) return tr('hace {n} días', { n: days });
+  return new Date(at * 1000).toLocaleDateString(LOCALE, { day: 'numeric', month: 'short', year: 'numeric' });
+}
 
 function musicHeader() {
   const head = document.createElement('div');
   head.className = 'lib-row lib-row-head';
   head.setAttribute('role', 'group');
   head.setAttribute('aria-label', tr('Ordenar por'));
-  head.append(document.createElement('span'));
+  // the select-all tick over the rows' ticks: on hover, or while selecting (the user, 2026-11-07)
+  const lead = document.createElement('span');
+  lead.className = 'c-lead';
+  const all = document.createElement('input');
+  all.type = 'checkbox';
+  all.id = 'sel-head';
+  all.className = 'gm-check sel-mark';
+  all.title = tr('Seleccionar todo');
+  all.setAttribute('aria-label', all.title);
+  all.checked = L.items.length > 0 && L.items.every((i) => L.selected.has(i.id));
+  all.addEventListener('change', () => {
+    if (!L.selecting) enterSelecting();
+    if (all.checked) $('sel-all').click();
+    else { const was = [...L.selected]; L.selected.clear(); was.forEach(markTile); updateSelbar(); }
+  });
+  lead.append(all);
+  head.append(lead);
   for (const [key, label] of MUSIC_COLS) {
     const b = document.createElement('button');
     b.type = 'button';
     b.className = `c-${key}`;
-    const active = L.sort === key || (key === 'bitrate' && L.sort === 'bitrate_asc');
-    b.textContent = (key === 'bitrate' && L.mview?.view === 'top' ? tr('Escuchado') : label) + (active ? (L.sort === 'bitrate_asc' ? ' ↑' : ' ↓') : '');
+    const [first, second] = COL_SORTS[key];
+    const active = !orderedView() && (L.sort === first || L.sort === second);
+    b.textContent = (key === 'bitrate' && L.mview?.view === 'top' ? tr('Escuchado') : label) + (active ? (SORT_UP.has(L.sort) ? ' ▲' : ' ▼') : '');
     b.setAttribute('aria-pressed', String(active));
+    b.title = active ? tr('Clic: al revés') : tr('Ordenar por {col}', { col: label.toLowerCase() });
     b.disabled = orderedView();
     b.addEventListener('click', () => {
-      L.sort = key === 'bitrate' && L.sort === 'bitrate' ? 'bitrate_asc' : key;
+      L.sort = L.sort === first ? second : first;
       setSel($('lib-sort'), L.sort);
       reloadItems();
     });
@@ -2757,20 +3146,58 @@ function rowFor(it, index) {
   const t = document.createElement('strong');
   t.textContent = it.title || it.name.replace(/\.[^.]+$/, '');
   text.append(t);
-  if (it.title) { const small = document.createElement('small'); small.textContent = it.name; text.append(small); }
+  // the file's name only when the tags don't say who it is: beside the Artista column it was the
+  // same words twice (pulido D10); the row's tooltip keeps the whole path
+  if (it.title && !it.artist) { const small = document.createElement('small'); small.textContent = it.name; text.append(small); }
   title.append(art, text);
   // «Más escuchadas» counts its plays where the format goes (2026-11-06, the user)
   const counting = L.mview?.view === 'top';
   const fmt = counting ? cell('c-bitrate c-plays', `${it.plays || 0} ${it.plays === 1 ? tr('vez') : tr('veces')}`)
     : cell('c-bitrate', `${(it.codec || it.ext || '').toUpperCase()}${it.bitrate ? ` · ${it.bitrate} kbps` : ''}`);
-  if (!counting && it.low_quality) { fmt.classList.add('low'); fmt.title = tr('Baja calidad: conviene volver a bajarla'); }
+  if (!counting && it.low_quality) {
+    fmt.classList.add('low');
+    fmt.title = tr('Baja calidad: conviene volver a bajarla');
+    // the mark leads somewhere (pulido P2 #15): a click asks for a better copy of this song
+    if (it.yt_id && !it.lossless) {
+      fmt.classList.add('low-go');
+      fmt.title = tr('Baja calidad · clic: bajarla de nuevo en mejor calidad');
+      fmt.addEventListener('click', (e) => { if (L.selecting) return; e.preventDefault(); e.stopPropagation(); openUpgrade([it.id]); });
+    }
+  }
   if (!counting && it.lossless) fmt.classList.add('lossless');
-  row.append(lead, title, cell('c-artist', it.artist), cell('c-album', it.album), cell('c-duration', fmtDur(it.duration)), fmt);
+  const added = cell('c-added', fmtAdded(it.date));
+  if (it.date) added.title = new Date(it.date * 1000).toLocaleString(LOCALE);
+  row.append(lead, title, cell('c-artist', it.artist), cell('c-album', it.album), added, cell('c-duration', fmtDur(it.duration)), fmt);
   row.setAttribute('aria-pressed', String(L.selecting && L.selected.has(it.id)));
   if (plCur()?.id === it.id) row.classList.add('playing');
-  row.addEventListener('contextmenu', (e) => { e.preventDefault(); openRowMenu(it, row); });
+  // Cola (pulido P1 #4): what comes later can go (✕, or Supr) and be dragged to another place;
+  // the song playing (the first row) stays
+  if (L.mview?.view === 'queue' && index > 0) {
+    const at = (P.queuePos || 0) + index;
+    const x = document.createElement('span');
+    x.className = 'row-x';
+    x.textContent = '✕';
+    x.title = tr('Quitar de la cola');
+    x.setAttribute('aria-hidden', 'true');  // Supr does it from the keyboard
+    const drop = async () => { await pc({ cmd: 'remove', pos: at }); openQueueView(true); };
+    x.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); drop(); });
+    row.addEventListener('keydown', (e) => { if (e.key === 'Delete') { e.preventDefault(); drop(); } });
+    row.append(x);
+    row.draggable = true;
+    row.addEventListener('dragstart', (e) => { e.dataTransfer.setData('text/x-bakin-pos', String(at)); e.dataTransfer.effectAllowed = 'move'; row.classList.add('dragging'); });
+    row.addEventListener('dragend', () => row.classList.remove('dragging'));
+    row.addEventListener('dragover', (e) => { if (e.dataTransfer.types.includes('text/x-bakin-pos')) { e.preventDefault(); row.classList.add('drop-here'); } });
+    row.addEventListener('dragleave', () => row.classList.remove('drop-here'));
+    row.addEventListener('drop', async (e) => {
+      e.preventDefault();
+      row.classList.remove('drop-here');
+      const from = Number(e.dataTransfer.getData('text/x-bakin-pos'));
+      if (Number.isFinite(from) && from !== at) { await pc({ cmd: 'move', from, to: at }); openQueueView(true); }
+    });
+  }
+  row.addEventListener('contextmenu', (e) => { e.preventDefault(); openRowMenu(it, pointerAnchor(e)); });
   row.addEventListener('click', (e) => {
-    if (L.selecting || e.ctrlKey || e.shiftKey) {
+    if (L.selecting || e.ctrlKey || e.shiftKey || e.target === check) {
       if (!L.selecting) enterSelecting();
       toggleSelect(index, e.shiftKey);
     } else if (L.mview?.view === 'queue') {
@@ -2872,9 +3299,11 @@ function syncMusicControls() {
 // ------------------------------------------------------- better copies
 let upFormat;
 
-async function openUpgrade() {
-  const ids = [...L.selected];
+let upIds = [];
+async function openUpgrade(only) {
+  const ids = Array.isArray(only) ? only : [...L.selected];
   if (!ids.length) return;
+  upIds = ids;
   if (!(await ensureMedia())) return;
   const items = L.items.filter((i) => ids.includes(i.id));
   const withId = items.filter((i) => i.yt_id && !i.lossless).length;
@@ -2886,7 +3315,7 @@ async function openUpgrade() {
 }
 
 async function submitUpgrade() {
-  const ids = [...L.selected];
+  const ids = upIds;
   $('upgrade-dialog').close();
   const res = await call('library_upgrade_audio', { ids, preset_id: $('up-preset').value, audio_format: upFormat.value })
     .catch((e) => ({ ok: false, error: String(e) }));
@@ -2898,8 +3327,8 @@ async function submitUpgrade() {
   exitSelecting();
   const parts = [tr('{queued} en cola para bajar de nuevo', { queued: res.queued })];
   if (res.already.length) parts.push(tr('{already} ya estaban en ese formato o sin pérdida', { already: res.already.length }));
-  if (res.no_id.length) parts.push(tr('{n} sin ID de YouTube (ver Actividad)', { n: res.no_id.length }));
-  if (res.refused?.length) { parts.push(tr('{refused} no entraron en la cola (ver Actividad)', { refused: res.refused.length })); log('warning', res.refused.join(' · ')); }
+  if (res.no_id.length) parts.push(tr('{n} sin ID de YouTube (ver el registro en Descargas)', { n: res.no_id.length }));
+  if (res.refused?.length) { parts.push(tr('{refused} no entraron en la cola (ver el registro en Descargas)', { refused: res.refused.length })); log('warning', res.refused.join(' · ')); }
   toast(parts.join(' · ') + '.', { duration: 9000, ...(res.queued ? { action: { label: tr('Ver cola'), onClick: () => setView('downloads') } } : {}) });
   if (res.no_id.length) log('warning', tr('Sin ID de YouTube, no se pueden volver a bajar: {no_id}', { no_id: res.no_id.join(', ') }));
 }
@@ -3030,11 +3459,15 @@ async function loadFollows() {
 }
 
 async function openFollow(t) {
-  if (!(await ensureMedia())) return;
+  const wh = t.kind === 'wallhaven';
+  if (!wh && !(await ensureMedia())) return;
   fwTarget = t;
   const web = t.kind === 'web';
-  $('fw-lead').textContent = tr('Seguir {t}: Bakin lo revisa solo y baja lo que se publique.', { t: labelFor(t) });
+  $('fw-lead').textContent = wh
+    ? tr('Seguir «{t}» en Wallhaven: Bakin la revisa sola y baja los fondos nuevos a Imágenes › Wallhaven.', { t: t.job.label })
+    : tr('Seguir {t}: Bakin lo revisa solo y baja lo que se publique.', { t: labelFor(t) });
   $('fw-preset-row').hidden = !web;
+  $('fw-new-row').hidden = wh;  // a search has no «already published»: it only ever brings the new
   if (web) fillPresetSelect($('fw-preset'), MEDIA.default_preset);
   $('fw-new').checked = true;
   $('fw-new-hint').textContent = tr('Lo que ya publicó se marca como visto y no se baja (se lee la lista una vez).');
@@ -3049,6 +3482,15 @@ async function submitFollow() {
   btn.disabled = true;
   btn.setAttribute('aria-busy', 'true');
   if ($('fw-new').checked && fwTarget.kind === 'web') $('fw-status').textContent = tr('Leyendo lo que ya publicó para marcarlo como visto…');
+  if (fwTarget.kind === 'wallhaven') {
+    const res = await call('wallhaven_follow', { job: fwTarget.job, every_hours: Number(fwEvery.value) || 24 }).catch((err) => ({ ok: false, error: String(err) }));
+    btn.disabled = false;
+    btn.removeAttribute('aria-busy');
+    if (!res.ok) { $('fw-status').textContent = tr(res.error); return; }
+    $('follow-dialog').close();
+    toast(tr('Siguiendo «{label}»: lo nuevo va a Imágenes › Wallhaven › {label}.', { label: res.follow.job.label }));
+    return;
+  }
   try {
     const r = await call('follow_add', { url: urlFor(fwTarget), preset_id: $('fw-preset').value,
       every_hours: Number(fwEvery.value) || 24, only_new: $('fw-new').checked });
@@ -3094,7 +3536,7 @@ function wireMusic() {
   upFormat = chipGroup($('up-format'), () => {});
   $('up-cancel').addEventListener('click', () => $('upgrade-dialog').close());
   $('up-go').addEventListener('click', submitUpgrade);
-  $('sel-upgrade').addEventListener('click', openUpgrade);
+  $('sel-upgrade').addEventListener('click', () => openUpgrade());
   $('lib-lowq').addEventListener('click', () => { L.lowq = !L.lowq; syncMusicControls(); reloadItems(); });
   wireWallpaperFilters();
 }
@@ -3394,14 +3836,14 @@ function actionsFor(t) {
 // The link box's modes: what the «Descargar» panel's link sections ask for.
 const LINK_MODES = {
   link: [tr('Descargar'), tr('Pega un enlace: un fondo, una búsqueda o una colección de Wallhaven, o cualquier enlace que soporte yt-dlp (YouTube, SoundCloud, Twitch…). Varios a la vez también.'), tr('Pega un enlace (Wallhaven, YouTube…)')],
-  media: [tr('Música y video'), tr('Pegá el enlace de un tema, un video, una playlist o un canal.'), tr('Enlace de YouTube, SoundCloud, Twitch…')],
+  media: [tr('Música y video'), tr('Pega el enlace de un tema, un video, una playlist o un canal.'), tr('Enlace de YouTube, SoundCloud, Twitch…')],
   follow: [tr('Seguir'), tr('Un canal o una playlist: Bakin lo revisa cada tanto y baja solo lo nuevo.'), tr('Enlace del canal o la playlist')],
 };
 let linkMode = 'link';
 
 // «Descargar»: one panel, every way to download in it (Wallhaven, a link,
 // music or video, the YouTube Music likes, following a channel).
-function openHub(sec = store.get('bakin.hub', 'wallhaven'), mode = 'link') {
+function openHub(sec = store.get('bakin.hub', 'catalog'), mode = 'link') {  // one default everywhere: music
   if (sec === 'liked') sec = 'link';  // «Me gusta» is a card in «Música y video» now
   if (!['catalog', 'wallhaven', 'link'].includes(sec)) sec = 'catalog';
   store.set('bakin.hub', sec);
@@ -3502,8 +3944,9 @@ function whTile(it) {
   b.dataset.id = it.id;
   b.setAttribute('aria-pressed', String(WH.picked.has(it.id)));
   b.title = `${it.resolution} · ${fmtSize(it.file_size || 0)}${it.purity === 'sketchy' ? ' · sketchy' : ''}`;
-  // the wallpaper's own shape (tall ones for a vertical monitor), within reason
-  if (it.width && it.height) b.style.aspectRatio = `${Math.min(2.4, Math.max(0.5, it.width / it.height))}`;
+  // the wallpaper's own shape, in justified rows (the user, 2026-11-07: each its size, packed to
+  // fill the row, no holes): app.css grows each tile by its shape (--r) in rows of one height
+  b.style.setProperty('--r', String(it.width && it.height ? Math.min(2.4, Math.max(0.5, it.width / it.height)) : 16 / 10));
   const img = new Image();
   img.alt = '';
   img.loading = 'lazy';
@@ -3523,7 +3966,7 @@ function whTile(it) {
     b.disabled = true;
     const have = document.createElement('span');
     have.className = 'wh-have';
-    have.textContent = tr('Ya lo tenés');
+    have.textContent = tr('Ya lo tienes');
     b.append(have);
   }
   const zoom = document.createElement('span');
@@ -3731,7 +4174,7 @@ async function whSearch(more = false) {
     WH.items.push(...res.items);
     $('wh-grid').append(...res.items.map(whTile));
     $('wh-status').textContent = res.total
-      ? tr('{total} fondos. Tocá los que quieras bajar.', { total: res.total.toLocaleString(LOCALE) })
+      ? tr('{total} fondos. Toca los que quieras bajar.', { total: res.total.toLocaleString(LOCALE) })
       : tr('No hay fondos con esos filtros. Probá con otros tags o «Cualquier pantalla».');
     $('wh-more').hidden = WH.page >= WH.last;
   } catch (err) {
@@ -3803,10 +4246,7 @@ function wireWallhaven() {
   });
   $('wh-follow-menu').addEventListener('gm-select', async (e) => {
     if (e.detail.value === 'all') return;  // «Elegir todos»: its own click handler
-    const src = whSource();
-    const res = await call('wallhaven_follow', { job: src, every_hours: Number(e.detail.value) }).catch((err) => ({ ok: false, error: String(err) }));
-    if (!res.ok) { toast(tr(res.error), { duration: 6000 }); return; }
-    toast(tr('Siguiendo «{label}»: lo nuevo va a Imágenes › Wallhaven › {label}.', { label: res.follow.job.label }));
+    openFollow({ kind: 'wallhaven', job: whSource() });
   });
   $('wh-all').addEventListener('click', () => {
     const free = WH.items.filter((i) => !i.have);
@@ -3896,6 +4336,7 @@ function wireSkeleton() {
 
 function wireSearch() {
   const go = $('go');
+  go.setAttribute('empty', tr('Eso no parece un enlace: pega uno completo, con https://'));
   go.source = (q) => {
     if (!q) {
       const items = recents().map((t) => ({ label: labelFor(t),
@@ -3948,11 +4389,13 @@ const MVIEWS = {
   artist: tr('Artista'), album: tr('Álbum'), playlist: 'Playlist', mix: 'Mix', stats: tr('Estadísticas'), radio: 'Radio',
 };
 const MUSIC_EMPTY = {
-  top: [tr('Todavía no escuchaste nada en Bakin'), tr('Un tema cuenta cuando escuchas la mitad o cuatro minutos. Lo que más suena aparece acá.')],
-  recent: [tr('Todavía no escuchaste nada en Bakin'), tr('Lo último que escuches aparece acá.')],
+  top: [tr('Todavía no escuchaste nada en Bakin'), tr('Un tema cuenta cuando escuchas la mitad o cuatro minutos. Lo que más suena aparece aquí.')],
+  recent: [tr('Todavía no escuchaste nada en Bakin'), tr('Lo último que escuches aparece aquí.')],
   favorites: [tr('Todavía no tienes temas favoritos'), tr('Toca el ♥ del reproductor mientras suena un tema (o la tecla F), o selecciona temas y usa «♥ Favorita».')],
   playlist: [tr('La playlist está vacía'), tr('Selecciona temas en la biblioteca y usa «Agregar a playlist…». Si es inteligente, revisa sus reglas con «Editar».')],
   mix: [tr('Este mix ya no tiene temas'), tr('Los mixes se arman con lo que escuchas: vuelve mañana.')],
+  never: [tr('Ya escuchaste todo'), tr('Cada tema de tu biblioteca sonó al menos una vez. Lo que bajes de ahora en adelante aparece aquí hasta que lo escuches.')],
+  queue: [tr('La cola está vacía'), tr('Elige un tema para que empiece a sonar, o usa «Reproducir» en cualquier lista: lo que sigue aparece aquí.')],
 };
 const ORDERED = new Set(['top', 'recent', 'added', 'playlist', 'mix', 'queue', 'radio']);  // the view sets the order
 let MUSIC = null;  // music_overview
@@ -4091,18 +4534,48 @@ function selectMusicView(view, extra = {}) {
 // ------------------------------------------- a clean library (PLAN 0.14)
 // A song's right click: radio from it, clean its title. The menu is made again each time
 // (its anchor is that row).
-function openRowMenu(it, row) {
+// A right click's menu opens where the pointer is (review 2026-11-07: it opened by the row's middle,
+// or the photo's corner over the sidebar): a 1 px anchor at the click, for glass-midas' menu
+function pointerAnchor(e) {
+  let a = $('ctx-anchor');
+  if (!a) {
+    a = document.createElement('div');
+    a.id = 'ctx-anchor';
+    a.setAttribute('aria-hidden', 'true');
+    a.style.cssText = 'position:fixed;width:1px;height:1px;pointer-events:none;';
+    document.body.append(a);
+  }
+  a.style.left = `${e.clientX}px`;
+  a.style.top = `${e.clientY}px`;
+  return a;
+}
+
+function openRowMenu(it, anchor) {
   $('row-menu')?.remove();
   const menu = document.createElement('gm-menu');
   menu.id = 'row-menu';
-  row.id ||= `row-${Math.random().toString(36).slice(2, 9)}`;
-  menu.setAttribute('anchor', row.id);
+  anchor.id ||= `row-${Math.random().toString(36).slice(2, 9)}`;
+  menu.setAttribute('anchor', anchor.id);
   const item = (value, label) => { const b = document.createElement('button'); b.type = 'button'; b.value = value; b.textContent = label; return b; };
-  menu.append(item('radio', tr('Radio desde este tema')), item('clean', tr('Limpiar título y artista…')));
-  menu.addEventListener('gm-select', (e) => {
+  const sep = () => document.createElement('hr');
+  // the same actions and names as the selection bar (docs/DESIGN.md: one name per thing)
+  menu.append(item('play', tr('▶ Reproducir')), item('queue', tr('Agregar a la cola')), item('addpl', tr('Agregar a playlist…')),
+    item('fav', it.fav ? tr('Quitar ♥') : tr('♥ Favorita')), sep(),
+    item('radio', tr('Radio desde este tema')), item('clean', tr('Limpiar título y artista…')));
+  if (it.yt_id && !it.lossless) menu.append(item('upgrade', tr('Mejorar calidad…')));
+  menu.append(sep(), item('reveal', tr('Mostrar en la carpeta')), item('delete', tr('Eliminar')));
+  menu.addEventListener('gm-select', async (e) => {
     const name = it.title || it.name.replace(/\.[^.]+$/, '');
-    if (e.detail.value === 'radio') selectMusicView('radio', { value: it.id, name: tr('Radio de «{name}»', { name: name.length > 40 ? `${name.slice(0, 38)}…` : name }) });
-    if (e.detail.value === 'clean') openClean([it.id]);
+    const v = e.detail.value;
+    if (v === 'play') playFromLibrary(it.id);
+    if (v === 'queue') plEnqueue(await tracksFor([it.id]));
+    if (v === 'addpl') openAddToPlaylist([it.id]);
+    if (v === 'fav') setFavorite([it.id], !it.fav);
+    if (v === 'radio') selectMusicView('radio', { value: it.id, name: tr('Radio de «{name}»', { name: name.length > 40 ? `${name.slice(0, 38)}…` : name }) });
+    if (v === 'clean') openClean([it.id]);
+    if (v === 'upgrade') openUpgrade([it.id]);
+    if (v === 'reveal') call('library_reveal', { item_id: it.id });
+    if (v === 'delete') deleteItems([it.id]);
   });
   document.body.append(menu);
   customElements.whenDefined('gm-menu').then(() => menu.open());
@@ -4238,7 +4711,15 @@ function onMusicBrainz(ev) {
 
 function wireClean() {
   $('mus-more').addEventListener('click', () => $('mus-menu').open());
+  // «Vista compacta» (like Spotify's Compact): one line a song; remembered on this PC
+  const compact = (on) => {
+    document.body.classList.toggle('compact', on);
+    $('mus-compact').textContent = (on ? '✓ ' : '') + tr('Vista compacta');
+    store.set('bakin.compact', on ? 'on' : 'off');
+  };
+  compact(store.get('bakin.compact', 'off') === 'on');
   $('mus-menu').addEventListener('gm-select', (e) => {
+    if (e.detail.value === 'compact') { compact(!document.body.classList.contains('compact')); return; }
     const ids = L.selecting && L.selected.size ? [...L.selected] : undefined;
     if (e.detail.value === 'clean') openClean(ids);
     if (e.detail.value === 'dupes') openDupes();
@@ -4438,7 +4919,7 @@ function drawCatalog(songs, tiles) {
 
 // the covers, from the engine in one go
 async function loadCatalogThumbs() {
-  if (L.catalogCovers === false) return;  // Configuración › Rendimiento
+  if (L.catalogCovers === false) return;  // Configuración › Descargas › Buscar música
   const imgs = [...document.querySelectorAll('#download-hub img[data-thumb]:not([data-loaded])')].filter((i) => i.dataset.thumb);
   if (!imgs.length) return;
   const r = await call('catalog_thumbs', { urls: [...new Set(imgs.map((i) => i.dataset.thumb))] }).catch(() => null);
@@ -4628,6 +5109,7 @@ function syncSoundSettings() {
   $('ld-preamp-label').textContent = `+${$('ld-preamp').value} dB`;
   const eq = P.state.eq || { on: false, gains: EQ_PRESETS.flat };
   $('eq-on').checked = !!eq.on;
+  syncEqDim();
   for (const inp of document.querySelectorAll('#eq input')) { inp.value = String(eq.gains[Number(inp.dataset.band)] || 0); inp.closest('gm-slider')?.sync?.(); }
   pc({ cmd: 'devices' }).then((r) => {
     const sel = $('out-device');
@@ -4636,7 +5118,21 @@ function syncSoundSettings() {
   });
 }
 
+// off, the bands and presets look off (review 2026-11-07: they looked live while the EQ did nothing)
+function syncEqDim() {
+  for (const id of ['eq', 'eq-presets']) $(id).classList.toggle('eq-off', !$('eq-on').checked);
+}
+
+function wireLoudnessStop() {
+  $('ld-stop').addEventListener('click', async () => {
+    await call('music_loudness_scan', { stop: true }).catch(() => {});
+    $('ld-stop').hidden = true;
+    $('ld-status').textContent = tr('Medición detenida: lo medido se conserva y sigue la próxima vez.');
+  });
+}
+
 function sendEq() {
+  syncEqDim();
   const gains = [...document.querySelectorAll('#eq input')].map((i) => Number(i.value));
   pc({ cmd: 'set', eq: { on: $('eq-on').checked, gains } });
 }
@@ -4730,23 +5226,58 @@ function wireSound() {
     $('ly-fetch').disabled = false;
     if (!r.ok) { toast(tr(r.error), { duration: 6000 }); return; }
     if (r.found) showLyrics(r); else showLyrics(null, tr('LRCLIB tampoco la tiene.'));
+    // «¿solo ahora o siempre?» (pulido P2 #14): asked once, the first time it's done by hand
+    let asked = true;
+    try { asked = localStorage.getItem('bakin.ly-asked') === '1'; localStorage.setItem('bakin.ly-asked', '1'); } catch { /* private storage */ }
+    if (!asked && !$('ly-online').checked) {
+      toast(tr('¿Buscar la letra sola cada vez que un tema no la tenga?'), { duration: 10000, action: { label: tr('Buscar siempre'), onClick: () => {
+        $('ly-online').checked = true;
+        call('settings_set', { changes: { lyrics_online: true } });
+      } } });
+    }
   });
-  // A–B
+  // A–B: a right click on the progress bar, at the moment under the pointer (pulido P2 #13)
   let abA = null;
-  const abLabel = () => {
-    const ab = P.state.ab;
-    $('ab-off').hidden = !ab && abA === null;
-    $('ab-b').disabled = abA === null;
-    $('ab-label').textContent = ab ? `${fmtDur(ab[0])} → ${fmtDur(ab[1])}` : abA !== null ? `desde ${fmtDur(abA)}` : '';
-  };
-  $('ab-a').addEventListener('click', () => { abA = P.state.time || 0; abLabel(); });
-  $('ab-b').addEventListener('click', async () => {
-    const b = P.state.time || 0;
-    if (abA !== null && b > abA + 1) { await pc({ cmd: 'set', ab: [abA, b] }); abA = null; }
-    abLabel();
+  $('pl-seek').addEventListener('contextmenu', async (e) => {
+    e.preventDefault();
+    const dur = P.state.duration || P.state.track?.duration || (await pc({ cmd: 'state' }).catch(() => ({})))?.duration || 0;
+    if (!dur) return;
+    const r = $('pl-seek').getBoundingClientRect();
+    const at = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)) * dur;
+    $('ab-menu')?.remove();
+    const menu = document.createElement('gm-menu');
+    menu.id = 'ab-menu';
+    const anchor = pointerAnchor(e);
+    menu.setAttribute('anchor', anchor.id);
+    const item = (value, label, off) => { const b = document.createElement('button'); b.type = 'button'; b.value = value; b.textContent = label; b.disabled = !!off; return b; };
+    const head = document.createElement('small');
+    head.className = 'menu-head gm-menu-label';
+    head.textContent = tr('Repetir un tramo');
+    menu.append(head, item('a', tr('Desde {t} (A)', { t: fmtDur(at) || '0:00' })));
+    if (abA !== null) menu.append(item('b', tr('Hasta {t} (B)', { t: fmtDur(at) || '0:00' }), at <= abA + 1));
+    if (P.state.ab || abA !== null) menu.append(item('off', tr('Quitar la repetición')));
+    menu.addEventListener('gm-select', async (ev) => {
+      const v = ev.detail.value;
+      if (v === 'a') { abA = at; abMark(); toast(tr('Desde {t}: ahora elige el final con otro clic derecho.', { t: fmtDur(at) || '0:00' })); }
+      if (v === 'b') { await pc({ cmd: 'set', ab: [abA, at] }); abA = null; }
+      if (v === 'off') { abA = null; await pc({ cmd: 'set', ab: null }); }
+      abMark();
+    });
+    document.body.append(menu);
+    customElements.whenDefined('gm-menu').then(() => menu.open());
   });
-  $('ab-off').addEventListener('click', async () => { abA = null; await pc({ cmd: 'set', ab: null }); abLabel(); });
-  $('pl-more').addEventListener('click', abLabel);
+  // the stretch shows on the bar itself: A alone is a tick, A–B a band
+  const abMark = () => {
+    const dur = P.state.duration || P.state.track?.duration || 0;
+    const ab = P.state.ab || (abA !== null ? [abA, abA] : null);
+    const mark = $('pl-ab');
+    mark.hidden = !ab || !dur;
+    if (mark.hidden) return;
+    mark.style.left = `${(ab[0] / dur) * 100}%`;
+    mark.style.width = `${(Math.max(0, ab[1] - ab[0]) / dur) * 100}%`;
+    mark.title = P.state.ab ? tr('Repite {a} → {b}', { a: fmtDur(ab[0]) || '0:00', b: fmtDur(ab[1]) }) : '';
+  };
+  P.abMark = abMark;
 }
 
 function leaveMusicView() {
@@ -4827,6 +5358,9 @@ const RULE_OPS = {
   bool: [['is', tr('es')]],
 };
 let pdEditing = null;
+// the menus are Bakin's (gm-select), not Windows' (pulido D12); gm-select takes the id to its button
+const pdSort = () => $('pd-sort-box').querySelector('select');
+const boxed = (select) => { const box = document.createElement('gm-select'); box.append(select); return box; };
 let pdKind;
 let pdMatch;
 let pdPreviewTimer;
@@ -4854,6 +5388,7 @@ function ruleRow(rule = { field: 'artist', op: 'contains', value: '' }) {
     const kind = RULE_FIELDS.find((f) => f[0] === field.value)[2];
     op.replaceChildren(...RULE_OPS[kind].map(([v, label]) => new Option(label, v)));
     if (keep && RULE_OPS[kind].some(([v]) => v === rule.op)) op.value = rule.op;
+    op.closest('gm-select')?.sync?.();
     let input;
     if (kind === 'bool') {
       input = document.createElement('select');
@@ -4870,25 +5405,25 @@ function ruleRow(rule = { field: 'artist', op: 'contains', value: '' }) {
       input.value = keep ? String(rule.value ?? '') : (kind === 'days' ? '30' : kind === 'number' ? '1' : '');
     }
     input.setAttribute('aria-label', tr('Valor'));
-    input.addEventListener('input', pdPreview);
-    value.replaceChildren(input);
+    input.addEventListener(kind === 'bool' ? 'change' : 'input', pdPreview);
+    value.replaceChildren(kind === 'bool' ? boxed(input) : input);
   };
   fill(true);
   field.addEventListener('change', () => { fill(false); pdPreview(); });
   op.addEventListener('change', pdPreview);
-  row.append(field, op, value, drop);
+  row.append(boxed(field), boxed(op), value, drop);
   return row;
 }
 
 function pdRules() {
   const rules = [...$('pd-rules').querySelectorAll('.pd-rule')].map((row) => {
-    const [field, op] = row.querySelectorAll(':scope > select');
-    const input = row.querySelector('.pd-value > *');
+    const [field, op] = row.querySelectorAll(':scope > gm-select > select');
+    const input = row.querySelector('.pd-value input, .pd-value select');
     const kind = RULE_FIELDS.find((f) => f[0] === field.value)[2];
     const value = kind === 'bool' ? input.value === 'true' : kind === 'text' ? input.value : Number(input.value);
     return { field: field.value, op: op.value, value };
   });
-  return { match: pdMatch.value, rules, sort: $('pd-sort').value, limit: Number($('pd-limit').value) || 0 };
+  return { match: pdMatch.value, rules, sort: pdSort().value, limit: Number($('pd-limit').value) || 0 };
 }
 
 function pdPreview() {
@@ -4910,7 +5445,7 @@ function openPlaylistDialog(pl = null) {
   for (const c of $('pd-kind').querySelectorAll('.gm-chip')) c.disabled = !!pl;  // a playlist keeps its kind
   const rules = pl?.rules || { match: 'all', rules: [], sort: 'new', limit: 0 };
   pdMatch.set(rules.match);
-  $('pd-sort').value = rules.sort;
+  setSel(pdSort(), rules.sort);
   $('pd-limit').value = String(rules.limit || 0);
   $('pd-rules').replaceChildren(...(rules.rules.length ? rules.rules : [undefined]).map((r) => ruleRow(r)));
   syncPdKind();
@@ -4979,6 +5514,8 @@ async function addToPlaylist(id, name) {
 function openSettings(sec = 'general') {
   showSettingsSection(sec);
   $('settings-dialog').show();
+  // the focus starts on the section shown, not on the first one (two looked chosen)
+  requestAnimationFrame(() => document.querySelector(`#settings-nav [data-sec="${sec}"]`)?.focus());
 }
 
 function showSettingsSection(sec) {
@@ -5189,7 +5726,7 @@ async function renderHotkeys() {
     key.className = 'gm-chip gm-chip-plain hotkey-key';
     key.dataset.action = h.id;
     key.textContent = prettyCombo(h.combo);
-    key.title = h.active ? tr('Tocá y apretá la combinación nueva') : tr('Otro programa usa esta combinación: elegí otra');
+    key.title = h.active ? tr('Toca y presiona la combinación nueva') : tr('Otro programa usa esta combinación: elige otra');
     if (!h.active) key.dataset.tone = 'warning';
     key.addEventListener('click', () => recordHotkey(key, h));
     row.append(name, key);
@@ -5251,11 +5788,21 @@ function wireMusicViews() {
   $('lib-back').addEventListener('click', () => L.mview?.back && selectMusicView(L.mview.back, { name: MVIEWS[L.mview.back] }));
   $('mus-play').addEventListener('click', () => playList(false));
   $('mus-shuffle').addEventListener('click', () => playList(true));
+  // its ⌄: the same four kinds as the player's right click; picking one plays the list that way
+  for (const b of document.querySelectorAll('#shuffle-menu > button')) $('mus-shuffle-menu').append(b.cloneNode(true));
+  $('mus-shuffle-more').addEventListener('click', () => {
+    for (const b of document.querySelectorAll('#mus-shuffle-menu > button')) b.setAttribute('aria-checked', String(b.value === (P.state.shuffle_mode || 'random')));
+    $('mus-shuffle-menu').open();
+  });
+  $('mus-shuffle-menu').addEventListener('gm-select', async (e) => {
+    await pc({ cmd: 'set', shuffle: true, shuffle_mode: e.detail.value });
+    playList(true);
+  });
   $('btn-new-playlist').addEventListener('click', () => openPlaylistDialog());
   pdKind = chipGroup($('pd-kind'), syncPdKind);
   pdMatch = chipGroup($('pd-match'), pdPreview);
   $('pd-add-rule').addEventListener('click', () => { $('pd-rules').append(ruleRow()); pdPreview(); });
-  $('pd-sort').addEventListener('change', pdPreview);
+  pdSort().addEventListener('change', pdPreview);
   $('pd-limit').addEventListener('input', pdPreview);
   $('pd-cancel').addEventListener('click', () => $('playlist-dialog').close());
   $('pd-save').addEventListener('click', savePlaylist);
@@ -5371,6 +5918,7 @@ function plDrawControls() {
   $('player').classList.toggle('playing', !!s.playing);
   $('pl-play').setAttribute('aria-label', s.playing ? tr('Pausar') : tr('Reproducir'));
   $('pl-shuffle').setAttribute('aria-pressed', String(!!s.shuffle));
+  P.abMark?.();
   const mode = s.shuffle_mode || 'random';
   $('pl-shuffle').dataset.mode = mode;
   $('pl-shuffle').title = (s.shuffle ? tr('Aleatorio: {mode}', { mode: SHUFFLE_NAMES[mode].toLowerCase() }) : tr('Aleatorio: no')) + tr(' (S) · clic derecho: elegir el tipo');
@@ -5567,7 +6115,7 @@ function wirePlayer() {
 async function init() {
   wireWindow();
   wireOptions();
-  wireJobs();
+  wireDownloads();
   wireSearch();
   wireSkeleton();
   wireWallhaven();
@@ -5594,6 +6142,7 @@ async function init() {
   $('perf-covers').addEventListener('change', () => perf({ catalog_covers: $('perf-covers').checked }));
   chipGroup($('st-span'), (v) => { statsSpan = v; reloadItems(); });
   wireHome();
+  wireLoudnessStop();
   wireBackground();
   wireBackdrop();
   wireLinks();
@@ -5602,6 +6151,8 @@ async function init() {
   await tauri.event.listen('engine', (e) => onEngineEvent(e.payload));
   await tauri.event.listen('engine-exit', () => {
     setBusy(false);
+    DL.job = null;  // the job died with the engine
+    renderDownloads();
     log('danger', tr('El motor de descargas se detuvo; vuelve a iniciarse solo con la próxima acción.'));
   });
   try {
@@ -5701,13 +6252,29 @@ async function onMirrorClick() {
   const pl = MUSIC?.playlists.find((p) => p.id === L.mview?.value);
   if (!pl) return;
   if (pl.mirror) {
-    call('music_mirror_sync', { playlist_id: pl.id });
-    toast(tr('Sincronizando la carpeta espejo: {mirror}', { mirror: pl.mirror }), { duration: 8000, action: { label: tr('Dejar de mantenerla'), onClick: async () => {
-      await call('music_mirror_off', { playlist_id: pl.id });
-      toast(tr('Ya no se mantiene esa carpeta; lo que tiene se queda.'));
-      await loadMusicOverview();
-      selectMusicView('playlist', { value: pl.id, name: pl.name });
-    } } });
+    // «Espejo ✓»: a menu with what can be done (pulido P2 #18), not a sync on click with the way
+    // out hidden in a toast
+    $('mirror-menu')?.remove();
+    const menu = document.createElement('gm-menu');
+    menu.id = 'mirror-menu';
+    menu.setAttribute('anchor', 'pl-mirror');
+    const head = document.createElement('small');
+    head.className = 'menu-head gm-menu-label';
+    head.textContent = pl.mirror;
+    const item = (value, label) => { const b = document.createElement('button'); b.type = 'button'; b.value = value; b.textContent = label; return b; };
+    menu.append(head, item('sync', tr('Sincronizar ahora')), item('open', tr('Abrir la carpeta')), document.createElement('hr'), item('off', tr('Dejar de mantenerla')));
+    menu.addEventListener('gm-select', async (e) => {
+      if (e.detail.value === 'sync') { call('music_mirror_sync', { playlist_id: pl.id }); toast(tr('Sincronizando la carpeta espejo…')); }
+      if (e.detail.value === 'open') { const r = await call('music_mirror_open', { playlist_id: pl.id }).catch((err) => ({ ok: false, error: String(err) })); if (!r.ok) toast(tr(r.error)); }
+      if (e.detail.value === 'off') {
+        await call('music_mirror_off', { playlist_id: pl.id });
+        toast(tr('Ya no se mantiene esa carpeta; lo que tiene se queda.'));
+        await loadMusicOverview();
+        selectMusicView('playlist', { value: pl.id, name: pl.name });
+      }
+    });
+    document.body.append(menu);
+    customElements.whenDefined('gm-menu').then(() => menu.open());
     return;
   }
   const dir = await tauri.dialog.open({ directory: true, title: tr('Carpeta espejo de «{name}»', { name: pl.name }) }).catch(() => null);

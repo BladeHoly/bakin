@@ -273,3 +273,17 @@ def test_only_merge_mode(world):
     z = backup.export(world["tmp"] / "b.zip", download_root=world["root"])["path"]
     with pytest.raises(backup.BackupError):
         backup.import_(Path(z), mode="replace", download_root=world["root"])
+
+
+def test_shortcuts_and_mini_travel_but_never_overwrite(world):
+    # pulido P2 #21: the copy carries the shortcuts and the mini's layout
+    (app_dir() / "hotkeys.json").write_text(json.dumps({"play_pause": "Ctrl+Alt+P", "next": "Ctrl+Alt+N"}), encoding="utf-8")
+    (app_dir() / "mini.json").write_text(json.dumps({"layout": "card", "side": 240}), encoding="utf-8")
+    z = backup.export(world["tmp"] / "b.zip", download_root=world["root"])["path"]
+    _wipe()
+    app_dir().mkdir(parents=True, exist_ok=True)
+    (app_dir() / "hotkeys.json").write_text(json.dumps({"next": "Ctrl+Shift+N"}), encoding="utf-8")
+    backup.import_(Path(z), download_root=world["root"])
+    keys = json.loads((app_dir() / "hotkeys.json").read_text(encoding="utf-8"))
+    assert keys == {"next": "Ctrl+Shift+N", "play_pause": "Ctrl+Alt+P"}  # this PC's choice stays
+    assert json.loads((app_dir() / "mini.json").read_text(encoding="utf-8")) == {"layout": "card", "side": 240}

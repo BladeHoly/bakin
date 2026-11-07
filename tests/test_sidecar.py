@@ -53,3 +53,21 @@ def test_start_validation_over_the_wire():
     lines = by_id(run([{"id": 5, "method": "start",
                         "params": {"mode": "download", "url": "esto no es un enlace"}}]))
     assert lines[5]["result"]["ok"] is False and lines[5]["result"]["field"] == "url"
+
+
+def test_a_failing_method_answers_with_its_error_class():
+    class Boom:
+        def get_state(self):
+            raise RuntimeError("disk on fire")
+    out = io.StringIO()
+    sidecar.handle(Boom(), sidecar.Channel(out), {"id": 8, "method": "get_state"})
+    assert json.loads(out.getvalue()) == {"id": 8, "error": "RuntimeError: disk on fire"}
+
+
+def test_requests_without_params_or_id():
+    class Svc:
+        def job_running(self):
+            return True
+    out = io.StringIO()
+    sidecar.handle(Svc(), sidecar.Channel(out), {"method": "job_running", "params": None})
+    assert json.loads(out.getvalue()) == {"id": None, "result": True}

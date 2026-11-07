@@ -123,9 +123,13 @@ def test_real_audio_and_video_conversions(tmp_path, ffmpeg):
 
 @needs_ffmpeg
 def test_cancel_stops_ffmpeg_and_leaves_nothing(tmp_path, ffmpeg):
-    clip = _make(ffmpeg, ["-f", "lavfi", "-i", "testsrc=duration=60:size=1920x1080:rate=30"], tmp_path / "largo.mp4")
+    # a folder of its own: tmp_path also holds the test's BAKIN_HOME, which another test's thread
+    # still finishing may create meanwhile (it made this test flaky)
+    folder = tmp_path / "videos"
+    folder.mkdir()
+    clip = _make(ffmpeg, ["-f", "lavfi", "-i", "testsrc=duration=60:size=1920x1080:rate=30"], folder / "largo.mp4")
     cancel = threading.Event()
     threading.Timer(1.5, cancel.set).start()
     stats = convert.convert_files([clip], convert.clean_options({"target": "webm"}), lambda e: None, cancel)
     assert stats.done == 0
-    assert sorted(p.name for p in tmp_path.iterdir()) == ["largo.mp4"]
+    assert sorted(p.name for p in folder.iterdir()) == ["largo.mp4"]

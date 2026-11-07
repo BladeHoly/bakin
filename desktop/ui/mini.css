@@ -1,135 +1,116 @@
-/* «Modo mínimo»: three layouts, each the size of the window (mini.rs):
-   a bar (500 × 72), a card (224 × 224, the cover) and the song only (340 × 80). */
-html, body { margin: 0; height: 100%; overflow: hidden; background: #0d0c14; color: var(--gm-ink); user-select: none;
+/* «Modo mínimo» (0.24): a bar (420 × 64, everything in sight) and a card (the cover, a square
+   of 160–400 px with its controls on hover); the song only (340 × 56) is what the gaming mode
+   shows while clicks go through. Sizes: mini.rs. Rules: docs/DESIGN.md. */
+html, body { margin: 0; height: 100%; overflow: hidden; background: transparent; color: var(--gm-ink); user-select: none;
   font-family: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif; }
-.mini { height: 100%; display: grid; grid-template-columns: 52px minmax(0, 1fr) auto auto; align-items: center; gap: 0.6rem;
-  padding: 0 0.5rem 0 10px; box-sizing: border-box; }
+/* the window is see-through (mini.rs): the bar is a rounded box of its own */
+.mini { position: relative; height: 100%; display: grid; grid-template-columns: 48px minmax(0, 1fr) auto auto; align-items: center;
+  gap: var(--sp-10); padding: 0 var(--sp-8); box-sizing: border-box; background: var(--c-base); border-radius: var(--r-12);
+  box-shadow: inset 0 0 0 1px var(--c-line); }
 svg { width: 16px; height: 16px; display: block; }
 [hidden] { display: none !important; }
 
-.m-cover { width: 52px; height: 52px; padding: 0; border: 0; border-radius: 10px; overflow: hidden; cursor: pointer;
-  display: grid; place-items: center; background: rgb(255 255 255 / 0.06); color: var(--gm-ink-muted); }
+.m-cover { width: 48px; height: 48px; border-radius: var(--r-8); overflow: hidden; display: grid; place-items: center;
+  background: var(--c-fill-2); color: var(--gm-ink-muted); cursor: default; }
 .m-cover img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .m-cover svg { width: 22px; height: 22px; }
-.m-cover:hover { outline: 2px solid rgb(255 255 255 / 0.25); }
 
-.m-meta { display: grid; min-width: 0; line-height: 1.25; }
-.m-meta strong, .m-meta small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.m-meta strong { font-size: 0.86rem; font-weight: 600; }
-.m-meta small { font-size: 0.74rem; color: var(--gm-ink-muted); min-height: 1em; }
+/* the song: title; «artist · album» with the time at its right; a hairline of progress */
+.m-meta { position: relative; display: grid; min-width: 0; line-height: 1.25; }
+.m-meta strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-13); font-weight: 600; }
+.m-sub { display: flex; align-items: baseline; gap: var(--sp-8); min-width: 0; }
+.m-sub small { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-12);
+  color: var(--gm-ink-muted); min-height: 1em; }
+.m-time { flex: none; font-size: var(--fs-11); color: var(--gm-ink-muted); font-variant-numeric: tabular-nums; }
 /* the song's progress: a thin line, a click jumps there */
-.m-seek { position: relative; height: 10px; margin-top: 2px; cursor: pointer; }
-.m-seek::before, .m-seek i { content: ''; position: absolute; left: 0; top: 4px; height: 3px; border-radius: 3px; }
-.m-seek::before { right: 0; background: rgb(255 255 255 / 0.14); }
-.m-seek i { width: 0; background: rgb(255 255 255 / 0.85); }
-.m-seek:hover i { background: rgb(90 210 150); }
-.m-time { display: none; font-size: 0.72rem; color: var(--gm-ink-muted); font-variant-numeric: tabular-nums; }
-/* volume: a slider (the 🔊 shows it in the bar; always there in the card) */
-.m-vol-row { display: none; align-items: center; gap: 6px; color: var(--gm-ink-muted); }
-.m-vol-row svg { width: 14px; height: 14px; flex: none; }
-/* glass-midas' slider, finer (like the main player's): a thin track, a small knob (0.13.1 polish) */
-.m-vol-row .m-slider { flex: 1; min-width: 0; }
-.m-slider input[type='range'] { height: 14px; }
-.m-slider input[type='range']::-webkit-slider-runnable-track { height: 0.22rem; }
-.m-slider input[type='range']::-webkit-slider-thumb { width: 0.7rem; height: 0.7rem; margin-top: -0.24rem; box-shadow: 0 1px 3px rgb(0 0 0 / 0.35); }
-.m-slider input[type='range']:active::-webkit-slider-thumb { scale: 1.25; }
-#m-vol[aria-pressed='true'] { color: rgb(90 210 150); }
+.m-seek { position: relative; height: 10px; margin-top: var(--sp-2); cursor: pointer; }
+.m-seek::before, .m-seek i { content: ''; position: absolute; left: 0; top: 4px; height: 3px; border-radius: var(--r-4); }
+.m-seek::before { right: 0; background: var(--c-line); }
+.m-seek i { width: 0; background: var(--c-ink-soft); }
+.m-seek:hover i { background: var(--c-ok); }
+/* the bar: the time sits by the progress line, so «artist · album» gets the whole width */
+body:not([data-layout='card']) .m-meta { grid-template-columns: minmax(0, 1fr) auto; column-gap: var(--sp-8); }
+body:not([data-layout='card']) .m-meta > strong { grid-column: 1 / -1; }
+body:not([data-layout='card']) .m-sub { display: contents; }
+body:not([data-layout='card']) .m-sub small { grid-column: 1 / -1; }
+body:not([data-layout='card']) .m-seek { grid-column: 1; align-self: center; margin-top: 0; }
+body:not([data-layout='card']) .m-time { grid-column: 2; line-height: 1; }
+/* the wheel's volume, over the song for a moment */
+.m-volnote { position: absolute; inset: 0; display: grid; place-items: center start; padding-left: var(--sp-2);
+  background: var(--c-base); font-size: var(--fs-13); font-weight: 600; font-variant-numeric: tabular-nums; }
 
-/* the card: the cover is the window (a 224 px square), like Apple Music's MiniPlayer and
-   Spotify's square miniplayer (0.13 review: the old card took 248 × 384 and stacked everything).
-   At rest only the cover and a hairline of progress; on hover a scrim brings the window options
-   (top), prev / play / next (centre), and the song, its time and the seek bar (bottom).
-   The wheel sets the volume, as anywhere in the small window. */
-body[data-layout='card'] .mini { display: block; position: relative; padding: 0; overflow: hidden; }
-body[data-layout='card'] .m-cover { position: absolute; inset: 0; width: 100%; height: 100%; border-radius: 0; }
-body[data-layout='card'] .m-cover svg { width: 56px; height: 56px; }
-body[data-layout='card'] .m-cover:hover { outline: none; }
-/* the scrims: darker at the edges, where text and buttons sit */
-body[data-layout='card'] .mini::before, body[data-layout='card'] .mini::after { content: ''; position: absolute; left: 0; right: 0;
-  pointer-events: none; opacity: 0; transition: opacity 0.18s; z-index: 1; }
-body[data-layout='card'] .mini::before { top: 0; height: 60%; background: linear-gradient(rgb(0 0 0 / 0.62), rgb(0 0 0 / 0.18) 55%, transparent); }
-body[data-layout='card'] .mini::after { bottom: 0; height: 70%; background: linear-gradient(transparent, rgb(0 0 0 / 0.35) 35%, rgb(0 0 0 / 0.82)); }
-body[data-layout='card'].hot .mini::before, body[data-layout='card'].hot .mini::after,
-body[data-layout='card'] .mini:focus-within::before, body[data-layout='card'] .mini:focus-within::after { opacity: 1; }
-/* what shows on hover */
-body[data-layout='card'] .m-window, body[data-layout='card'] .m-buttons,
-body[data-layout='card'] .m-meta > :not(.m-seek) { opacity: 0; transition: opacity 0.18s; }
-body[data-layout='card'].hot :is(.m-window, .m-buttons, .m-meta > :not(.m-seek)),
-body[data-layout='card'] .mini:focus-within :is(.m-window, .m-buttons, .m-meta > :not(.m-seek)) { opacity: 1; }
-body[data-layout='card'] .m-window { position: absolute; z-index: 2; top: 6px; left: 6px; right: 6px; justify-content: space-between;
-  border-left: 0; padding: 0; }
-body[data-layout='card'] .m-window .m-close { margin-left: 10px; }  /* a little apart: not hit by mistake */
-body[data-layout='card'] .m-buttons { position: absolute; z-index: 2; left: 50%; top: 50%; translate: -50% -58%; gap: 10px; }
-body[data-layout='card'] .m-buttons .m-play { width: 2.9rem; height: 2.9rem; }
-body[data-layout='card'] #m-vol, body[data-layout='card'] .m-vol-row { display: none; }
-body[data-layout='card'] .m-meta { position: absolute; z-index: 2; left: 10px; right: 10px; bottom: 6px; text-align: left; }
-body[data-layout='card'] .m-meta strong { font-size: 0.84rem; text-shadow: 0 1px 3px rgb(0 0 0 / 0.6); }
-body[data-layout='card'] .m-meta small { color: rgb(255 255 255 / 0.78); }
-body[data-layout='card'] .m-time { display: block; position: absolute; right: 0; bottom: 14px; font-size: 0.68rem; color: rgb(255 255 255 / 0.78); }
-/* at rest the progress is a hairline at the very bottom; on hover, a bar to click */
-body[data-layout='card'] .m-seek { margin: 3px -10px -6px; height: 8px; }
-body[data-layout='card'] .m-seek::before, body[data-layout='card'] .m-seek i { top: 5px; height: 3px; border-radius: 0; }
-body[data-layout='card'].hot .m-seek { margin: 4px 0 0; }
-body[data-layout='card'].hot .m-seek::before, body[data-layout='card'].hot .m-seek i { border-radius: 3px; }
-
-/* the song only: cover, title, artist and time; the size button on hover */
-body[data-layout='info'] .mini { grid-template-columns: 56px minmax(0, 1fr) auto; }
-body[data-layout='info'] .m-cover { width: 56px; height: 56px; }
-body[data-layout='info'] .m-buttons, body[data-layout='info'] .m-vol-row { display: none; }
-body[data-layout='info'] .m-time { display: block; }
-body[data-layout='info'] .m-window { border-left: 0; padding: 0; }
-/* the song only: ⋯ (on hover) opens the window options as a vertical menu under it */
-.m-more { display: none; }
-body[data-layout='info'] .m-window > :not(.m-more) { display: none; }
-body[data-layout='info'] .m-more { display: grid; opacity: 0; transition: opacity 0.15s; }
-body[data-layout='info']:hover .m-more, body[data-pop-kind='menu'] .m-more { opacity: 1; }
-body[data-pop-kind='menu'] .m-more { color: rgb(90 210 150); }
-body.through .m-more, body.through .m-window, body.through .m-pop { display: none !important; }
-
-/* what opens from ⋯ and 🔊: the song keeps its place, the room the window made holds the rest */
-body[data-pop] .mini { height: var(--base-h); }
-body[data-pop='up'] .mini { position: fixed; left: 0; right: 0; bottom: 0; }
-.m-pop { position: fixed; left: 0; right: 0; padding: 6px 8px; box-sizing: border-box; }
-body[data-pop='down'] .m-pop { top: var(--base-h); bottom: 0; }
-body[data-pop='up'] .m-pop { top: 0; bottom: var(--base-h); }
-.m-menu, .m-volpop { display: none; }
-body[data-pop-kind='menu'] .m-menu { display: grid; gap: 1px; margin-left: auto; width: 200px; padding: 4px; border-radius: 14px;
-  background: rgb(255 255 255 / 0.05); box-shadow: inset 0 0 0 0.5px rgb(255 255 255 / 0.12); }
-.m-menu button { display: flex; align-items: center; gap: 0.6rem; padding: 0.4rem 0.6rem; border: 0; border-radius: 10px;
-  background: none; color: var(--gm-ink); font: inherit; font-size: 0.82rem; text-align: left; cursor: pointer; }
-.m-menu button:hover, .m-menu button:focus-visible { background: rgb(255 255 255 / 0.09); outline: none; }
-.m-menu button svg { width: 15px; height: 15px; flex: none; }
-.m-menu hr { margin: 3px 6px; border: 0; border-top: 1px solid rgb(255 255 255 / 0.1); }
-.m-menu .danger:hover, .m-menu .danger:focus-visible { background: #c42b1c; color: #fff; }
-body[data-pop-kind='vol'] .m-volpop { display: grid; place-items: center; position: absolute; top: 6px; bottom: 6px; width: 40px;
-  border-radius: 14px; background: rgb(255 255 255 / 0.05); box-shadow: inset 0 0 0 0.5px rgb(255 255 255 / 0.12); }
-/* standing up: filled from the bottom */
-.m-slider-v { position: absolute; top: 10px; bottom: 10px; left: 13px; width: 14px;
-  --gm-slider-track: linear-gradient(to top, var(--gm-ink) var(--gm-fill, 50%), rgb(255 255 255 / 0.16) var(--gm-fill, 50%)); }
-.m-slider-v input[type='range'] { writing-mode: vertical-lr; direction: rtl; width: 14px; height: 100%; }
-.m-slider-v input[type='range']::-webkit-slider-runnable-track { width: 0.22rem; height: 100%; }
-.m-slider-v input[type='range']::-webkit-slider-thumb { margin-top: 0; margin-left: -0.24rem; }
-
-.m-buttons, .m-window { display: flex; align-items: center; gap: 2px; }
+.m-buttons, .m-window { display: flex; align-items: center; gap: var(--sp-2); }
 .m-buttons .gm-chip-round, .m-window .gm-chip-round { width: 2rem; height: 2rem; }
-.m-buttons .m-play { width: 2.4rem; height: 2.4rem; background: rgb(255 255 255 / 0.94); color: #121118; }
+.m-buttons .m-play { width: 2.4rem; height: 2.4rem; background: var(--c-ink-strong); color: var(--c-base-2); }
 .m-play .i-pause, body.playing .m-play .i-play { display: none; }
 body.playing .m-play .i-pause { display: block; }
-.m-window { padding-left: 0.3rem; border-left: 1px solid rgb(255 255 255 / 0.08); }
 .m-window svg { width: 14px; height: 14px; }
-#m-pin[data-layer='top'] { color: rgb(90 210 150); }
-#m-pin[data-layer='normal'] { color: var(--gm-ink-muted); }
-#m-pin[data-layer='bottom'] { color: rgb(150 170 255); }
-#m-pin[data-layer='bottom'] svg { rotate: 180deg; }
-.m-close:hover { background: #c42b1c; color: #fff; }
-/* transparent to the mouse: the shell switches to the song-only layout */
-body.through .m-seek::before { background: rgb(255 255 255 / 0.08); }
-/* opened upwards (near the screen's bottom edge): «Cerrar» still the farthest from ⋯ */
-body[data-pop='up'][data-pop-kind='menu'] .m-menu { display: flex; flex-direction: column-reverse; margin-top: auto; }
-body[data-pop='up'] .m-pop { display: flex; flex-direction: column; }
+.m-grip { display: none; }
+
+/* the card: the cover is the window, like Apple Music's MiniPlayer and Spotify's square one.
+   At rest the cover and a hairline of progress; on hover a scrim brings ⤢ and ⋯ (top),
+   prev / play / next (centre), the song and its time (bottom), and the corner to resize it. */
+body[data-layout='card'] .mini { display: block; padding: 0; overflow: hidden; }
+body[data-layout='card'] .m-cover { position: absolute; inset: 0; width: 100%; height: 100%; border-radius: 0; }
+body[data-layout='card'] .m-cover svg { width: 56px; height: 56px; }
+body[data-layout='card'] .mini::before, body[data-layout='card'] .mini::after { content: ''; position: absolute; left: 0; right: 0;
+  pointer-events: none; opacity: 0; transition: opacity 0.18s; z-index: 1; }
+body[data-layout='card'] .mini::before { top: 0; height: 45%; background: linear-gradient(var(--c-shade-3), transparent); }
+body[data-layout='card'] .mini::after { bottom: 0; height: 60%; background: linear-gradient(transparent, var(--c-shade-2) 35%, var(--c-shade-4)); }
+body[data-layout='card'].hot .mini::before, body[data-layout='card'].hot .mini::after,
+body[data-layout='card'] .mini:focus-within::before, body[data-layout='card'] .mini:focus-within::after { opacity: 1; }
+body[data-layout='card'] :is(.m-window, .m-buttons, .m-meta > strong, .m-sub, .m-grip) { opacity: 0; transition: opacity 0.18s; }
+body[data-layout='card'].hot :is(.m-window, .m-buttons, .m-meta > strong, .m-sub, .m-grip),
+body[data-layout='card'] .mini:focus-within :is(.m-window, .m-buttons, .m-meta > strong, .m-sub) { opacity: 1; }
+body[data-layout='card'] .m-window { position: absolute; z-index: 2; top: var(--sp-6); left: var(--sp-6); right: var(--sp-6);
+  justify-content: space-between; }
+body[data-layout='card'] .m-buttons { position: absolute; z-index: 2; left: 50%; top: 50%; translate: -50% -60%; gap: var(--sp-10); }
+body[data-layout='card'] .m-buttons .m-play { width: 2.9rem; height: 2.9rem; }
 /* over a light cover the white icons need their own dark round */
-body[data-layout='card'] .m-buttons .gm-chip-plain { background: rgb(0 0 0 / 0.38); color: #fff; }
-body[data-layout='card'] .m-buttons .gm-chip-plain:hover { background: rgb(0 0 0 / 0.55); }
+body[data-layout='card'] :is(.m-buttons, .m-window) .gm-chip-plain { background: var(--c-shade-2); color: var(--c-white); }
+body[data-layout='card'] :is(.m-buttons, .m-window) .gm-chip-plain:hover { background: var(--c-shade-3); }
+body[data-layout='card'] .m-meta { position: absolute; z-index: 2; left: var(--sp-10); right: var(--sp-10); bottom: var(--sp-6); }
+body[data-layout='card'] .m-meta strong { text-shadow: 0 1px 3px var(--c-shade-3); }
+body[data-layout='card'] .m-sub small, body[data-layout='card'] .m-time { color: var(--c-ink-soft); }
+body[data-layout='card'] .m-volnote { background: none; place-items: end start; padding-bottom: var(--sp-16); text-shadow: 0 1px 3px var(--c-shade-3); }
+/* at rest the progress is a hairline at the very bottom; on hover, a bar to click */
+body[data-layout='card'] .m-seek { margin: var(--sp-4) -10px -6px; height: 8px; }
+body[data-layout='card'] .m-seek::before, body[data-layout='card'] .m-seek i { top: 5px; height: 3px; border-radius: 0; }
+body[data-layout='card'].hot .m-seek { margin: var(--sp-4) 0 0; }
+body[data-layout='card'].hot .m-seek::before, body[data-layout='card'].hot .m-seek i { border-radius: var(--r-4); }
+/* the corner that resizes it */
+body[data-layout='card'] .m-grip { display: block; position: absolute; z-index: 3; right: 0; bottom: 0; width: var(--sp-16); height: var(--sp-16);
+  cursor: nwse-resize; background: linear-gradient(135deg, transparent 50%, var(--c-line-strong) 50%, var(--c-line-strong) 58%, transparent 58%,
+  transparent 70%, var(--c-line-strong) 70%, var(--c-line-strong) 78%, transparent 78%); }
+
+/* the gaming mode: the song only, a picture you can't touch (clicks go through it) */
+body[data-layout='info'] .mini { grid-template-columns: 40px minmax(0, 1fr); box-shadow: inset 0 0 0 1px var(--c-line); }
+body[data-layout='info'] .m-cover { width: 40px; height: 40px; }
+body[data-layout='info'] :is(.m-buttons, .m-window, .m-grip) { display: none; }
+body.through .m-pop { display: none !important; }
+body.through .mini { box-shadow: inset 0 0 0 1px var(--c-line); outline: 1px dashed var(--c-line-strong); outline-offset: -3px; }
+
+/* what opens from ⋯: the song keeps its place, the room the window made holds the rest */
+body[data-pop] .mini { height: var(--base-h); }
+body[data-pop='up'] .mini { position: fixed; left: 0; right: 0; bottom: 0; }
+.m-pop { position: fixed; left: 0; right: 0; padding: var(--sp-6) var(--sp-8); box-sizing: border-box; }
+body[data-pop='down'] .m-pop { top: var(--base-h); bottom: 0; }
+body[data-pop='up'] .m-pop { top: 0; bottom: var(--base-h); display: flex; flex-direction: column; justify-content: flex-end; }
+.m-menu { display: grid; gap: 1px; width: min(260px, 100%); margin-left: auto;  /* beside it the window is see-through: no block */ padding: var(--sp-4); border-radius: var(--r-16);
+  background: var(--c-base); box-shadow: inset 0 0 0 1px var(--c-line); box-sizing: border-box; }
+.m-menu button { display: flex; align-items: center; gap: var(--sp-10); min-height: var(--hit-min); padding: var(--sp-6) var(--sp-10);
+  border: 0; border-radius: var(--r-12); background: none; color: var(--gm-ink); font: inherit; font-size: var(--fs-13); text-align: left; cursor: pointer; }
+.m-menu button span { flex: 1; }
+.m-menu button:hover, .m-menu button:focus-visible { background: var(--c-fill-3); outline: none; }
+.m-menu button svg { width: 15px; height: 15px; flex: none; }
+.m-menu .mm-check { font-style: normal; color: var(--c-ok); visibility: hidden; }
+.m-menu [aria-checked='true'] .mm-check { visibility: visible; }
+.m-menu hr { margin: var(--sp-2) var(--sp-6); border: 0; border-top: 1px solid var(--c-fill-3); }
+.m-ask { display: grid; gap: var(--sp-8); padding: var(--sp-10) var(--sp-12); border-radius: var(--r-16); background: var(--c-base);
+  box-shadow: inset 0 0 0 1px var(--c-line); font-size: var(--fs-12); }
+.m-ask p { margin: 0; color: var(--gm-ink-muted); }
+.m-ask strong { display: block; color: var(--gm-ink); font-size: var(--fs-13); }
+.m-ask-actions { display: flex; justify-content: flex-end; gap: var(--sp-6); }
 
 /* faded while the pointer is away (PLAN 0.17.4; off unless chosen) */
 .mini { transition: opacity 0.4s; }

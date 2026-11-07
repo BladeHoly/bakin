@@ -94,6 +94,17 @@ def _spend(hourly: int, now: float) -> None:
         _calls.append(now)
 
 
+def _offline(exc: BaseException) -> bool:
+    """No connection (or the site doesn't answer): not a change on YouTube's side (PLAN 0.23.4)."""
+    import requests
+    seen = exc
+    while seen is not None:
+        if isinstance(seen, (requests.ConnectionError, requests.Timeout, TimeoutError, ConnectionError)):
+            return True
+        seen = seen.__cause__ or seen.__context__
+    return False
+
+
 def _blocked(exc: Exception) -> bool:
     text = f"{exc.__class__.__name__} {exc}".lower()
     return any(w in text for w in ("429", "too many requests", "not a bot", "captcha", "sign in to confirm"))
@@ -115,6 +126,8 @@ def _ask(key: tuple, ttl: int, hourly: int, fn):
             with _lock:
                 _paused_until = now + COOLDOWN
             raise Busy("YouTube pidió esperar: el catálogo vuelve en una hora.", _paused_until) from exc
+        if _offline(exc):
+            raise CatalogError("No se pudo conectar con YouTube Music: revisa la conexión a internet.") from exc
         raise CatalogError("YouTube Music no respondió como se esperaba. Si sigue, actualiza Bakin.") from exc
     with _lock:
         _cache[key] = (now, value)

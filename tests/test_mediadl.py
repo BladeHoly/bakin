@@ -376,3 +376,17 @@ def test_suggested_preset_follows_what_was_detected_then_the_users_choice():
     s["site_prefs"] = {"youtube.com": music["preset"]}
     again = mediadl.suggest_preset(s, "https://www.youtube.com/watch?v=y", {"kind": "video"})
     assert again["preset"] == music["preset"] and "youtube.com" in again["why"]
+
+
+def test_friendly_errors_for_disk_network_and_gone():
+    # PLAN 0.23.4: the three things that go wrong most, in plain words (the raw text stays after)
+    full = mediadl.friendly_error("ERROR: unable to write data: [Errno 28] No space left on device")
+    assert full.startswith("No queda espacio en el disco") and "Errno 28" in full
+    win_full = mediadl.friendly_error("OSError: [WinError 112] There is not enough space on the disk")
+    assert win_full.startswith("No queda espacio")
+    offline = mediadl.friendly_error("ERROR: Unable to download webpage: <urlopen error [Errno 11001] getaddrinfo failed>")
+    assert offline.startswith("No hay conexión a internet")
+    gone = mediadl.friendly_error("ERROR: [youtube] abc: Private video. Sign in if you've been granted access")
+    assert gone.startswith("El video es privado")
+    assert mediadl.friendly_error("ERROR: [youtube] abc: Video unavailable").startswith("El video es privado")
+    assert mediadl.friendly_error("something else") == "something else"

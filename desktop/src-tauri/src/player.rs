@@ -1258,6 +1258,27 @@ impl Engine {
         self.tell_queue();
     }
 
+    /// Cola, dragged (pulido P1 #4): a song that comes later moves to another later place; the
+    /// one playing and the ones already played stay put. «Play next» songs keep their count.
+    fn move_to(&mut self, from: usize, to: usize) {
+        let len = self.order.len();
+        if from >= len || to >= len || from == to || from <= self.pos || to <= self.pos {
+            return;
+        }
+        let next = |p: usize, s: &Self| p > s.pos && p <= s.pos + s.queued;
+        let (was, will) = (next(from, self), next(to, self));
+        let song = self.order.remove(from);
+        self.order.insert(to, song);
+        if was && !will {
+            self.queued = self.queued.saturating_sub(1);
+        } else if !was && will {
+            self.queued += 1;
+        }
+        self.drop_lookahead();
+        self.dirty = true;
+        self.tell_queue();
+    }
+
     fn clear_after(&mut self) {
         self.order.truncate(self.pos + 1);
         self.queued = 0;
@@ -1347,6 +1368,10 @@ impl Engine {
             }
             "remove" => self.remove(s("pos").and_then(|v| v.as_u64()).unwrap_or(u64::MAX) as usize),
             "clear_after" => self.clear_after(),
+            "move" => {
+                let at = |k: &str| s(k).and_then(|v| v.as_u64()).unwrap_or(u64::MAX) as usize;
+                self.move_to(at("from"), at("to"));
+            }
             "fav" => {
                 let id = s("id").and_then(|v| v.as_str()).unwrap_or("").to_string();
                 self.set_fav(&id, s("value").and_then(|v| v.as_bool()).unwrap_or(false));
@@ -1879,6 +1904,22 @@ mod tests {
         e.loudness = true;
         e.regain();
         assert_eq!(e.track_gain(3), 1.0);
+    }
+
+    #[test]
+    fn cola_moves_only_what_comes_later() {
+        let mut e = Engine::new(Box::new(|_, _| {}));
+        e.order = vec![10, 11, 12, 13, 14];
+        e.pos = 1;
+        e.move_to(4, 2); // the last one, right after the one playing
+        assert_eq!(e.order, vec![10, 11, 14, 12, 13]);
+        e.move_to(1, 3); // the one playing doesn't move
+        e.move_to(3, 0); // nor to before it
+        e.move_to(9, 2); // nor from nowhere
+        assert_eq!(e.order, vec![10, 11, 14, 12, 13]);
+        e.queued = 1; // «play next»: 14
+        e.move_to(2, 4); // out of «next»: the count goes down
+        assert_eq!((e.order.clone(), e.queued), (vec![10, 11, 12, 13, 14], 0));
     }
 
     #[test]

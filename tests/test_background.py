@@ -210,3 +210,15 @@ def test_follow_history(svc, monkeypatch):
     h = a._load_follows()[0]["history"]
     assert len(h) == 30 and h[-1]["new"] == 2 and h[-1]["skipped"] == 1
     assert "privado" in h[-1]["failed"][0].lower() or "private" in h[-1]["failed"][0].lower()
+
+
+def test_cancel_current_keeps_the_queue(svc, monkeypatch):
+    # 0.24: the ✕ of what downloads now stops that job only; the rest of the queue goes on
+    no_worker(monkeypatch)
+    a = svc()
+    a.start("download", "https://www.youtube.com/watch?v=aaaaaaaaaaa", {"preset": "bimusic"})
+    a.start("download", "https://www.youtube.com/watch?v=bbbbbbbbbbb", {"preset": "bimusic"})
+    assert a.cancel_current() == {"ok": False}            # nothing running yet
+    a._current = a._queue.pop(0)
+    assert a.cancel_current() == {"ok": True}
+    assert a._cancel.is_set() and len(a._queue) == 1      # the next one still waits

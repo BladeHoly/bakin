@@ -182,6 +182,34 @@ def test_restored_by_hand_from_windows_is_noticed(dl, fake_bin):
     assert svc.library_deleted()["items"] == []
 
 
+def test_deleted_song_keeps_its_youtube_id_and_comes_back(dl, fake_bin, monkeypatch):
+    # pulido P3 #26: «Volver a bajar» in Eliminadas, even with the Recycle Bin emptied
+    from bakin import tools
+    svc = service.Service()
+    victim = svc.library_items({})["items"][0]
+    monkeypatch.setattr(svc, "_lib_index", lambda real=svc._lib_index: _with_yt(real(), victim["id"]))
+    svc.library_delete([victim["id"]])
+    (gone,) = svc.library_deleted()["items"]
+    assert gone["yt_id"] == "dQw4w9WgXcQ"
+    seen = {}
+    monkeypatch.setattr(tools, "missing", lambda: [])
+    monkeypatch.setattr(svc, "_start_media", lambda url, opts, **kw: seen.update(url=url, **kw) or {"ok": True})
+    monkeypatch.setattr(svc, "_push_queue", lambda: None)
+    res = svc.library_redownload([victim["id"]])
+    assert res["queued"] == 1 and seen["url"].endswith("v=dQw4w9WgXcQ")
+    assert seen["preset_obj"]["folder"] == str(Path(victim["path"]).parent)
+    assert seen["preset_obj"]["archive"] is False
+    assert svc.library_deleted()["items"] == []
+
+
+def _with_yt(idx, item_id):
+    for items in idx["items"].values():
+        for it in items:
+            if it["id"] == item_id:
+                it["yt_id"] = "dQw4w9WgXcQ"
+    return idx
+
+
 def test_emptied_bin_restore_fails_cleanly_and_can_be_forgotten(dl, fake_bin):
     svc = service.Service()
     victim = svc.library_items({})["items"][0]
@@ -268,10 +296,14 @@ def test_a_downloading_songs_cover_is_not_a_photo(tmp_path, monkeypatch):
     (music / "Tema.f251.webm.part").write_bytes(b"\0" * 100)
     (music / "Otro.jpg").write_bytes(jpeg_bytes(40, 40))          # a finished song's cover
     (music / "Otro.opus").write_bytes(b"\0" * 100)
-    (music / "foto suelta.jpg").write_bytes(jpeg_bytes(40, 40))   # not anyone's cover
+    (music / "Tema renombrado [dQw4w9WgXcQ].webp").write_bytes(jpeg_bytes(40, 40))  # left behind (2026-11-07)
+    walls = root / "Wallhaven"
+    walls.mkdir()
+    (walls / ".bakin-media.json").write_text('{"preset": "Wallhaven"}', encoding="utf-8")
+    (walls / "wallhaven-abc123.jpg").write_bytes(jpeg_bytes(40, 40))
     service.save_settings({**service.load_settings(), "out_dir": str(root)})
     names = sorted(i["name"] for i in service.Service().library_items({"kinds": ["image"]}, 0, 50)["items"])
-    assert names == ["foto suelta.jpg"]
+    assert names == ["wallhaven-abc123.jpg"]  # a music folder's pictures are covers, all of them
     # in the user's own folders nothing is hidden
     mine = tmp_path / "Mis cosas"
     mine.mkdir()
@@ -280,3 +312,17 @@ def test_a_downloading_songs_cover_is_not_a_photo(tmp_path, monkeypatch):
     svc = service.Service()
     svc.library_add_folder(str(mine))
     assert "tapa.jpg" in [i["name"] for i in svc.library_items({"kinds": ["image"]}, 0, 50)["items"]]
+
+
+def test_music_sorts_both_ways_with_empty_values_last():
+    # a friend (2026-11-07): sort by date added, and every column both ways, like Spotify
+    from bakin import library
+    def it(n, title, artist, dur, date):
+        return {"id": n, "rel": n, "name": f"{n}.opus", "kind": "audio", "fav": False, "tags": [], "size": 1,
+                "title": title, "artist": artist, "album": "", "duration": dur, "date": date}
+    items = [it("a", "Brisa", "Zeta", 200, 30), it("b", "Alba", "", 90, 10), it("c", "", "Mora", None, 20)]
+    ids = lambda sort: [i["id"] for i in library.query(items, {"sort": sort})]
+    assert ids("new") == ["a", "c", "b"] and ids("old") == ["b", "c", "a"]
+    assert ids("title") == ["b", "a", "c"] and ids("title_desc") == ["a", "b", "c"]     # no title: last, both ways
+    assert ids("artist") == ["c", "a", "b"] and ids("artist_desc") == ["a", "c", "b"]
+    assert ids("duration_asc") == ["b", "a", "c"] and ids("duration") == ["a", "b", "c"]  # no length: last

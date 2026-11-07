@@ -121,7 +121,8 @@ def _open(url: str, timeout: float = 30, key: str | None = None):
             raise WallhavenError("Wallhaven pide una cuenta para eso: agrega tu clave de API en Configuración › Descargas.") from None
         raise WallhavenError(f"Wallhaven respondió con un error ({exc.code}). Prueba en un rato.") from None
     except (urllib.error.URLError, TimeoutError, OSError) as exc:
-        raise WallhavenError(f"No se pudo conectar con Wallhaven: {getattr(exc, 'reason', exc)}") from None
+        raise WallhavenError("No se pudo conectar con Wallhaven: revisa la conexión a internet. "
+                             f"({getattr(exc, 'reason', exc)})") from None
 
 
 def _get(path: str, params: dict | None = None, key: str | None = None) -> dict:

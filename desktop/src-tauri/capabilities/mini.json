@@ -1,13 +1,14 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "mini-capability",
-  "description": "The small music-bar window: dragging and closing itself, nothing else.",
+  "description": "The small music window: dragging, resizing (the card) and closing itself, nothing else.",
   "windows": [
     "mini"
   ],
   "permissions": [
     "core:default",
     "core:window:allow-close",
-    "core:window:allow-start-dragging"
+    "core:window:allow-start-dragging",
+    "core:window:allow-start-resize-dragging"
   ]
 }

@@ -47,7 +47,7 @@ fn english_of(es: &'static str) -> &'static str {
     match es {
         "Abrir Bakin" => "Open Bakin",
         "Modo mínimo" => "Mini player",
-        "Modo mínimo: usar el mouse" => "Mini player: use the mouse",
+        "Salir del modo gaming" => "Exit gaming mode",
         "Pausar descargas" => "Pause downloads",
         "Reanudar descargas" => "Resume downloads",
         "Siguiente fondo" => "Next wallpaper",

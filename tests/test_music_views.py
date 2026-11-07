@@ -227,3 +227,15 @@ def test_lan_pairing_code():
     assert svc.lan_code(new=True)["code"] != first
     s = svc.settings_set({"lan_enabled": True, "lan_port": 80})["settings"]
     assert s["lan_enabled"] is True and s["lan_port"] == 4533
+
+
+def test_mirror_open_only_its_own_folder(tmp_path, monkeypatch):
+    # «Espejo ✓» › «Abrir la carpeta»: the playlist's mirror folder, or a clear «not there»
+    opened = []
+    monkeypatch.setattr(service.os, "startfile", lambda p: opened.append(str(p)), raising=False)
+    pl = music.playlist_save(None, "Auto")
+    assert not service.Service.music_mirror_open(pl["id"])["ok"]                   # no mirror
+    music.playlist_mirror(pl["id"], {"folder": str(tmp_path / "gone"), "mode": "copy"})
+    assert not service.Service.music_mirror_open(pl["id"])["ok"]                   # unplugged
+    music.playlist_mirror(pl["id"], {"folder": str(tmp_path), "mode": "copy"})
+    assert service.Service.music_mirror_open(pl["id"])["ok"] and opened == [str(tmp_path)]
