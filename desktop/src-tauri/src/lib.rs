@@ -16,6 +16,7 @@ mod i18n;
 mod lan;
 mod links;
 mod mini;
+mod nmhost;
 mod player;
 mod rotation;
 mod scheduler;
@@ -44,7 +45,7 @@ const ENGINE_METHODS: &[&str] = &[
     "media_import_presets", "media_set_site_pref", "media_scan_folder", "media_redownload", "media_maintenance",
     "tools_install", "tools_check",
     "library_upgrade_audio", "convert_formats", "convert_inspect", "convert_start", "convert_open",
-    "wallhaven_search", "wallhaven_download", "wallhaven_open", "music_search_open", "cookies_vault", "cookies_import", "cookies_delete_original", "cookies_forget", "cookies_use_vault", "library_redownload", "music_clean_propose", "music_clean_apply", "music_tags_undo", "music_mb_start", "music_mb_enable", "catalog_search", "catalog_page", "catalog_thumbs", "catalog_download", "spotify_resolve", "spotify_cancel", "read_text_file", "settings_set", "music_loudness_scan", "music_gains", "music_lyrics", "music_lyrics_fetch", "data_dir_info", "data_dir_move", "backup_export", "backup_inspect", "backup_import", "music_mb_cancel", "music_dupes", "music_dupes_resolve", "music_stats",
+    "wallhaven_search", "wallhaven_download", "wallhaven_open", "music_search_open", "cookies_vault", "cookies_import", "cookies_delete_original", "cookies_forget", "cookies_use_vault", "cookies_take_incoming", "library_redownload", "music_clean_propose", "music_clean_apply", "music_tags_undo", "music_mb_start", "music_mb_enable", "catalog_search", "catalog_page", "catalog_thumbs", "catalog_download", "spotify_resolve", "spotify_cancel", "read_text_file", "settings_set", "music_loudness_scan", "music_gains", "music_lyrics", "music_lyrics_fetch", "data_dir_info", "data_dir_move", "backup_export", "backup_inspect", "backup_import", "music_mb_cancel", "music_dupes", "music_dupes_resolve", "music_stats",
 ];
 
 /// A play counted while the engine sleeps: one line in music/plays-pending.jsonl
@@ -163,6 +164,12 @@ async fn player_call(app: AppHandle, cmd: Value) -> Result<Value, String> {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // Started by a browser for the extension (it hands over the YouTube cookies): answer it and
+    // leave, before the single-instance plugin would pass this launch to the running Bakin
+    let args: Vec<String> = std::env::args().collect();
+    if nmhost::is_invocation(&args) {
+        std::process::exit(nmhost::run());
+    }
     let app = tauri::Builder::default()
         // First: a second launch just shows the running Bakin (one engine, one queue).
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
@@ -231,6 +238,7 @@ pub fn run() {
             scheduler::start(app.handle().clone());
             hotkeys::register_all(app.handle());
             links::setup(app.handle());
+            nmhost::register();
             home::autostart(app.handle()); // «En tu casa», if it was on (PLAN 0.21.1)
             // Started with Windows: stay in the tray; otherwise show the window.
             if !background::started_in_background() {

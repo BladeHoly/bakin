@@ -1381,5 +1381,12 @@ export default {
 "hoy quedan {left}": "{left} left today",
 "Carpetas que se suman a la biblioteca: {list}": "Folders added to the library: {list}",
 "Seguidos que bajan solos: {list}": "Follows that download on their own: {list}",
-"Presets (sin cookies): {list}": "Presets (without cookies): {list}"
+"Presets (sin cookies): {list}": "Presets (without cookies): {list}",
+"Copiaste {what}": "You copied {what}",
+"Cookies de YouTube guardadas desde el navegador ({n}): los presets ya las usan.": "YouTube cookies saved from the browser ({n}): the presets use them now.",
+"No se pudieron leer las cookies que mandó la extensión.": "The cookies the extension sent couldn't be read.",
+"Las cookies que mandó la extensión no tienen una sesión de YouTube.": "The cookies the extension sent have no YouTube session.",
+"Lo más fácil, sin exportar nada: con la extensión de Bakin en tu navegador, clic derecho en su ícono › «Darle a Bakin mi sesión de YouTube».": "The easiest way, nothing to export: with Bakin's extension in your browser, right-click its icon › «Darle a Bakin mi sesión de YouTube» (give Bakin my YouTube session).",
+"Instalar la extensión…": "Install the extension…",
+"Con clic derecho en su ícono, «Darle a Bakin mi sesión de YouTube» le pasa tus cookies de YouTube a Bakin, en esta PC, sin exportar nada (para tus «Me gusta» y lo que pide cuenta). Si ya la tenías, tócale «Recargar» en la página de extensiones después de actualizar Bakin.": "Right-click its icon › «Darle a Bakin mi sesión de YouTube» hands your YouTube cookies to Bakin, on this PC, with nothing to export (for your «Me gusta» and anything that needs an account). If you already had it, press «Reload» on the extensions page after updating Bakin."
 };

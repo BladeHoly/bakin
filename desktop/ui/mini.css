@@ -1,7 +1,7 @@
 /* «Modo mínimo» (0.24): a bar (420 × 64, everything in sight) and a card (the cover, a square
    of 160–400 px with its controls on hover); the song only (340 × 56) is what the gaming mode
    shows while clicks go through. Sizes: mini.rs. Rules: docs/DESIGN.md. */
-html, body { margin: 0; height: 100%; overflow: hidden; background: transparent; color: var(--gm-ink); user-select: none;
+html, body { color-scheme: dark; margin: 0; height: 100%; overflow: hidden; background: transparent; color: var(--gm-ink); user-select: none;
   font-family: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif; }
 /* the window is see-through (mini.rs): the bar is a rounded box of its own */
 .mini { position: relative; height: 100%; display: grid; grid-template-columns: 48px minmax(0, 1fr) auto auto; align-items: center;

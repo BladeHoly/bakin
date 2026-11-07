@@ -330,7 +330,7 @@ dependencies = [
 
 [[package]]
 name = "bakin-desktop"
-version = "0.24.0"
+version = "0.24.1"
 dependencies = [
  "audioadapter-buffers",
  "axum",
@@ -363,6 +363,7 @@ dependencies = [
  "webview2-com",
  "windows",
  "windows-core",
+ "windows-registry",
  "windows-sys 0.61.2",
 ]
 

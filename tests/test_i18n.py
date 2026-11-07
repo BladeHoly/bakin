@@ -167,6 +167,6 @@ def test_page_scripts_parse():
     if not node:
         import pytest
         pytest.skip("node not installed")
-    for f in JS + [UI / "i18n" / "en.js"]:
+    for f in JS + [UI / "i18n" / "en.js", ROOT / "extension" / "background.js"]:
         r = subprocess.run([node, "--check", str(f)], capture_output=True, text=True)
         assert r.returncode == 0, f"{f.name}: {r.stderr.strip()[:400]}"

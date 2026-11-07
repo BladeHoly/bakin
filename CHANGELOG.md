@@ -4,6 +4,12 @@ Resumen de los cambios de cada versión, la más nueva arriba. Bakin muestra
 desde aquí lo que cambió entre tu versión y la nueva cuando hay una
 actualización. Formato: `## <versión> — <fecha>` y una lista corta.
 
+## 0.24.1 — 2026-11-07
+
+- Tu sesión de YouTube desde el navegador, sin exportar nada: con la extensión de Bakin, clic derecho en su ícono › «Darle a Bakin mi sesión de YouTube». Sirve también con Brave, Chrome y Edge, que no dejan leer sus cookies de otra forma. Si ya tenías la extensión, tócale «Recargar» en la página de extensiones.
+- Un enlace de Spotify copiado o mandado desde la extensión ya no termina en un error: abre «Desde Spotify», que busca cada tema en YouTube Music.
+- Los menús desplegables ya no se ven blancos con Windows en modo claro.
+
 ## 0.24.0 — 2026-11-07
 
 - Buscar música sin salir de Bakin: canciones, artistas y álbumes de YouTube Music; tildas lo que quieres y «Bajar». También desde una playlist de Spotify.

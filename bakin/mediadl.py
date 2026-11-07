@@ -721,6 +721,11 @@ def cookies_text_status(text: str) -> dict:
     return out
 
 
+def is_spotify(url: str) -> bool:
+    """A Spotify link: yt-dlp can't download it (DRM); its songs are found on YouTube Music instead."""
+    return bool(re.match(r"^(spotify:|https?://([a-z]+\.)?spotify\.com/)", str(url or "").strip(), re.I))
+
+
 def friendly_error(msg: str) -> str:
     if re.search(r"decrypt with dpapi|app.bound", msg, re.I):
         return ("Las cookies de Brave, Chrome y Edge están cifradas por el propio navegador y yt-dlp no "
@@ -745,6 +750,10 @@ def friendly_error(msg: str) -> str:
     if OFFLINE_ERRORS.search(msg):
         return ("No hay conexión a internet, o el sitio no responde. Lo terminado se conserva; "
                 f"reintenta en un rato. ({msg[:120]})")
+    if "[DRM]" in msg or "DRM protection" in msg:
+        return ("Este sitio protege su contenido (DRM): no se puede bajar. De Spotify, Bakin toma los nombres "
+                "y baja cada tema de YouTube Music: pega el enlace en «Descargar» y elige «Buscar estos temas "
+                "en YouTube Music».")
     if "HTTP Error 403" in msg:
         return f"El sitio rechazó la descarga (403). Actualiza yt-dlp desde Herramientas y reintenta. ({msg[:160]})"
     return msg[:400]

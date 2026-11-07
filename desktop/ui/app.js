@@ -894,6 +894,8 @@ function doneToast(ev) {
 // Returns true when the job was accepted (started or queued). `quiet` leaves the
 // toasts to the caller (several jobs at once).
 async function startJob(mode, url, overrides = {}, { quiet = false } = {}) {
+  // Spotify can't go to yt-dlp (DRM): its songs are looked up on YouTube Music (a friend, 2026-11-07)
+  if (isSpotify(url)) { openSpotify(url); return true; }
   try {
     const res = await call('start', { mode, url, options: { ...options(), ...overrides } });
     if (res.ok) {
@@ -2513,7 +2515,13 @@ async function ensureMedia() {
   return !!MEDIA;
 }
 
+const isSpotify = (url) => /^(spotify:|https?:\/\/([a-z]+\.)?spotify\.com\/)/i.test(String(url || '').trim());
+
 async function openMediaDialog(urls) {
+  const spotify = urls.filter(isSpotify);
+  if (spotify.length) openSpotify(spotify[0]);
+  urls = urls.filter((u) => !isSpotify(u));
+  if (!urls.length) return;
   if (!(await ensureMedia())) return;
   mdUrls = urls;
   const ul = $('md-urls');
@@ -3351,9 +3359,22 @@ const BOOKMARKLET = "javascript:location.href='bakin://download?url='+encodeURIC
 function offerLink(url, how) {
   const t = classifyAny(url);
   if (!t) return false;
+  if (t.kind === 'web' && isSpotify(t.value)) { openSpotify(t.value); return true; }
   if (t.kind === 'web') { openMediaDialog([t.value]); return true; }
   toast(`${how}: ${labelFor(t)}`, { duration: 12000, action: { label: tr('Descargar'), onClick: () => startJob('download', urlFor(t)) } });
   return true;
+}
+
+// The YouTube cookies the browser extension handed over (src/nmhost.rs): they go where the
+// presets read them. `quiet` when checking at start (nothing came: nothing to say).
+async function takeExtensionCookies(quiet = false) {
+  const r = await call('cookies_take_incoming').catch((e) => ({ ok: false, error: String(e) }));
+  if (r.ok) {
+    toast(tr('Cookies de YouTube guardadas desde el navegador ({n}): los presets ya las usan.', { n: r.count }), { duration: 7000 });
+    if ($('settings-dialog').open) renderCookiesVault();
+  } else if (!quiet && !r.none) {
+    toast(tr(r.error), { duration: 7000 });
+  }
 }
 
 function handleBakinLinks(urls) {
@@ -3361,6 +3382,7 @@ function handleBakinLinks(urls) {
     try {
       const u = new URL(raw);
       if (u.protocol !== 'bakin:') continue;
+      if (u.host === 'cookies') { takeExtensionCookies(); continue; }
       const target = u.searchParams.get('url');
       if (target && !offerLink(target, tr('Enlace recibido'))) toast(tr('Bakin recibió un enlace que no puede descargar.'));
     } catch { /* not a URL */ }
@@ -3373,15 +3395,21 @@ function onClipboardLink(url) {
   lastClip = url;
   const t = classifyAny(url);
   if (!t) return;
-  toast(`Copiaste ${labelFor(t)}`, {
+  // the link box's first choice for it: Spotify is looked up on YouTube Music, «Me gusta» uses its preset…
+  const first = actionsFor(t)[0];
+  if (!first) return;
+  const label = /^(spotify|liked):/.test(first.href.slice(6)) ? first.label : tr('Descargar');
+  toast(tr('Copiaste {what}', { what: labelFor(t) }), {
     duration: 10000,
-    action: { label: tr('Descargar'), onClick: () => (t.kind === 'web' ? openMediaDialog([t.value]) : startJob('download', urlFor(t))) },
+    action: { label, onClick: () => runLinkAction(first.href) },
   });
   notifyIfAway(tr('Copiaste un enlace'), tr('{t}: abre Bakin para descargarlo.', { t: labelFor(t) }));
 }
 
 async function wireLinks() {
   $('btn-extension').addEventListener('click', () => { $('ext-bookmarklet').value = BOOKMARKLET; $('extension-dialog').show(); });
+  // Cuentas › YouTube: the easy way to the cookies is the extension (a friend, 2026-11-07)
+  $('cv-extension').addEventListener('click', () => { $('settings-dialog').close(); $('btn-extension').click(); });
   $('ext-close').addEventListener('click', () => $('extension-dialog').close());
   $('ext-open').addEventListener('click', async () => {
     try { await tauri.core.invoke('open_extension_folder'); } catch (e) { toast(tr(String(e)), { duration: 6000 }); }
@@ -3401,6 +3429,7 @@ async function wireLinks() {
   await tauri.event.listen('bakin-links', (e) => handleBakinLinks(e.payload?.urls));
   await tauri.event.listen('clipboard-link', (e) => onClipboardLink(e.payload?.url));
   try { handleBakinLinks(await tauri.core.invoke('pending_links')); } catch { /* none */ }
+  takeExtensionCookies(true);  // handed over while Bakin was closed
 }
 
 // ---------------------------------------------------------------- follows
@@ -4367,23 +4396,30 @@ function wireSearch() {
   };
   go.addEventListener('gm-select', (e) => {
     e.preventDefault();
-    const [, mode, payload] = e.detail.href.split(':');
-    if (!payload) return;
-    const t = JSON.parse(decodeURIComponent(payload));
-    const list = Array.isArray(t) ? t : [t];
-    if (mode === 'liked') { startJob('download', urlFor(list[0]), { preset: 'biliked' }); return; }
-    if (mode === 'follow') { openFollow(list[0]); return; }
-    if (mode === 'spotify') { openSpotify(urlFor(list[0])); return; }
-    list.forEach(remember);
-    if (mode === 'pick') {
-      const ig = list.filter((x) => x.kind !== 'web');
-      if (ig.length) startMany('download', ig.map((x) => [urlFor(x), {}]));
-      openMediaDialog(list.filter((x) => x.kind === 'web').map(urlFor));
-      return;
-    }
-    if (list.length > 1) startMany(mode, list.map((x) => [urlFor(x), {}]));
-    else startJob(mode, urlFor(list[0]));
+    runLinkAction(e.detail.href);
   });
+}
+
+// What a link action does (`bakin:<mode>:<links>`): the link box's choices, and the same first
+// choice for a copied link or one from the extension, so every way in downloads alike (a friend's
+// copied Spotify playlist went straight to yt-dlp and hit its DRM, 2026-11-07)
+function runLinkAction(href) {
+  const [, mode, payload] = String(href).split(':');
+  if (!payload) return;
+  const t = JSON.parse(decodeURIComponent(payload));
+  const list = Array.isArray(t) ? t : [t];
+  if (mode === 'liked') { startJob('download', urlFor(list[0]), { preset: 'biliked' }); return; }
+  if (mode === 'follow') { openFollow(list[0]); return; }
+  if (mode === 'spotify') { openSpotify(urlFor(list[0])); return; }
+  list.forEach(remember);
+  if (mode === 'pick') {
+    const ig = list.filter((x) => x.kind !== 'web');
+    if (ig.length) startMany('download', ig.map((x) => [urlFor(x), {}]));
+    openMediaDialog(list.filter((x) => x.kind === 'web').map(urlFor));
+    return;
+  }
+  if (list.length > 1) startMany(mode, list.map((x) => [urlFor(x), {}]));
+  else startJob(mode, urlFor(list[0]));
 }
 
 // ------------------------------------------------------------------- start
@@ -5045,7 +5081,7 @@ function drawSpMatch(row) {
       drawSpMatch(row);
       syncSpotify();
     });
-    row.extra.append(sel);
+    row.extra.append(boxed(sel));  // Bakin's own menu, not Windows' (white on a light Windows: a friend, 2026-11-07)
   }
   if (r.verdict === 'doubt' && row.pick === r.match) {
     const b = document.createElement('span');

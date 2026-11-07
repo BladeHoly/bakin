@@ -390,3 +390,15 @@ def test_friendly_errors_for_disk_network_and_gone():
     assert gone.startswith("El video es privado")
     assert mediadl.friendly_error("ERROR: [youtube] abc: Video unavailable").startswith("El video es privado")
     assert mediadl.friendly_error("something else") == "something else"
+
+
+def test_spotify_links_never_go_to_ytdlp_and_drm_is_explained():
+    # a friend (2026-11-07): a Spotify playlist ended in «[DRM] … will NOT be supported»
+    from bakin import service
+    for url in ("https://open.spotify.com/playlist/4QcQTjpSGkoznLFbreOfWI?si=x", "spotify:track:abc"):
+        assert mediadl.is_spotify(url)
+        r = service.Service(lambda e: None).start("download", url)
+        assert not r["ok"] and r.get("spotify") and "YouTube Music" in r["error"]
+    assert not mediadl.is_spotify("https://www.youtube.com/watch?v=x")
+    msg = mediadl.friendly_error("ERROR: [DRM] The requested site is known to use DRM protection. It will NOT be supported.")
+    assert "DRM" in msg and "YouTube Music" in msg and "NOT be supported" not in msg

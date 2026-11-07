@@ -32,7 +32,7 @@ METHODS = frozenset({
     "media_import_presets", "media_set_site_pref", "media_scan_folder", "media_redownload", "media_maintenance",
     "tools_install", "tools_check",
     "library_upgrade_audio", "convert_formats", "convert_inspect", "convert_start", "convert_open",
-    "wallhaven_search", "wallhaven_download", "wallhaven_open", "music_search_open", "cookies_vault", "cookies_import", "cookies_delete_original", "cookies_forget", "cookies_use_vault", "library_redownload", "music_clean_propose", "music_clean_apply", "music_tags_undo", "music_mb_start", "music_mb_enable", "catalog_search", "catalog_page", "catalog_thumbs", "catalog_download", "spotify_resolve", "spotify_cancel", "read_text_file", "settings_set", "music_loudness_scan", "music_gains", "music_lyrics", "music_lyrics_fetch", "data_dir_info", "data_dir_move", "backup_export", "backup_inspect", "backup_import", "music_mb_cancel", "music_dupes", "music_dupes_resolve", "music_stats",
+    "wallhaven_search", "wallhaven_download", "wallhaven_open", "music_search_open", "cookies_vault", "cookies_import", "cookies_delete_original", "cookies_forget", "cookies_use_vault", "cookies_take_incoming", "library_redownload", "music_clean_propose", "music_clean_apply", "music_tags_undo", "music_mb_start", "music_mb_enable", "catalog_search", "catalog_page", "catalog_thumbs", "catalog_download", "spotify_resolve", "spotify_cancel", "read_text_file", "settings_set", "music_loudness_scan", "music_gains", "music_lyrics", "music_lyrics_fetch", "data_dir_info", "data_dir_move", "backup_export", "backup_inspect", "backup_import", "music_mb_cancel", "music_dupes", "music_dupes_resolve", "music_stats",
 })
 
 log = logging.getLogger("bakin.sidecar")

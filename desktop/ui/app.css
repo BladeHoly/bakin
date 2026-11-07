@@ -11,6 +11,11 @@
  * below row 1, so it can never sit under the window controls.
  */
 
+/* Bakin is dark everywhere: Windows' own pieces (a native list, a date picker, a scrollbar)
+   follow it too, even on a light Windows, where they came out white with Bakin's light ink on
+   them (a friend, 2026-11-07) */
+:root { color-scheme: dark; }
+
 :root {
   --side-w: 264px;
   --top-h: 52px;
@@ -244,7 +249,7 @@ body.maximized #win-max .i-restore { display: block; }
 .gm-media-tile img { width: 100%; height: 100%; object-fit: cover; display: block; }
 
 .since { display: flex; align-items: center; gap: var(--sp-4); min-width: 0; }
-.since .gm-input { width: 9.5rem; color-scheme: dark; }
+.since .gm-input { width: 9.5rem; }
 #since-error:empty { display: none; }
 
 .move-progress { display: grid; gap: var(--sp-6); }

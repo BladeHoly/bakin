@@ -141,3 +141,21 @@ def test_import_also_serves_presets_stuck_on_a_locked_browser(svc, tmp_path):
     by_id = {p["id"]: p for p in mediadl.load_settings()["presets"]}
     assert by_id["biliked"]["cookies_source"] == "vault"
     assert by_id["bimusic"]["cookies_source"] == "browser"  # Firefox works: left alone
+
+
+def test_cookies_from_the_extension_become_the_vaults(svc, tmp_path):
+    # a friend (2026-11-07): Brave's cookies can't be read on Windows; the extension hands them over
+    # (src/nmhost.rs leaves them encrypted as «cookies-incoming») and Bakin takes them once
+    a = svc()
+    assert a.cookies_take_incoming().get("none")
+    vault.put("cookies-incoming", cookies_file(tmp_path).read_bytes())
+    ms = mediadl.load_settings()
+    for p in ms["presets"]:
+        p.update(cookies_source="browser", cookies_browser="brave", cookies_mode="auto")
+    mediadl.save_settings(ms)
+    r = a.cookies_take_incoming()
+    assert r["ok"] and r["presets"] and not vault.has("cookies-incoming")
+    assert vault.get(mediadl.VAULT_COOKIES) == cookies_file(tmp_path).read_bytes()
+    assert all(p["cookies_source"] == "vault" for p in mediadl.load_settings()["presets"])
+    vault.put("cookies-incoming", b"# Netscape HTTP Cookie File\n.youtube.com\tTRUE\t/\tFALSE\t0\tPREF\tx\n")
+    assert not a.cookies_take_incoming()["ok"] and not vault.has("cookies-incoming")  # signed out: dropped

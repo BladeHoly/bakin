@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "bakin"
-version = "0.24.0"
+version = "0.24.1"
 description = "Your photo and music library on your PC: wallpapers, music and video, and a light player"
 readme = "README.md"
 requires-python = ">=3.11"

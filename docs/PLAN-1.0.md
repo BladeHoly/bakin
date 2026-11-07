@@ -603,6 +603,7 @@ De OPT «Parte 2» (X1–X30), de GPUI, REF y SEC, y de las decisiones del usuar
 | **D14** | **OK de publicar la 1.0.0 y de pushear al repo público** | 1.0.0 | compuerta β cerrada |
 | D15 | Si `ytmusicapi` muere: sidecar Rust `rustypipe` (GPL-3, proceso aparte) o quitar el catálogo | solo si pasa | RYP §9 |
 | D16 | Textos finales de Apariencia (nombres «Sobrio / Vidrio / Cristal / Personalizado» y el del interruptor de captura) | α7 P8 | capturas |
+| D17 | **Cuenta de Spotify** (pedido del usuario, 2026-11-07, por las playlists privadas, «Tus me gusta» y las de más de 100 temas). La API ya no deja una app para todos: desde feb-2026 el modo desarrollador admite **5 usuarios con Premium** por Client ID y el modo extendido pide una empresa con 250.000 usuarios activos por mes ([Spotify](https://developer.spotify.com/blog/2026-02-06-update-on-developer-access-and-platform-security)). Caminos: (a) «trae tu Client ID»: cada uno crea su app en developer.spotify.com y la pega en Configuración › Cuentas; login en el navegador con PKCE, solo el token en la bóveda, nunca contraseñas; (b) seguir con el enlace público (hasta 100 temas) + el CSV de Exportify (ya está), explicado mejor en el diálogo; (c) las dos. Recomendación: (b) ya y (a) como opcional | cuando el usuario lo pida (puede ir antes de la 1.0: no depende de GPUI) | — |
 
 ---
 

@@ -1,6 +1,6 @@
 [package]
 name = "bakin-desktop"
-version = "0.24.0"
+version = "0.24.1"
 description = "Bakin desktop shell (Tauri)"
 license = "MIT"
 edition = "2021"
@@ -52,7 +52,9 @@ tower = { version = "0.5", features = ["util"] }
 # media keys and the Windows media overlay for the player (src/smtc.rs)
 windows = { version = "0.62", features = ["Media", "Foundation", "Storage_Streams", "Win32_Foundation", "Win32_System_WinRT", "Win32_UI_WindowsAndMessaging", "Win32_System_ProcessStatus", "Win32_System_Diagnostics_ToolHelp", "Win32_System_Threading", "Win32_UI_Shell", "Win32_System_Com", "Win32_System_SystemInformation", "System_UserProfile", "Storage"] }
 # Same version Tauri already pulls in; used for the DWM window border colour.
-windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Graphics_Dwm", "Win32_System_DataExchange", "Win32_System_Memory"] }
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Graphics_Dwm", "Win32_System_DataExchange", "Win32_System_Memory", "Win32_Security_Cryptography"] }
+# the browser extension's native messaging host (src/nmhost.rs); the same crate Tauri already brings
+windows-registry = "0.6"
 # the WebView2 interfaces Tauri already brings (PLAN 0.17.2: the mini's memory level)
 webview2-com = "0.39"
 windows-core = "0.62"

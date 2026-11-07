@@ -656,6 +656,36 @@ class Service:
         log.info("cookies imported into the vault (%d presets)", len(switched))
         return {"ok": True, "presets": switched, "file": str(src), "status": self._vault_cookies_status()}
 
+    def cookies_take_incoming(self) -> dict:
+        """The YouTube cookies the browser extension handed over (src/nmhost.rs leaves them
+        encrypted as `cookies-incoming`): they become the vault's cookies, and the presets stuck on
+        a browser Windows won't let yt-dlp read, or on a file, use them. {"ok": False} when none."""
+        from . import mediadl, vault
+        incoming = "cookies-incoming"
+        try:
+            data = vault.get(incoming)
+        except OSError:
+            vault.delete(incoming)
+            return {"ok": False, "error": "No se pudieron leer las cookies que mandó la extensión."}
+        if not data:
+            return {"ok": False, "none": True}
+        vault.delete(incoming)
+        status = mediadl.cookies_text_status(data.decode("utf-8", "replace"))
+        if not status["youtube_session"]:
+            return {"ok": False, "error": "Las cookies que mandó la extensión no tienen una sesión de YouTube."}
+        vault.put(mediadl.VAULT_COOKIES, data)
+        ms = mediadl.load_settings()
+        switched = []
+        for p in ms["presets"]:
+            locked = p["cookies_source"] == "browser" and p["cookies_browser"] in mediadl.LOCKED_BROWSERS
+            if locked or p["cookies_source"] == "file":
+                p["cookies_source"], p["cookies_file"] = "vault", ""
+                switched.append(p["name"])
+        ms["cookies_imported_from"] = "extension"
+        mediadl.save_settings(ms)
+        log.info("cookies taken from the extension into the vault (%d presets)", len(switched))
+        return {"ok": True, "presets": switched, "count": status["count"], "status": self._vault_cookies_status()}
+
     def cookies_use_vault(self) -> dict:
         """The presets stuck on a browser Windows won't let yt-dlp read (Brave, Chrome, Edge…)
         use the cookies saved in Bakin instead."""
@@ -2209,6 +2239,12 @@ class Service:
             wh = wallhaven.parse_url(str(url or ""))
             if wh:
                 return self._start_wallhaven(wh, options or {})
+            from . import mediadl
+            if mediadl.is_spotify(str(url)):
+                # never to yt-dlp (DRM): the window opens the Spotify importer instead (a friend, 2026-11-07)
+                return {"ok": False, "field": "url", "spotify": True, "error":
+                        "Spotify no se baja directo (DRM): Bakin busca esos temas en YouTube Music. Pega el enlace "
+                        "en «Descargar» y elige «Buscar estos temas en YouTube Music»."}
             if _is_web_url(url):
                 return self._start_media(str(url).strip(), options or {})
             return {"ok": False, "field": "url", "error":

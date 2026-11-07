@@ -1059,6 +1059,45 @@ await check('cookies guardadas en Bakin, cifradas (C83)', async () => {
   return '';
 });
 
+await check('la sesión de YouTube desde la extensión (C129)', async () => {
+  // a friend (2026-11-07): Brave's cookies can't be read on Windows. The extension hands them to
+  // Bakin over native messaging: the browser starts Bakin.exe with its origin and a length-prefixed
+  // message; Bakin keeps the YouTube lines encrypted, the extension opens bakin://cookies and the
+  // window moves them where the presets read them. Here the smoke plays the browser.
+  const { spawnSync } = await import('node:child_process');
+  const fs = await import('node:fs');
+  const path = await import('node:path');
+  const exp = Math.floor(Date.now() / 1000) + 86400 * 30;
+  const text = `# Netscape HTTP Cookie File
+.youtube.com	TRUE	/	TRUE	${exp}	SAPISID	valor-falso-C129
+.otro-sitio.example	TRUE	/	FALSE	0	x	no-va
+`;
+  const body = Buffer.from(JSON.stringify({ cookies: text }));
+  const len = Buffer.alloc(4); len.writeUInt32LE(body.length);
+  const host = spawnSync(exe, ['chrome-extension://mekgdfenkaoklmelenfjnjkghahpnbhp/', '--parent-window=0'],
+    { input: Buffer.concat([len, body]), timeout: 30000, env: { ...process.env, BAKIN_HOME: home } });
+  const out = host.stdout || Buffer.alloc(0);
+  const reply = out.length > 4 ? JSON.parse(out.subarray(4, 4 + out.readUInt32LE(0)).toString()) : null;
+  if (!reply?.ok || reply.count !== 1) return `Bakin no contestó como el navegador espera: ${JSON.stringify(reply)} ${host.error || ''}`;
+  const raw = fs.readFileSync(path.join(home, 'vault', 'cookies-incoming.bin'));
+  if (raw.includes('valor-falso-C129')) return 'lo que llegó quedó en texto plano';
+  const r = await js(`(async () => {
+    const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+    document.querySelectorAll('gm-toast').forEach((t) => t.remove());
+    await window.__TAURI__.event.emit('bakin-links', { urls: ['bakin://cookies'] });
+    for (let i = 0; i < 20 && !document.querySelector('gm-toast'); i++) await wait(250);
+    const toast = [...document.querySelectorAll('gm-toast')].map((t) => t.textContent).join(' | ');
+    document.querySelectorAll('gm-toast').forEach((t) => t.remove());
+    return { toast, leaked: document.documentElement.outerHTML.includes('valor-falso-C129') };
+  })()`);
+  const left = fs.existsSync(path.join(home, 'vault', 'cookies-incoming.bin'));
+  await engine('cookies_forget');
+  if (!/guardadas desde el navegador/.test(r.toast)) return `la ventana no tomó las cookies: «${r.toast}»`;
+  if (r.leaked) return 'el valor de una cookie llegó a la página';
+  if (left) return 'lo que llegó no se movió a la bóveda';
+  return '';
+});
+
 await check('biblioteca limpia: limpiar títulos, duplicados, estadísticas, radio (C84–C88)', async () => {
   // PLAN 0.14. The smoke's songs are WAV (no tags to write): the dialogs open and say so, a pair
   // of copies makes a group (closed without resolving: tests never touch the Recycle Bin), the
@@ -1170,10 +1209,35 @@ await check('Spotify → YouTube Music (C91)', async () => {
     out.rows = [...document.querySelectorAll('#sp-list .sp-row')].map((row) => ({ to: row.querySelector('.sp-to').textContent, on: row.querySelector('input').checked }));
     out.button = document.getElementById('sp-download').textContent;
     out.status = document.getElementById('sp-status').textContent;
+    // a friend (2026-11-07): Windows' own lists came out white on his PC: every menu is Bakin's
+    // (a gm-select), and Windows' pieces follow the dark page
+    out.lone = [...document.querySelectorAll('select')].filter((x) => !x.closest('gm-select')).map((x) => x.id || x.className || x.title);
+    out.scheme = getComputedStyle(document.documentElement).colorScheme;
     document.getElementById('sp-close').click(); await wait(300);
+    // a friend (2026-11-07): a Spotify playlist copied with «Vigilar portapapeles» went straight to
+    // yt-dlp («[DRM] … will NOT be supported»); copied or from the extension, it opens the importer too
+    const sp = 'https://open.spotify.com/album/4aawyAB9vmqN3uQ7FjRGTy';
+    document.querySelectorAll('gm-toast').forEach((t) => t.remove());
+    await window.__TAURI__.event.emit('clipboard-link', { url: sp }); await wait(400);
+    const copied = [...document.querySelectorAll('gm-toast')].find((t) => /Copiaste/.test(t.textContent));
+    out.clipLabel = copied?.querySelector('button')?.textContent || '';
+    copied?.querySelector('button')?.click();
+    for (let i = 0; i < 20 && !document.getElementById('spotify-dialog').open; i++) await wait(250);
+    out.clipOpens = document.getElementById('spotify-dialog').open;
+    document.getElementById('sp-close').click(); await wait(300);
+    await window.__TAURI__.event.emit('bakin-links', { urls: ['bakin://download?url=' + encodeURIComponent(sp)] });
+    for (let i = 0; i < 20 && !document.getElementById('spotify-dialog').open; i++) await wait(250);
+    out.extOpens = document.getElementById('spotify-dialog').open;
+    out.mediaDialog = !!document.getElementById('media-dialog')?.open;
+    document.getElementById('sp-close').click(); await wait(300);
+    document.querySelectorAll('gm-toast').forEach((t) => t.remove());
     return out;
   })()`);
   if (!/YouTube Music/.test(r.action || '')) return `el campo no ofrece buscar en YouTube Music: ${JSON.stringify(r)}`;
+  if (r.lone.length) return `menús de Windows sin el de Bakin: ${r.lone.join(', ')}`;
+  if (r.scheme !== 'dark') return `la página no le dice a Windows que es oscura (color-scheme: ${r.scheme})`;
+  if (!r.clipOpens || !/YouTube Music/.test(r.clipLabel)) return `Spotify copiado no abre el importador: ${JSON.stringify({ label: r.clipLabel, open: r.clipOpens })}`;
+  if (!r.extOpens || r.mediaDialog) return `Spotify desde la extensión no abre el importador: ${JSON.stringify({ open: r.extOpens, media: r.mediaDialog })}`;
   if (!r.open || r.rows.length !== 2) return `diálogo de Spotify: ${JSON.stringify(r)}`;
   if (!r.rows[0].on || !/Tema de prueba/.test(r.rows[0].to) || r.rows[1].on || r.button !== 'Bajar (1)') return `coincidencias: ${JSON.stringify(r)}`;
   return '';

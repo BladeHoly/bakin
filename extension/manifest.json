@@ -2,25 +2,51 @@
   "manifest_version": 3,
   "name": "Descargar con Bakin",
   "short_name": "Bakin",
-  "version": "1.0.0",
-  "description": "Manda la página, un enlace, un video o un audio a Bakin para descargarlo. Bakin te pide confirmar antes de bajar nada.",
+  "version": "1.1.0",
+  "description": "Manda la página, un enlace, un video o un audio a Bakin para descargarlo, y si quieres, tu sesión de YouTube. Bakin te pide confirmar antes de bajar nada.",
   "homepage_url": "https://github.com/BladeHoly/bakin",
-  "icons": { "16": "icons/icon16.png", "32": "icons/icon32.png", "48": "icons/icon48.png", "128": "icons/icon128.png" },
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAwN4VNIaLEfZKuTwzLXuJjAsNoupu8rTK6k+PU92ICgOCOFJiT7cW6oAjLsXOGViCbO04Zl6oeP/ikTkK4LHIlI8sDsW8auxV2Ka41TkOavWNETcPe29NvfcgITVuxbRx3aNjRAKUKSdxzzj8z++jcKNJ67MWThM4YiiSGJvzZUFojU9XWXpsuw1kiji1KO6fMmbXZi3P4PQOF7YWYKUrV1kxDDtoLL0QMBST5CO+Wu3jfCH8urMeCs2Y+XZGq2a3WkqeaMkatnWYYu5zNW6JIgTs2ug4kM1/ScKmlHkNGUbeAsY4pBo/V/GjnSMKv+TusaGYkq49PjUYkPF2xyxHrQIDAQAB",
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
   "action": {
     "default_title": "Descargar esta página con Bakin",
-    "default_icon": { "16": "icons/icon16.png", "32": "icons/icon32.png" }
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png"
+    }
   },
-  "permissions": ["contextMenus", "activeTab"],
+  "permissions": [
+    "contextMenus",
+    "activeTab",
+    "cookies",
+    "nativeMessaging"
+  ],
+  "host_permissions": [
+    "*://*.youtube.com/*",
+    "*://*.google.com/*"
+  ],
   "background": {
     "service_worker": "background.js",
-    "scripts": ["background.js"]
+    "scripts": [
+      "background.js"
+    ]
   },
   "browser_specific_settings": {
     "gecko": {
       "id": "bakin@bladeholy",
       "strict_min_version": "140.0",
-      "data_collection_permissions": { "required": ["none"] }
+      "data_collection_permissions": {
+        "required": [
+          "none"
+        ]
+      }
     },
-    "gecko_android": { "strict_min_version": "142.0" }
+    "gecko_android": {
+      "strict_min_version": "142.0"
+    }
   }
 }
